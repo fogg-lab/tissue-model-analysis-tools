@@ -9,9 +9,6 @@ from tensorflow.keras.optimizers import Adam
 import keras_tuner as kt
 
 
-# RESNET_INP_SHAPE = (128, 128, 3)
-# INCLUDE_TOP = False
-
 
 def build_ResNet50_TL(base_model: Model, ll: int, img_shape: tuple) -> Model:
     base_model = Model(inputs=base_model.input, outputs=base_model.layers[ll].output)
