@@ -1,3 +1,6 @@
+# graphRecon files
+src/fl_tissue_model_tools/graph_recon_DM/dataset/
+
 # Project files
 dev_paths.txt
 
