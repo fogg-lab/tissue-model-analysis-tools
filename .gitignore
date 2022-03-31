@@ -1,3 +1,9 @@
+# graphRecon files
+src/fl_tissue_model_tools/graph_recon_DM/dataset/
+src/fl_tissue_model_tools/graph_recon_DM/result/
+src/fl_tissue_model_tools/graph_recon_DM/spt_cpp/spt_cpp
+src/fl_tissue_model_tools/graph_recon_DM/spt_cpp/spt_cpp.exe
+
 # Project files
 dev_paths.txt
 
