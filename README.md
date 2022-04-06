@@ -9,6 +9,8 @@ root/path/for/storing/figures   # top-level directory of figure and visualizatio
 # blank line
 ```
 
+See `dev_paths_example.txt` for an example file where.
+
 ## `fl_tissue_model_tools` Package Environment
 
 ### `conda` + `fl_tissue_model_tools`

@@ -1,0 +1,3 @@
+home/username/data
+home/username/analysis
+home/username/figures
