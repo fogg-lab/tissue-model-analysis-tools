@@ -38,6 +38,8 @@ root/path/for/storing/figures   # top-level directory of figure and visualizatio
 # blank line
 ```
 
+See `dev_paths_example.txt` for an example file.
+
 ## Topological Analysis
 To utilize the `fl_tissue_model_tools.topology` module, the `graph_recon_DM` dependency must be set up. To do so, follow the installation instructions in `fl_tissue_model_tools/graph_recon_DM/README.md`.
 
