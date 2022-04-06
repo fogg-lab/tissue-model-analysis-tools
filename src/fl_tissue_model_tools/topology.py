@@ -42,31 +42,34 @@ def __compute_morse_skeleton_and_barcode_one_component(im: npt.ArrayLike, thresh
     #         Don't be alarmed. This is safe.
     verts, edges = graphRecon.cmp_dm_img_grid2D(im, threshold, graph_recon_path)
 
-    # If the Morse skeleton is not empty, we compute and plot the barcode of the Morse skeleton.
-    # The filtration adds the vertices and edges in decreasing order of distance from the center.
+
+    # check if the morse skeleton is empty
     if(len(edges) == 0):
         # if the Morse skeleton is empty,
-        # we return empty numpy arrays with this number of columns
-        # so that they can be concatenated with arrays from other connected components
+        # we return empty numpy arrays with a specified number of columns
+        # so the arrays can be concatenated with arrays from other connected components
         verts = np.zeros((0,2))
         edges = np.zeros((0,3))
         bc = np.zeros((0,2))
 
         return verts, edges, bc
     else:
-        # the elements of edges are indices of verts
-        # edges are returned as floats for some reason, so we cast them to ints
+        # If the Morse skeleton is not empty,
+        # we compute the barcode of the Morse skeleton.
+
+        # The elements of `edges` are indices of `verts`.
+        # `edges` are returned as floats for some reason, so we cast them to ints
         edges = edges.astype('int')
 
-        # create a networkx graph of Morse skeleton
-        # we use {G} to compute the distance of each vertex from the "center" of the graph
+        # Create a networkx graph of Morse skeleton
+        # We use the graph to compute the distance of each vertex from the "center" of the graph
         # The center is a graph-theoretic notion defined here: https://en.wikipedia.org/wiki/Graph_center
         G = nx.Graph()
         for v0, v1, _ in edges:
-            # add each graph to the graph with weight = Euclidean distance between endpoints
-            # each edge in edges is an array [i, j, _],
+            # Add each graph to the graph with weight = Euclidean distance between endpoints
+            # Each row in `edges` is an array [i, j, _],
             #   where i and j are ints representing the index of the endpoints.
-            # each vertex in verts is an array [x, y],
+            # Each row in `verts` is an array [x, y],
             #   where x and y are the 2d-coordinates of the vertex.
             edge_length = np.linalg.norm(verts[v0]-verts[v1])
             G.add_edge(v0, v1, weight=edge_length)
@@ -86,22 +89,22 @@ def __compute_morse_skeleton_and_barcode_one_component(im: npt.ArrayLike, thresh
         center = centers[0]
         # Use a random vertex instead of the actual center as centers can take a while to compute
         # center = np.random.randint(len(verts))
-        # distances of each point to the center
+        # Distances of each vertex to the center
         distances = nx.algorithms.shortest_paths.weighted.single_source_dijkstra_path_length(G, center)
 
-        # Now, we use the {distances} to compute the barcode of the Morse skeleton
+        # Now, we use the distances to compute the barcode of the Morse skeleton
         #
-        # build a Gudhi complex to compute the filtration
-        # K is just another representation of the Morse skeleton
+        # Build a Gudhi complex to compute the filtration
+        # `K` is just another representation of the Morse skeleton
         K = gd.SimplexTree()
 
-        # add the vertices to the complex with their filtration values
-        # {distances} is a dict with entries of the form {vertex_idx : distance to {center}}
+        # Add the vertices to the complex with their filtration values
+        # `distances` is a dict with entries of the form {vertex_idx : distance to `center`}
         for key in distances:
             K.insert([key], filtration=-distances[key])
 
-        # add the edge to the complex
-        # the filtation value of an edge is the max filtation value of its vertices
+        # Add the edges to the complex.
+        # The filtation value of an edge is the max filtation value of its vertices.
         for v0, v1, _ in edges:
             K.insert([v0, v1], filtration = max(K.filtration([v0]), K.filtration([v1])))
 
@@ -141,16 +144,13 @@ def compute_morse_skeleton_and_barcode_parallel(im: npt.ArrayLike, mask: npt.Arr
                                                    of the filtration on the Morse skeleton
 
     """
-    # compute the connected components of im
+    # Compute the connected components of `im`
     _, im_components, component_stats, _ = cv.connectedComponentsWithStats(mask.astype('uint8'))
 
-    # indices of connected components sorted in increasing order by area
-    # component_idx_sorted = np.argsort(component_stats[:, 4])
-
-    # {component_stats[1:,4]} contains the area of each connected component,
+    # `component_stats[1:,4]` contains the area of each connected component,
     #   exluding the background which is row 0
-    # {components_idx} contains indices of all components larger than {component_min_size}
-    #   we add 1 to the idx because we removed the first row of {component_stats}
+    # `components_idx` contains indices of all components larger than `component_min_size`.
+    #  We add 1 to the index because we removed the first row of `component_stats`.
     components_idx = [idx+1 for idx, area in enumerate(component_stats[1:,4]) if area > component_min_size]
     print(f"{len(components_idx)} connected components found\n\n")
 
@@ -164,9 +164,9 @@ def compute_morse_skeleton_and_barcode_parallel(im: npt.ArrayLike, mask: npt.Arr
     # create a list of images of all the connected components
     components_list = []
     for idx in components_idx:
-        # pixels of the ith largest component of the image
+        # pixels of the component
         component = (im_components == idx)
-        # find original pixel values in the component
+        # find original pixel values of the component in the image
         component = component.astype('uint8') * im
         # rescale the image to the range [0,1]
         component = component / 255
@@ -192,8 +192,6 @@ def compute_morse_skeleton_and_barcode_parallel(im: npt.ArrayLike, mask: npt.Arr
         # stats contain the top left corner (x_min, y_min) of the connected component
         y_min, x_min, _, _, _ = component_stats[idx]
         verts = verts + np.array([y_min, x_min])
-        # add barcode to total barcode
-        bc_total = np.concatenate((bc_total, bc), axis=0)
         # concatenate vertices and edges with vertices and edges of other connected components
         #
         # the indices of edges are relative to verts, not verts_total
@@ -205,6 +203,8 @@ def compute_morse_skeleton_and_barcode_parallel(im: npt.ArrayLike, mask: npt.Arr
         edges[:,:2] += num_prev_verts
         verts_total = np.concatenate((verts_total, verts), axis=0)
         edges_total = np.concatenate((edges_total, edges), axis=0)
+        # add barcode to total barcode
+        bc_total = np.concatenate((bc_total, bc), axis=0)
 
     return verts_total, edges_total, bc_total
 
