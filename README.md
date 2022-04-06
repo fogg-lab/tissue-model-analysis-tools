@@ -1,16 +1,5 @@
 # fogg-lab-tissue-model-analysis-tools
 
-Ensure that a file called dev_paths.txt is located in the root project directory. The file should be laid out as follows (do not include comments):
-
-```
-root/path/for/storing/data      # top-level directory of data to be analyzed
-root/path/for/storing/analysis  # top-level directory of analysis output
-root/path/for/storing/figures   # top-level directory of figure and visualization output
-# blank line
-```
-
-See `dev_paths_example.txt` for an example file where.
-
 ## `fl_tissue_model_tools` Package Environment
 
 ### `conda` + `fl_tissue_model_tools`
@@ -37,6 +26,19 @@ pip uninstall fl_tissue_model_tools
 ### Jupyter + `fl_tissue_model_tools`
 If changes are made to the `fl_tissue_model_tools` code, the notebook kernel must be restarted for those changes to be reflected.
 
+## Usage
+
+### Data, Analysis, and Figures Directories
+Ensure that a file called dev_paths.txt is located in the root project directory. The file should be laid out as follows (do not include comments):
+
+```
+root/path/for/storing/data      # top-level directory of data to be analyzed
+root/path/for/storing/analysis  # top-level directory of analysis output
+root/path/for/storing/figures   # top-level directory of figure and visualization output
+# blank line
+```
+
+See `dev_paths_example.txt` for an example file.
 
 ## Topological Analysis
 To utilize the `fl_tissue_model_tools.topology` module, the `graph_recon_DM` dependency must be set up. To do so, follow the installation instructions in `fl_tissue_model_tools/graph_recon_DM/README.md`.
