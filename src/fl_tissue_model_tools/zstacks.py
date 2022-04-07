@@ -7,6 +7,7 @@ https://github.com/cmcguinness/focusstack
 import cv2
 import re
 import numpy as np
+import dask as d
 from glob import glob
 import numpy.typing as npt
 from typing import Optional, Sequence, Union, Callable
@@ -18,8 +19,35 @@ _zpos_pattern = "(z|Z)[0-9]+_"
 
 
 def _default_get_zpos(z_path: str) -> int:
+    """Use `_zpos_pattern` to retrieve z-position from path string.
+
+    Args:
+        z_path: The full path or file name of a z-position image
+
+    Returns:
+        Image z-position as an integer.
+
+    """
     # Trim the 'Z' from the beginning of the match
     return int(re.search(_zpos_pattern, z_path)[0][1:-1])
+
+
+def _blur_and_lap(image: npt.NDArray, kernel_size: int=5) -> npt.NDArray:
+    """Compute Laplacian of a blurred image.
+
+    Used to perform edge detection of `image`. A larger kernel size
+    will contribute to a Laplacian with higher contrast between foreground
+    and background, but less resolution within foreground objects.
+
+    Args:
+        image: Image on which Laplacian is to be computed.
+        kernel_size: Kernel for both the Gaussian blur and the Laplacian.
+
+    Returns:
+        Laplacian of blurred image.
+    """
+    blurred = cv2.GaussianBlur(image, (kernel_size, kernel_size), 0)
+    return cv2.Laplacian(blurred, cv2.CV_64F, ksize=kernel_size)
 
 
 def z_stack_from_dir(z_stack_dir: str, file_ext: str="tif", descending: bool=True, get_zpos: Optional[Callable[[str], int]]=None) -> tuple[Sequence[str], npt.NDArray]:
@@ -55,6 +83,7 @@ def z_stack_from_dir(z_stack_dir: str, file_ext: str="tif", descending: bool=Tru
         A tuple containing (1) a list of the full paths to each z-poistion image
         in the z-stack (sorted by z-position) and (2) the z-stack (a 3-D numpy
         array) containing each z-position image.
+
     """
 
     z_paths = [fn.replace("\\", "/") for fn in glob(f"{z_stack_dir}/*.{file_ext}")]
@@ -71,8 +100,45 @@ def z_stack_from_dir(z_stack_dir: str, file_ext: str="tif", descending: bool=Tru
     return sorted_z_paths, np.array([cv2.imread(img_n, flag) for img_n in sorted_z_paths])
 
 
+def proj_focus_stack(stack: npt.NDArray, axis: Union[int, Sequence[int]]=0, kernel_size:int=5) -> npt.NDArray:
+    """Project image stack along given axis using focus stacking.
+
+    Args:
+        stack: Image stack.
+        kernel_size: Kernel size to be passed to `_blur_and_lap`.
+
+    Returns:
+        Focus stack projection of image stack.
+    """
+    laps = np.array(
+        d.compute([
+            d.delayed(_blur_and_lap)(pos, kernel_size) for pos in stack
+        ])[0]
+    )
+    output = np.zeros_like(stack[0])
+    abs_laps = np.absolute(laps)
+    maxima = np.max(abs_laps, axis=axis)
+    mask = (abs_laps == maxima).astype(np.uint8)
+    for i in range(len(stack)):
+        output = cv2.bitwise_not(stack[i], output, mask=mask[i])
+    return defs.GS_MAX - output
+
+
 def proj_avg(stack: npt.NDArray, axis: Union[int, Sequence[int]]=0) -> npt.NDArray:
+    """Project image stack along given axis using average pixel intensity.
+
+    Args:
+        stack: Image stack.
+        axis (Union[int, Sequence[int]], optional): _description_. Defaults to 0.
+
+    Returns:
+        Average projection of image stack.
+    """
     return np.mean(stack, axis=axis)
+
+
+def proj_med(stack: npt.NDArray, axis: Union[int, Sequence[int]]=0) -> npt.NDArray:
+    return np.median(stack, axis=axis)
 
 
 def proj_max(stack: npt.NDArray, axis: Union[int, Sequence[int]]=0) -> npt.NDArray:
