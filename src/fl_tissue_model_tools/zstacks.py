@@ -11,11 +11,13 @@ import dask as d
 from glob import glob
 import numpy.typing as npt
 from typing import Optional, Sequence, Union, Callable
+import numbers
 
 from . import defs
 
 
 _zpos_pattern = "(z|Z)[0-9]+_"
+_np_float_types = {np.float16, np.float32, np.float64, np.floa}
 
 
 def _default_get_zpos(z_path: str) -> int:
@@ -100,27 +102,40 @@ def z_stack_from_dir(z_stack_dir: str, file_ext: str="tif", descending: bool=Tru
     return sorted_z_paths, np.array([cv2.imread(img_n, flag) for img_n in sorted_z_paths])
 
 
-def proj_focus_stack(stack: npt.NDArray, axis: Union[int, Sequence[int]]=0, kernel_size:int=5) -> npt.NDArray:
+def proj_focus_stacking(stack: npt.NDArray, axis: int=0, kernel_size:int=5) -> npt.NDArray:
     """Project image stack along given axis using focus stacking.
 
-    Elements of `stack` should be unsigned 8-bit integers.
+    This procedure projects an image stack by retaining the maximum
+    sharpness pixels.
+
+    `stack` must be grayscale (8-bit), or will be converted.
 
     Args:
         stack: Image stack.
+        axis: The axis to project along (defaults to z)
         kernel_size: Kernel size to be passed to `_blur_and_lap`.
 
     Returns:
-        Focus stack projection of image stack as grayscale image.
+        Focus stack projection of image stack as grayscale (8-bit) image.
+
     """
     if stack.dtype != np.uint8:
         stack = stack.round().astype(np.uint8)
 
+    # We do not perform the alignment step which is typically included,
+    # since each image in the stack is assumed to be an in-focus cross-section.
+
+    # Compute Laplacian for each slice in stack. This will give sharpness
+    # measurement for each pixel in each slice.
     laps = np.array(
         d.compute([
             d.delayed(_blur_and_lap)(pos, kernel_size) for pos in stack
         ])[0]
     )
     output = np.zeros_like(stack[0])
+
+    # For each pixel in output, assign to it the value in the stack with the
+    # largest magnitude sharpness measurement at that position.
     abs_laps = np.absolute(laps)
     maxima = np.max(abs_laps, axis=axis)
     mask = (abs_laps == maxima).astype(np.uint8)
@@ -129,26 +144,76 @@ def proj_focus_stack(stack: npt.NDArray, axis: Union[int, Sequence[int]]=0, kern
     return defs.GS_MAX - output
 
 
-def proj_avg(stack: npt.NDArray, axis: Union[int, Sequence[int]]=0, dtype=np.uint8) -> npt.NDArray:
+def proj_avg(stack: npt.NDArray, axis: int=0, dtype=np.uint8) -> npt.NDArray:
     """Project image stack along given axis using average pixel intensity.
 
     Args:
         stack: Image stack.
-        axis (Union[int, Sequence[int]], optional): _description_. Defaults to 0.
+        axis: The axis to project along (defaults to z)
+        dtype: The output datatype.
 
     Returns:
         Average projection of image stack.
+
     """
-    return np.mean(stack, axis=axis).round().astype(dtype)
+    proj = np.mean(stack, axis=axis)
+    if issubclass(dtype, numbers.Integral):
+        return proj.round().astype(dtype)
+    return proj.astype(dtype)
 
 
-def proj_med(stack: npt.NDArray, axis: Union[int, Sequence[int]]=0, dtype=np.uint8) -> npt.NDArray:
-    return np.median(stack, axis=axis).round().astype(dtype)
+def proj_med(stack: npt.NDArray, axis: int=0, dtype=np.uint8) -> npt.NDArray:
+    """Project image stack along given axis using median pixel intensity.
+
+    Args:
+        stack: Image stack.
+        axis: The axis to project along (defaults to z)
+        dtype: The output datatype.
+
+    Returns:
+        Median projection of image stack.
+
+    """
+
+    proj = np.median(stack, axis=axis)
+    if issubclass(dtype, numbers.Integral):
+        return proj.round().astype(dtype)
+    return proj.astype(dtype)
 
 
-def proj_max(stack: npt.NDArray, axis: Union[int, Sequence[int]]=0, dtype=np.uint8) -> npt.NDArray:
-    return np.max(stack, axis=axis).round().astype(dtype)
+def proj_max(stack: npt.NDArray, axis: int=0, dtype=np.uint8) -> npt.NDArray:
+    """Project image stack along given axis using maximum pixel intensity.
+
+    Args:
+        stack: Image stack.
+        axis: The axis to project along (defaults to z)
+        dtype: The output datatype.
+
+    Returns:
+        Maximum projection of image stack.
+
+    """
+
+    proj = np.max(stack, axis=axis)
+    if issubclass(dtype, numbers.Integral):
+        return proj.round().astype(dtype)
+    return proj.astype(dtype)
 
 
-def proj_min(stack: npt.NDArray, axis: Union[int, Sequence[int]]=0, dtype=np.uint8) -> npt.NDArray:
-    return np.min(stack, axis=axis).round().astype(dtype)
+def proj_min(stack: npt.NDArray, axis: int=0, dtype=np.uint8) -> npt.NDArray:
+    """Project image stack along given axis using minimum pixel intensity.
+
+    Args:
+        stack: Image stack.
+        axis: The axis to project along (defaults to z)
+        dtype: The output datatype.
+
+    Returns:
+        Minimum projection of image stack.
+
+    """
+
+    proj = np.min(stack, axis=axis)
+    if issubclass(dtype, numbers.Integral):
+        return proj.round().astype(dtype)
+    return proj.astype(dtype)
