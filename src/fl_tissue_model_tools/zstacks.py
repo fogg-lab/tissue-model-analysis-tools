@@ -103,13 +103,18 @@ def z_stack_from_dir(z_stack_dir: str, file_ext: str="tif", descending: bool=Tru
 def proj_focus_stack(stack: npt.NDArray, axis: Union[int, Sequence[int]]=0, kernel_size:int=5) -> npt.NDArray:
     """Project image stack along given axis using focus stacking.
 
+    Elements of `stack` should be unsigned 8-bit integers.
+
     Args:
         stack: Image stack.
         kernel_size: Kernel size to be passed to `_blur_and_lap`.
 
     Returns:
-        Focus stack projection of image stack.
+        Focus stack projection of image stack as grayscale image.
     """
+    if stack.dtype != np.uint8:
+        stack = stack.round().astype(np.uint8)
+
     laps = np.array(
         d.compute([
             d.delayed(_blur_and_lap)(pos, kernel_size) for pos in stack
@@ -124,7 +129,7 @@ def proj_focus_stack(stack: npt.NDArray, axis: Union[int, Sequence[int]]=0, kern
     return defs.GS_MAX - output
 
 
-def proj_avg(stack: npt.NDArray, axis: Union[int, Sequence[int]]=0) -> npt.NDArray:
+def proj_avg(stack: npt.NDArray, axis: Union[int, Sequence[int]]=0, dtype=np.uint8) -> npt.NDArray:
     """Project image stack along given axis using average pixel intensity.
 
     Args:
@@ -134,16 +139,16 @@ def proj_avg(stack: npt.NDArray, axis: Union[int, Sequence[int]]=0) -> npt.NDArr
     Returns:
         Average projection of image stack.
     """
-    return np.mean(stack, axis=axis)
+    return np.mean(stack, axis=axis).round().astype(dtype)
 
 
-def proj_med(stack: npt.NDArray, axis: Union[int, Sequence[int]]=0) -> npt.NDArray:
-    return np.median(stack, axis=axis)
+def proj_med(stack: npt.NDArray, axis: Union[int, Sequence[int]]=0, dtype=np.uint8) -> npt.NDArray:
+    return np.median(stack, axis=axis).round().astype(dtype)
 
 
-def proj_max(stack: npt.NDArray, axis: Union[int, Sequence[int]]=0) -> npt.NDArray:
-    return np.max(stack, axis=axis)
+def proj_max(stack: npt.NDArray, axis: Union[int, Sequence[int]]=0, dtype=np.uint8) -> npt.NDArray:
+    return np.max(stack, axis=axis).round().astype(dtype)
 
 
-def proj_min(stack: npt.NDArray, axis: Union[int, Sequence[int]]=0) -> npt.NDArray:
-    return np.min(stack, axis=axis)
+def proj_min(stack: npt.NDArray, axis: Union[int, Sequence[int]]=0, dtype=np.uint8) -> npt.NDArray:
+    return np.min(stack, axis=axis).round().astype(dtype)
