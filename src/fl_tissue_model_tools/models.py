@@ -12,8 +12,8 @@ from tensorflow.keras.activations import sigmoid
 import keras_tuner as kt
 
 
-def build_ResNet50_TL(img_shape: Sequence[int], base_last_layer: str="conv5_block3_out", output_act: str="sigmoid", base_model_trainable: bool=False, base_model_name: str="base_model") -> Model:
-    resnet50_model = resnet50.ResNet50(weights="imagenet", include_top=False, input_shape=img_shape)
+def build_ResNet50_TL(img_shape: Sequence[int], base_init_weights: str="image_net", base_last_layer: str="conv5_block3_out", output_act: str="sigmoid", base_model_trainable: bool=False, base_model_name: str="base_model") -> Model:
+    resnet50_model = resnet50.ResNet50(weights=base_init_weights, include_top=False, input_shape=img_shape)
     bll_idx = [l.name for l in resnet50_model.layers].index(base_last_layer)
     base_model = Model(inputs=resnet50_model.input, outputs=resnet50_model.layers[bll_idx].output)
     inputs = Input(shape=img_shape)
@@ -65,7 +65,6 @@ class ResNet50TLHyperModel(kt.HyperModel):
         )
         model.compile(self.frozen_optimizer, self.loss, self.metrics)
         return model
-
 
     def fit(self, hp: kt.HyperParameters, model: Model, *args, **kwargs) -> History:
         frozen_epochs = hp.Int("frozen_epochs", min_value=self.min_frozen_epochs, max_value=self.max_frozen_epochs)
