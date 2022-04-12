@@ -12,7 +12,7 @@ from tensorflow.keras.activations import sigmoid
 import keras_tuner as kt
 
 
-def build_ResNet50_TL(img_shape: Sequence[int], base_init_weights: str="image_net", base_last_layer: str="conv5_block3_out", output_act: str="sigmoid", base_model_trainable: bool=False, base_model_name: str="base_model") -> Model:
+def build_ResNet50_TL(n_outputs: int, img_shape: Sequence[int], base_init_weights: str="imagenet", base_last_layer: str="conv5_block3_out", output_act: str="sigmoid", base_model_trainable: bool=False, base_model_name: str="base_model") -> Model:
     resnet50_model = resnet50.ResNet50(weights=base_init_weights, include_top=False, input_shape=img_shape)
     bll_idx = [l.name for l in resnet50_model.layers].index(base_last_layer)
     base_model = Model(inputs=resnet50_model.input, outputs=resnet50_model.layers[bll_idx].output)
@@ -21,7 +21,7 @@ def build_ResNet50_TL(img_shape: Sequence[int], base_init_weights: str="image_ne
     # for fine-tuning. 
     x = base_model(inputs, training=False)
     x = GlobalAveragePooling2D()(x)
-    outputs = Dense(1, activation=output_act)(x)
+    outputs = Dense(n_outputs, activation=output_act)(x)
     model = Model(inputs, outputs)
 
     # Set layer properties
@@ -37,17 +37,16 @@ def toggle_TL_freeze(tl_model: Model, base_model_name: str="base_model") -> None
 
 
 class ResNet50TLHyperModel(kt.HyperModel):
-    def __init__(self, img_shape: Sequence[int], frozen_optimizer: Optimizer, fine_tune_optimizer: Callable[[Any], Optimizer], loss: Loss, metrics: Sequence, name: str=None, tunable: bool=True, base_init_weights: str="image_net", last_layer_options: Sequence[str]=["conv5_block3_out", "conv5_block2_out", "conv5_block1_out", "conv4_block6_out"], output_act: str="sigmoid", min_fine_tune_lr: float=1e-5, min_frozen_epochs: int=2, max_frozen_epochs: int=10, min_fine_tune_epochs: int=1, max_fine_tune_epochs: int=10, base_model_name: str="base_model") -> None:
+    def __init__(self, n_outputs: int, img_shape: Sequence[int], frozen_optimizer: Optimizer, fine_tune_optimizer: Callable[[Any], Optimizer], loss: Loss, metrics: Sequence, name: str=None, tunable: bool=True, base_init_weights: str="image_net", last_layer_options: Sequence[str]=["conv5_block3_out", "conv5_block2_out", "conv5_block1_out", "conv4_block6_out"], output_act: str="sigmoid", min_fine_tune_lr: float=1e-5, frozen_epochs: int=10, fine_tune_epochs: int=10, base_model_name: str="base_model") -> None:
         super().__init__(name, tunable)
+        self.n_outputs = n_outputs
         self.img_shape = tuple(deepcopy(img_shape))
         self.base_init_weights = base_init_weights
         self.last_layer_options = last_layer_options
         self.output_act = output_act
         self.min_fine_tune_lr = min_fine_tune_lr
-        self.min_frozen_epochs = min_frozen_epochs
-        self.max_frozen_epochs = max_frozen_epochs
-        self.min_fine_tune_epochs = min_fine_tune_epochs
-        self.max_fine_tune_epochs = max_fine_tune_epochs
+        self.frozen_epochs = frozen_epochs
+        self.fine_tune_epochs = fine_tune_epochs
         self.frozen_optimizer = frozen_optimizer
         self.fine_tune_optimizer = fine_tune_optimizer
         self.loss = loss
@@ -58,6 +57,7 @@ class ResNet50TLHyperModel(kt.HyperModel):
     def build(self, hp: kt.HyperParameters) -> Model:
         ll = hp.Choice("last_resnet_layer", self.last_layer_options)
         model = build_ResNet50_TL(
+            self.n_outputs,
             self.img_shape,
             base_last_layer=ll,
             output_act=self.output_act,
@@ -67,12 +67,12 @@ class ResNet50TLHyperModel(kt.HyperModel):
         return model
 
     def fit(self, hp: kt.HyperParameters, model: Model, *args, **kwargs) -> History:
-        frozen_epochs = hp.Int("frozen_epochs", min_value=self.min_frozen_epochs, max_value=self.max_frozen_epochs)
-        fine_tune_epochs = hp.Int("fine_tune_epochs", min_value=self.min_fine_tune_epochs, max_value=self.max_fine_tune_epochs)
+        # frozen_epochs = hp.Int("frozen_epochs", min_value=self.min_frozen_epochs, max_value=self.max_frozen_epochs)
+        # fine_tune_epochs = hp.Int("fine_tune_epochs", min_value=self.min_fine_tune_epochs, max_value=self.max_fine_tune_epochs)
         fine_tune_lr = hp.Float("fine_tune_lr", min_value=self.min_fine_tune_lr, max_value=1e-3, sampling="log")
         # Fit with frozen base model
-        model.fit(*args, **kwargs, epochs=frozen_epochs)
+        model.fit(*args, **kwargs, epochs=self.frozen_epochs)
         # Fine tune full model
         toggle_TL_freeze(model, self.base_model_name)
         model.compile(self.fine_tune_optimizer(fine_tune_lr), self.loss, self.metrics)
-        return model.fit(*args, **kwargs, epochs=fine_tune_epochs)
+        return model.fit(*args, **kwargs, epochs=self.fine_tune_epochs)
