@@ -67,8 +67,6 @@ class ResNet50TLHyperModel(kt.HyperModel):
         return model
 
     def fit(self, hp: kt.HyperParameters, model: Model, *args, **kwargs) -> History:
-        # frozen_epochs = hp.Int("frozen_epochs", min_value=self.min_frozen_epochs, max_value=self.max_frozen_epochs)
-        # fine_tune_epochs = hp.Int("fine_tune_epochs", min_value=self.min_fine_tune_epochs, max_value=self.max_fine_tune_epochs)
         fine_tune_lr = hp.Float("fine_tune_lr", min_value=self.min_fine_tune_lr, max_value=1e-3, sampling="log")
         # Fit with frozen base model
         model.fit(*args, **kwargs, epochs=self.frozen_epochs)
