@@ -12,7 +12,7 @@ from tensorflow.keras.activations import sigmoid
 import keras_tuner as kt
 
 
-def build_ResNet50_TL(n_outputs: int, img_shape: Sequence[int], base_init_weights: str="imagenet", base_last_layer: str="conv5_block3_out", output_act: str="sigmoid", base_model_trainable: bool=False, base_model_name: str="base_model") -> Model:
+def build_ResNet50_TL(n_outputs: int, img_shape: tuple[int, int], base_init_weights: str="imagenet", base_last_layer: str="conv5_block3_out", output_act: str="sigmoid", base_model_trainable: bool=False, base_model_name: str="base_model") -> Model:
     resnet50_model = resnet50.ResNet50(weights=base_init_weights, include_top=False, input_shape=img_shape)
     bll_idx = [l.name for l in resnet50_model.layers].index(base_last_layer)
     base_model = Model(inputs=resnet50_model.input, outputs=resnet50_model.layers[bll_idx].output)
@@ -31,13 +31,17 @@ def build_ResNet50_TL(n_outputs: int, img_shape: Sequence[int], base_init_weight
     return model
 
 
+def build_UNetXception(n_outputs: int, img_shape: tuple[int, int]) -> Model:
+    pass
+
+
 def toggle_TL_freeze(tl_model: Model, base_model_name: str="base_model") -> None:
     base_model = tl_model.get_layer(base_model_name)
     base_model.trainable = not base_model.trainable
 
 
 class ResNet50TLHyperModel(kt.HyperModel):
-    def __init__(self, n_outputs: int, img_shape: Sequence[int], frozen_optimizer: Optimizer, fine_tune_optimizer: Callable[[Any], Optimizer], loss: Loss, metrics: Sequence, name: str=None, tunable: bool=True, base_init_weights: str="image_net", last_layer_options: Sequence[str]=["conv5_block3_out", "conv5_block2_out", "conv5_block1_out", "conv4_block6_out"], output_act: str="sigmoid", min_fine_tune_lr: float=1e-5, frozen_epochs: int=10, fine_tune_epochs: int=10, base_model_name: str="base_model") -> None:
+    def __init__(self, n_outputs: int, img_shape: tuple[int, int], frozen_optimizer: Optimizer, fine_tune_optimizer: Callable[[Any], Optimizer], loss: Loss, metrics: Sequence, name: str=None, tunable: bool=True, base_init_weights: str="image_net", last_layer_options: Sequence[str]=["conv5_block3_out", "conv5_block2_out", "conv5_block1_out", "conv4_block6_out"], output_act: str="sigmoid", min_fine_tune_lr: float=1e-5, frozen_epochs: int=10, fine_tune_epochs: int=10, base_model_name: str="base_model") -> None:
         super().__init__(name, tunable)
         self.n_outputs = n_outputs
         self.img_shape = tuple(deepcopy(img_shape))
