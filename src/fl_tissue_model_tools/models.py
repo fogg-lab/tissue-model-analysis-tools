@@ -187,12 +187,13 @@ class UNetXceptionGridSearch():
             model.compile(optimizer=self.optimizer, loss=self.loss, metrics=self.metrics)
             h = model.fit(callbacks=self.callbacks + [cp_callback],*args, **kwargs)
             self.histories.append(h)
+            # TODO: allow for maximizing on objectives
             score = np.min(h.history[objective])
             if score < self.best_score:
                 self.best_score = score
                 self.best_filter_counts = deepcopy(fc)
                 self.best_score_idx = i
-                # TODO save hyperparams for best model
+                # TODO: save hyperparams for best model
 
     def get_best_model(self) -> None:
         model = build_UNetXception(self.n_outputs, self.img_shape, channels=self.channels, filter_counts=self.best_filter_counts, output_act=self.output_act)
