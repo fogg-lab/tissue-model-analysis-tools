@@ -1,10 +1,10 @@
-from importlib.machinery import OPTIMIZED_BYTECODE_SUFFIXES
 import numpy as np
 import dask as d
 import tensorflow as tf
 import keras_tuner as kt
 import keras.backend as K
 import numpy.typing as npt
+import json
 
 from operator import lt, gt
 from numpy.random import RandomState
@@ -23,7 +23,21 @@ from tensorflow.keras.activations import sigmoid
 from fl_tissue_model_tools import data_prep
 
 
-def _check_consec_factor(x, factor, reverse=False):
+def _check_consec_factor(x: Sequence[float], factor: float, reverse: bool=False) -> bool:
+    """_summary_
+
+    Args:
+        x: An ordered sequence of numbers.
+        factor: The factor by which elements of `x` should
+            change consecutively.
+        reverse: Whether to reverse `x` when assessing consecutive
+            factor change.
+
+    Returns:
+        Whether elements of `x` change consecutively by a factor of
+            `factor`.
+
+    """
     res = True
     if reverse:
         x = list(reversed(x))
@@ -33,11 +47,34 @@ def _check_consec_factor(x, factor, reverse=False):
     
 
 def toggle_TL_freeze(tl_model: Model, base_model_name: str="base_model") -> None:
+    """Toggle the `trainable` property of a transfer learning model.
+
+    IMPORTANT: `tl_model` must be recompiled after changing this attribute.
+
+    Args:
+        tl_model: The transfer learning model.
+        base_model_name: The name of the base model that will have its
+            `trainable` property toggled.
+
+    """
     base_model = tl_model.get_layer(base_model_name)
     base_model.trainable = not base_model.trainable
 
 
 def mean_iou_coef(y: tf.Tensor, yhat: tf.Tensor, smooth: float=1.0, obs_axes: tuple[int, ...]=(1, 2, 3), thresh: float=0.5):
+    """Compute mean intersection over union coefficient.
+
+    Args:
+        y: True labels.
+        yhat: Predicted labels.
+        smooth: Accounts for case of zero union. 
+        obs_axes: Axes to collapse when computing IoU.
+        thresh: Threshold that decides classification. Value of > 0.5
+            will yield a more "picky" classification.
+    Returns:
+        mean IoU coefficient for batch.
+
+    """
     y = K.cast(y, "float32")
     yhat = K.cast(yhat, "float32")
     # Set yhat > thresh to 1, 0 otherwise.
@@ -67,7 +104,26 @@ def mean_iou_coef_factory(smooth: int=1, obs_axes: tuple[int, ...]=(1, 2, 3), th
     fn.__name__ = f"mean_iou_coef"
     return fn
 
+
 def build_ResNet50_TL(n_outputs: int, img_shape: tuple[int, int], base_init_weights: str="imagenet", base_last_layer: str="conv5_block3_out", output_act: str="sigmoid", base_model_trainable: bool=False, base_model_name: str="base_model") -> Model:
+    """Build a ResNet50 model for transfer learning.
+
+    Args:
+        n_outputs: Number of output units.
+        img_shape: Shape (h, w) of input images.
+        base_init_weights: Weights to be loaded for base model.
+        base_last_layer: Last layer of base model to keep. Should always be a convolution
+            block output layer, due to ResNet50 architecture.
+        output_act: Output activation for classification.
+        base_model_trainable: Whether base model should be trainable at instantiation. This
+            should usually be False so training can occur in two stages (frozen & fine tune).
+        base_model_name: Name of the base model. Important to know if want to toggle
+            `trainable` property later.
+
+    Returns:
+        A ResNet50 model, ready for transfer learning applications.
+
+    """
     resnet50_model = resnet50.ResNet50(weights=base_init_weights, include_top=False, input_shape=img_shape)
     bll_idx = [l.name for l in resnet50_model.layers].index(base_last_layer)
     base_model = Model(inputs=resnet50_model.input, outputs=resnet50_model.layers[bll_idx].output)
@@ -87,6 +143,23 @@ def build_ResNet50_TL(n_outputs: int, img_shape: tuple[int, int], base_init_weig
 
 
 def build_UNetXception(n_outputs: int, img_shape: tuple[int, int], channels: int=1, filter_counts: tuple[int, int, int, int]=(32, 64, 128, 256), output_act: str="sigmoid") -> Model:
+    """Build a UNetXception model for semantic segmentation.
+
+    Adapted from Keras documentation: https://keras.io/examples/vision/oxford_pets_image_segmentation/
+
+    Args:
+        n_outputs: Number of output units.
+        img_shape: Shape (h, w) of input images.
+        channels: Number of channels. Assumed to be grayscale (i.e., 1).
+        filter_counts: Number of filters for downsampling (reversed for upsampling). If
+            elements are not in ascending order, they will be sorted. Elements must be
+            consecutively increasing by a factor of 2 after sorting.
+        output_act: Output activation for last layer. Sigmoid is best for binary classificaion.
+
+    Returns:
+        UNetXception model.
+
+    """
     inputs = Input(img_shape + (channels,))
     # Validate filter counts
     filter_counts = sorted(filter_counts)
@@ -147,7 +220,34 @@ def build_UNetXception(n_outputs: int, img_shape: tuple[int, int], channels: int
 
 
 class ResNet50TLHyperModel(kt.HyperModel):
+    """ ResNet50 Hypermodel for use with KerasTuner.
+
+    """
     def __init__(self, n_outputs: int, img_shape: tuple[int, int], frozen_optimizer: Optimizer, fine_tune_optimizer: Callable[[Any], Optimizer], loss: Loss, metrics: Sequence, name: str=None, tunable: bool=True, base_init_weights: str="image_net", last_layer_options: Sequence[str]=["conv5_block3_out", "conv5_block2_out", "conv5_block1_out", "conv4_block6_out"], output_act: str="sigmoid", min_fine_tune_lr: float=1e-5, frozen_epochs: int=10, fine_tune_epochs: int=10, base_model_name: str="base_model") -> None:
+        """Create ResNet Hypermodel for use with KerasTuner.
+
+        Args:
+            n_outputs: Number of output units.
+            img_shape: Shape (h, w) of input images.
+            frozen_optimizer: Optimizer used for frozen base model training.
+            fine_tune_optimizer: Optimizer used for fine-tune training. This is a function
+                because the fine tune learning rate will be optimized.
+            loss: Loss used for training.
+            metrics: Metrics to track during training.
+            name: Name of transfer learning model (see KerasTuner documentation).
+            tunable: Whether model is tunable (see KerasTuner documentation).
+            base_init_weights: Weights to be loaded for base model.
+            last_layer_options: Choices of last layer of base model to keep. All should be a
+                convolution block output layer, due to ResNet50 architecture. This will be
+                optimized.
+            output_act: Output activation for classification.
+            min_fine_tune_lr: Minimum fine tune learning rate. Used to set optimization
+                range for fine tune learning rate.
+            frozen_epochs: Number of epochs to train frozen model.
+            fine_tune_epochs: Number of epochs to fine tune model.
+            base_model_name: Name of the base model. Important to know for toggling
+                `trainable` property later.
+        """
         super().__init__(name, tunable)
         self.n_outputs = n_outputs
         self.img_shape = tuple(deepcopy(img_shape))
@@ -187,7 +287,28 @@ class ResNet50TLHyperModel(kt.HyperModel):
 
 
 class UNetXceptionGridSearch():
+    """ Wrapper class for handling grid search for UNet model.
+
+    """
     def __init__(self, save_dir: str, filter_counts_options: Sequence[tuple[int, int, int, int]], n_outputs: int, img_shape: tuple[int, int], optimizer, loss, channels: int=1, output_act: str="sigmoid", callbacks=[], metrics=None) -> None:
+        """Create wrapper class for handling grid search for UNet model. 
+
+        Args:
+            save_dir: Root directory for saving optimization output.
+            filter_counts_options: Choices of filter counts for model. This will
+                be optimized.
+            n_outputs: Number of output units.
+            img_shape: Shape (h, w) of input images.
+            optimizer: Optimizer to use for training.
+            loss: Loss to use for training.
+            channels: Number of channels. Assumed to be grayscale (i.e., 1).
+            output_act: Output activation for last layer. Sigmoid is best for binary classificaion.
+            callbacks: Callbacks for training. A `ModelCheckpoint` callback will automatically
+                be used in addition to any other callbacks.
+            metrics: Metrics to track during training. Must include the metric passed to
+                `search()` as `objective`. Note: if the search objective will be "val_[metric]", only
+                [metric] needs to be included.
+        """
         self.best_filter_counts = []
         self.best_score = np.NaN
         self.best_score_idx = 0
@@ -217,11 +338,13 @@ class UNetXceptionGridSearch():
             compare = gt
             get_best = np.max
             get_best_idx = np.argmax
+        
 
         for i, fc in enumerate(self.filter_counts_options):
             if search_verbose:
                 print(f"Testing filter counts: {fc}")
-            cp_callback = ModelCheckpoint(f"{self.save_dir}/best_weights_config_{i}.h5", save_best_only=True, save_weights_only=True)
+            best_weights_file = f"{self.save_dir}/best_weights_config_{i}.h5"
+            cp_callback = ModelCheckpoint(best_weights_file, save_best_only=True, save_weights_only=True)
             model = build_UNetXception(self.n_outputs, self.img_shape, channels=self.channels, filter_counts=fc, output_act=self.output_act)
             model.compile(optimizer=self.optimizer, loss=self.loss, metrics=self.metrics)
             h = model.fit(callbacks=self.callbacks + [cp_callback],*args, **kwargs)
@@ -233,6 +356,8 @@ class UNetXceptionGridSearch():
                 print(f"Best objective value observed: {cur_best_score}")
                 print(f"Best objective value observed on epoch: {cur_best_score_idx + 1}")
                 print(f"Previous best score: {self.best_score}")
+            
+            # If model is an improvement
             if compare(cur_best_score, self.best_score):
                 if search_verbose:
                     print(f"Current best ({cur_best_score}) is an improvement over previous best ({self.best_score}).")
@@ -243,6 +368,13 @@ class UNetXceptionGridSearch():
                     print(f"Current best hyper parameters: {self.best_filter_counts}")
                     print(f"Current best objective value observed: {self.best_score}")
                 # TODO: save hyperparams for best model
+                with open(f"{self.save_dir}/best_model_hps.json", "w") as fp:
+                    hp_meta = {
+                        "search_objective": objective,
+                        "best_score": self.best_score,
+                        "best_hps": {"filter_counts": self.best_filter_counts},
+                        "best_weights_file": best_weights_file}
+                    json.dump(hp_meta, fp)
             else:
                 if search_verbose:
                     print(f"Current best ({cur_best_score}) is not an improvement over previous best ({self.best_score}).")
