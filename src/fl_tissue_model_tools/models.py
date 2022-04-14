@@ -1,10 +1,12 @@
 from importlib.machinery import OPTIMIZED_BYTECODE_SUFFIXES
 import numpy as np
 import dask as d
+import tensorflow as tf
 import keras_tuner as kt
 import keras.backend as K
 import numpy.typing as npt
 
+from operator import lt, gt
 from numpy.random import RandomState
 from ast import Global, Mod
 from copy import deepcopy
@@ -35,11 +37,35 @@ def toggle_TL_freeze(tl_model: Model, base_model_name: str="base_model") -> None
     base_model.trainable = not base_model.trainable
 
 
-def iou_coef(y: npt.NDArray[np.int_], yhat: npt.NDArray[np.int_], smooth=1, obs_axes=(1, 2, 3)):
+def mean_iou_coef(y: tf.Tensor, yhat: tf.Tensor, smooth: float=1.0, obs_axes: tuple[int, ...]=(1, 2, 3), thresh: float=0.5):
+    y = K.cast(y, "float32")
+    yhat = K.cast(yhat, "float32")
+    # Set yhat > thresh to 1, 0 otherwise.
+    yhat = K.cast(K.cast(K.greater(K.clip(yhat, 0, 1), thresh), "uint32"), "float32")
     intersection = K.sum(y * yhat, axis=obs_axes)
     union = K.sum(y, axis=obs_axes) + K.sum(yhat, axis=obs_axes) - intersection
-    return K.mean(K.cast(intersection + smooth, "float32") / K.cast(union + smooth, "float32"), axis=0)
+    mean_iou = K.mean((intersection + smooth) / (union + smooth), axis=0)
+    return mean_iou
 
+
+def mean_iou_coef_factory(smooth: int=1, obs_axes: tuple[int, ...]=(1, 2, 3), thresh: float=0.5):
+    """Returns a an instance of the `iou_coef` function with extra parameters filled in.
+
+    Allows user to use `Keras` metrics tracking without defining a lambda function.
+    Returns an instance of the `iou_coef` function with the parameters below filled
+    in with the values desired by the user.
+
+    Args:
+        smooth: Accounts for case of zero union. 
+        obs_axes: Axes to collapse when computing IoU.
+        thresh: Threshold that decides classification. Value of > 0.5
+            will yield a more "picky" classification.
+
+    """
+    def fn(y, yhat):
+        return mean_iou_coef(y, yhat, smooth=smooth, obs_axes=obs_axes, thresh=thresh)
+    fn.__name__ = f"mean_iou_coef"
+    return fn
 
 def build_ResNet50_TL(n_outputs: int, img_shape: tuple[int, int], base_init_weights: str="imagenet", base_last_layer: str="conv5_block3_out", output_act: str="sigmoid", base_model_trainable: bool=False, base_model_name: str="base_model") -> Model:
     resnet50_model = resnet50.ResNet50(weights=base_init_weights, include_top=False, input_shape=img_shape)
@@ -163,7 +189,7 @@ class ResNet50TLHyperModel(kt.HyperModel):
 class UNetXceptionGridSearch():
     def __init__(self, save_dir: str, filter_counts_options: Sequence[tuple[int, int, int, int]], n_outputs: int, img_shape: tuple[int, int], optimizer, loss, channels: int=1, output_act: str="sigmoid", callbacks=[], metrics=None) -> None:
         self.best_filter_counts = []
-        self.best_score = np.inf
+        self.best_score = np.NaN
         self.best_score_idx = 0
         self.filter_counts_options = filter_counts_options
         self.save_dir = save_dir
@@ -179,21 +205,47 @@ class UNetXceptionGridSearch():
 
         data_prep.make_dir(self.save_dir)
     
-    def search(self, objective, *args, **kwargs) -> None:
+    def search(self, objective: str, comparison: str, *args, search_verbose: bool=True, **kwargs) -> None:
+        assert comparison == "min" or comparison == "max", f"comparison operator must be either {min} or {max}"
+        if comparison == "min":
+            self.best_score = np.inf
+            compare = lt
+            get_best = np.min
+            get_best_idx = np.argmin
+        else:
+            self.best_score = -np.inf
+            compare = gt
+            get_best = np.max
+            get_best_idx = np.argmax
+
         for i, fc in enumerate(self.filter_counts_options):
-            print(f"Testing filter counts: {fc}")
+            if search_verbose:
+                print(f"Testing filter counts: {fc}")
             cp_callback = ModelCheckpoint(f"{self.save_dir}/best_weights_config_{i}.h5", save_best_only=True, save_weights_only=True)
             model = build_UNetXception(self.n_outputs, self.img_shape, channels=self.channels, filter_counts=fc, output_act=self.output_act)
             model.compile(optimizer=self.optimizer, loss=self.loss, metrics=self.metrics)
             h = model.fit(callbacks=self.callbacks + [cp_callback],*args, **kwargs)
             self.histories.append(h)
-            # TODO: allow for maximizing on objectives
-            score = np.min(h.history[objective])
-            if score < self.best_score:
-                self.best_score = score
+            
+            cur_best_score = get_best(h.history[objective])
+            cur_best_score_idx = get_best_idx(h.history[objective])
+            if search_verbose:
+                print(f"Best objective value observed: {cur_best_score}")
+                print(f"Best objective value observed on epoch: {cur_best_score_idx + 1}")
+                print(f"Previous best score: {self.best_score}")
+            if compare(cur_best_score, self.best_score):
+                if search_verbose:
+                    print(f"Current best ({cur_best_score}) is an improvement over previous best ({self.best_score}).")
+                self.best_score = cur_best_score
                 self.best_filter_counts = deepcopy(fc)
                 self.best_score_idx = i
+                if search_verbose:
+                    print(f"Current best hyper parameters: {self.best_filter_counts}")
+                    print(f"Current best objective value observed: {self.best_score}")
                 # TODO: save hyperparams for best model
+            else:
+                if search_verbose:
+                    print(f"Current best ({cur_best_score}) is not an improvement over previous best ({self.best_score}).")
 
     def get_best_model(self) -> None:
         model = build_UNetXception(self.n_outputs, self.img_shape, channels=self.channels, filter_counts=self.best_filter_counts, output_act=self.output_act)

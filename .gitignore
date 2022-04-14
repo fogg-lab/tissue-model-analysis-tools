@@ -1,3 +1,7 @@
+# Prototyping files
+oxford_pets_grid_search/
+oxford_pets_toy/
+
 # graphRecon files
 src/fl_tissue_model_tools/graph_recon_DM/dataset/
 src/fl_tissue_model_tools/graph_recon_DM/result/
