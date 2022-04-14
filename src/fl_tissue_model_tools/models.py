@@ -2,6 +2,7 @@ from importlib.machinery import OPTIMIZED_BYTECODE_SUFFIXES
 import numpy as np
 import dask as d
 import keras_tuner as kt
+import keras.backend as K
 import numpy.typing as npt
 
 from numpy.random import RandomState
@@ -32,6 +33,12 @@ def _check_consec_factor(x, factor, reverse=False):
 def toggle_TL_freeze(tl_model: Model, base_model_name: str="base_model") -> None:
     base_model = tl_model.get_layer(base_model_name)
     base_model.trainable = not base_model.trainable
+
+
+def iou_coef(y: npt.NDArray[np.int_], yhat: npt.NDArray[np.int_], smooth=1, obs_axes=(1, 2, 3)):
+    intersection = K.sum(y * yhat, axis=obs_axes)
+    union = K.sum(y, axis=obs_axes) + K.sum(yhat, axis=obs_axes) - intersection
+    return K.mean(K.cast(intersection + smooth, "float32") / K.cast(union + smooth, "float32"), axis=0)
 
 
 def build_ResNet50_TL(n_outputs: int, img_shape: tuple[int, int], base_init_weights: str="imagenet", base_last_layer: str="conv5_block3_out", output_act: str="sigmoid", base_model_trainable: bool=False, base_model_name: str="base_model") -> Model:
@@ -67,8 +74,11 @@ def build_UNetXception(n_outputs: int, img_shape: tuple[int, int], channels: int
     previous_block_activation = x
 
     # Downsampling Xception blocks
-    for filters in filter_counts[1:]:
-        x = Activation("relu")(x)
+    for i, filters in enumerate(filter_counts[1:]):
+        # Don't want a redundant activation layer on first block
+        if i != 0:
+            x = Activation("relu")(x)
+
         x = SeparableConv2D(filters, 3, padding="same")(x)
         x = BatchNormalization()(x)
 
@@ -182,6 +192,7 @@ class UNetXceptionGridSearch():
                 self.best_score = score
                 self.best_filter_counts = deepcopy(fc)
                 self.best_score_idx = i
+                # TODO save hyperparams for best model
 
     def get_best_model(self) -> None:
         model = build_UNetXception(self.n_outputs, self.img_shape, channels=self.channels, filter_counts=self.best_filter_counts, output_act=self.output_act)
