@@ -1,15 +1,23 @@
+from importlib.machinery import OPTIMIZED_BYTECODE_SUFFIXES
+import numpy as np
+import dask as d
+import keras_tuner as kt
+import numpy.typing as npt
+
+from numpy.random import RandomState
 from ast import Global, Mod
 from copy import deepcopy
-from typing import Sequence, Union, Callable, Any
+from typing import Sequence, Union, Callable, Any, Optional
 from tensorflow.keras import Input, Model
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Softmax, Conv2D, BatchNormalization, Activation, SeparableConv2D, MaxPooling2D, Conv2DTranspose, UpSampling2D, add
 from tensorflow.keras.applications import resnet50
-from tensorflow.keras.callbacks import History
+from tensorflow.keras.callbacks import History, ModelCheckpoint
 from tensorflow.keras.losses import BinaryCrossentropy, Loss
 from tensorflow.keras.metrics import BinaryAccuracy
 from tensorflow.keras.optimizers import Adam, Optimizer
 from tensorflow.keras.activations import sigmoid
-import keras_tuner as kt
+
+from fl_tissue_model_tools import data_prep
 
 
 def _check_consec_factor(x, factor, reverse=False):
@@ -142,5 +150,41 @@ class ResNet50TLHyperModel(kt.HyperModel):
         return model.fit(*args, **kwargs, epochs=self.fine_tune_epochs)
 
 
-class UNetXceptionHyperModel(kt.HyperModel):
-    pass
+class UNetXceptionGridSearch():
+    def __init__(self, save_dir: str, filter_counts_options: Sequence[tuple[int, int, int, int]], n_outputs: int, img_shape: tuple[int, int], optimizer, loss, channels: int=1, output_act: str="sigmoid", callbacks=[], metrics=None) -> None:
+        self.best_filter_counts = []
+        self.best_score = np.inf
+        self.best_score_idx = 0
+        self.filter_counts_options = filter_counts_options
+        self.save_dir = save_dir
+        self.n_outputs = n_outputs
+        self.img_shape = img_shape
+        self.channels = channels
+        self.output_act = output_act
+        self.optimizer = optimizer
+        self.loss = loss
+        self.callbacks = callbacks
+        self.metrics = metrics
+        self.histories = []
+
+        data_prep.make_dir(self.save_dir)
+    
+    def search(self, objective, *args, **kwargs) -> None:
+        for i, fc in enumerate(self.filter_counts_options):
+            print(f"Testing filter counts: {fc}")
+            cp_callback = ModelCheckpoint(f"{self.save_dir}/best_weights_config_{i}.h5", save_best_only=True, save_weights_only=True)
+            model = build_UNetXception(self.n_outputs, self.img_shape, channels=self.channels, filter_counts=fc, output_act=self.output_act)
+            model.compile(optimizer=self.optimizer, loss=self.loss, metrics=self.metrics)
+            h = model.fit(callbacks=self.callbacks + [cp_callback],*args, **kwargs)
+            self.histories.append(h)
+            score = np.min(h.history[objective])
+            if score < self.best_score:
+                self.best_score = score
+                self.best_filter_counts = deepcopy(fc)
+                self.best_score_idx = i
+
+    def get_best_model(self) -> None:
+        model = build_UNetXception(self.n_outputs, self.img_shape, channels=self.channels, filter_counts=self.best_filter_counts, output_act=self.output_act)
+        model.load_weights(f"{self.save_dir}/best_weights_config_{self.best_score_idx}.h5")
+        model.compile(optimizer=self.optimizer, loss=self.loss, metrics=self.metrics)
+        return model
