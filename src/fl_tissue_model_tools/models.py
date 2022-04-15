@@ -1,16 +1,13 @@
+import json
 import numpy as np
 import dask as d
 import tensorflow as tf
 import keras_tuner as kt
 import keras.backend as K
-import numpy.typing as npt
-import json
 
 from operator import lt, gt
-from numpy.random import RandomState
 from ast import Global, Mod
 from copy import deepcopy
-from typing import Sequence, Union, Callable, Any, Optional
 from tensorflow.keras import Input, Model
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Softmax, Conv2D, BatchNormalization, Activation, SeparableConv2D, MaxPooling2D, Conv2DTranspose, UpSampling2D, add
 from tensorflow.keras.applications import resnet50
@@ -20,6 +17,12 @@ from tensorflow.keras.metrics import BinaryAccuracy
 from tensorflow.keras.optimizers import Adam, Optimizer
 from tensorflow.keras.activations import sigmoid
 
+# Typing
+import numpy.typing as npt
+from numpy.random import RandomState
+from typing import Sequence, Union, Callable, Any, Optional
+
+# Custom
 from fl_tissue_model_tools import data_prep
 
 
