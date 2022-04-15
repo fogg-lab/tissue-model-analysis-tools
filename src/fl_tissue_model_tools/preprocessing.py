@@ -1,15 +1,18 @@
-import numpy as np
 import cv2
+import numpy as np
+import dask as d
 from sklearn.mixture import GaussianMixture
 
 # Typing
 import numpy.typing as npt
 from numpy.random import RandomState
+from typing import Union, Sequence, Any
 
+# Custom
 from . import defs
 
 
-def min_max_(x: npt.NDArray, a: float, b: float, mn: float, mx: float) -> npt.NDArray[np.float64]:
+def min_max_(x: npt.NDArray[Any], a: float, b: float, mn: float, mx: float) -> npt.NDArray[np.float64]:
     """Normalize the `x` from the range [`mn`, `mx`] to the range [`a`, `b`]
 
     Args:
@@ -185,3 +188,43 @@ def blur(img: npt.NDArray, blur_itr: int, k_size: int=3, gs: bool=True) -> npt.N
         return proc_img.round()
     return proc_img.round().astype(np.uint8)
 
+
+def augment_img(img: npt.NDArray[Union[np.float_, np.int_]], rot: int, hflip: bool, vflip: bool, expand_dims: bool=True) -> npt.NDArray[Union[np.float_, np.int_]]:
+    hw = img.shape[:2]
+    # Horizontal flip
+    if hflip:
+        img = cv2.flip(img, 1)
+    # Vertical flip
+    if vflip:
+        img = cv2.flip(img, 0)
+    # Rotation
+    rot_mat = cv2.getRotationMatrix2D((hw[1] // 2, hw[0] // 2), rot, 1.0)
+    
+    if expand_dims:
+        img = np.expand_dims(cv2.warpAffine(img, rot_mat, hw), 2)
+    
+    return img
+
+
+def augment_img_mask_pairs(x: npt.NDArray[np.float_], y: npt.NDArray[np.int_], rs: RandomState) -> tuple[npt.NDArray[np.float_], npt.NDArray[np.int_]]:
+    assert len(x) == len(y), f"x and y must have the same shape, x: {x.shape} != y: {y.shape}"
+    m = len(x)
+    # Cannot parallelize (random state ensures reproducibility)
+    rots = rs.choice([0, 90, 180, 270], size=m)
+    hflips = rs.choice([True, False], size=m)
+    vflips = rs.choice([True, False], size=m)
+
+    def aug_imgs(imgs):
+        return np.array([augment_img(imgs[i], rots[i], hflips[i], vflips[i]) for i in range(m)])
+
+    x, y = d.compute((d.delayed(aug_imgs)(x), d.delayed(aug_imgs)(y)))[0]
+    return x, y
+
+
+def map2bin(lab: npt.NDArray[np.int_], fg_vals: Sequence[int], bg_vals: Sequence[int], fg: int=1, bg: int=0) -> npt.NDArray[np.int_]:
+    fg_mask = np.isin(lab, fg_vals)
+    bg_mask = np.isin(lab, bg_vals)
+    lab_c = lab.copy()
+    lab_c[fg_mask] = fg
+    lab_c[bg_mask] = bg
+    return lab_c
