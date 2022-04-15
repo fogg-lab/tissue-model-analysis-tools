@@ -12,7 +12,7 @@ from typing import Union, Sequence, Any
 from . import defs
 
 
-def min_max_(x: npt.NDArray[Any], a: float, b: float, mn: float, mx: float) -> npt.NDArray[np.float64]:
+def min_max_(x: npt.NDArray, a: float, b: float, mn: float, mx: float) -> npt.NDArray[np.float64]:
     """Normalize the `x` from the range [`mn`, `mx`] to the range [`a`, `b`]
 
     Args:
@@ -30,7 +30,7 @@ def min_max_(x: npt.NDArray[Any], a: float, b: float, mn: float, mx: float) -> n
     return a + ( (x - mn) * (b - a) ) / (mx - mn)
 
 
-def gen_circ_mask(center: npt.ArrayLike, rad: float, shape: npt.ArrayLike, mask_val: np.uint8) -> npt.NDArray[np.uint8]:
+def gen_circ_mask(center: tuple[int, int], rad: float, shape: tuple[int, int], mask_val: np.uint8) -> npt.NDArray[np.uint8]:
     """Generate a 2D circular mask.
 
     The circle mask is a size `shape` array of uint8, where an element
@@ -83,7 +83,7 @@ def bin_thresh(img: npt.NDArray, img_max: npt.NDArray, threshold: float=0) -> np
     return img
 
 
-def exec_threshold(masked: npt.NDArray, mask_idx: npt.ArrayLike, sd_coef: float, rs: RandomState) -> npt.NDArray:
+def exec_threshold(masked: npt.NDArray, mask_idx: Sequence, sd_coef: float, rs: RandomState) -> npt.NDArray:
     """Apply threshold to obtain the foreground (cell content) of a plate image.
 
     A 2-component Gaussian mixture model is fit to pixel the intensities of
