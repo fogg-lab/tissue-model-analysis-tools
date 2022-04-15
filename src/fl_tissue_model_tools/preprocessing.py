@@ -6,12 +6,12 @@ from sklearn.mixture import GaussianMixture
 # Typing
 import numpy.typing as npt
 from numpy.random import RandomState
-from typing import Union, Sequence
+from typing import Union, Sequence, Any
 
 from . import defs
 
 
-def min_max_(x: npt.NDArray, a: float, b: float, mn: float, mx: float) -> npt.NDArray[np.float64]:
+def min_max_(x: npt.NDArray[Any], a: float, b: float, mn: float, mx: float) -> npt.NDArray[np.float64]:
     """Normalize the `x` from the range [`mn`, `mx`] to the range [`a`, `b`]
 
     Args:

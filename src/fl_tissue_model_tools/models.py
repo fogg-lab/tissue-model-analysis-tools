@@ -24,7 +24,7 @@ from fl_tissue_model_tools import data_prep
 
 
 def _check_consec_factor(x: Sequence[float], factor: float, reverse: bool=False) -> bool:
-    """_summary_
+    """Check that consecutive elements of `x` increase by a constant factor.
 
     Args:
         x: An ordered sequence of numbers.
@@ -308,6 +308,7 @@ class UNetXceptionGridSearch():
             metrics: Metrics to track during training. Must include the metric passed to
                 `search()` as `objective`. Note: if the search objective will be "val_[metric]", only
                 [metric] needs to be included.
+    
         """
         self.best_filter_counts = []
         self.best_score = np.NaN
@@ -327,6 +328,16 @@ class UNetXceptionGridSearch():
         data_prep.make_dir(self.save_dir)
     
     def search(self, objective: str, comparison: str, *args, search_verbose: bool=True, **kwargs) -> None:
+        """Execute grid search using `objective` to assess performance.
+
+        Args:
+            objective: Objective function used to assess model performance. Should
+                be one of the metrics passed to __init__().
+            comparison: One of ["min", "max"]. Used to assess hyperparameter performance.
+                If higher score of `objective` is good, use `max`, otherwise, use `min`. 
+            search_verbose: Print out updates during grid search.
+
+        """
         assert comparison == "min" or comparison == "max", f"comparison operator must be either {min} or {max}"
         if comparison == "min":
             self.best_score = np.inf
@@ -380,6 +391,12 @@ class UNetXceptionGridSearch():
                     print(f"Current best ({cur_best_score}) is not an improvement over previous best ({self.best_score}).")
 
     def get_best_model(self) -> None:
+        """Get the best model obtained during the hyperparameter search.
+
+        Returns:
+            The best model found during the hyperparameter search.
+
+        """
         model = build_UNetXception(self.n_outputs, self.img_shape, channels=self.channels, filter_counts=self.best_filter_counts, output_act=self.output_act)
         model.load_weights(f"{self.save_dir}/best_weights_config_{self.best_score_idx}.h5")
         model.compile(optimizer=self.optimizer, loss=self.loss, metrics=self.metrics)
