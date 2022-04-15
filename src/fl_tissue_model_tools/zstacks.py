@@ -17,7 +17,6 @@ from . import defs
 
 
 _zpos_pattern = "(z|Z)[0-9]+_"
-_np_float_types = {np.float16, np.float32, np.float64, np.floa}
 
 
 def _default_get_zpos(z_path: str) -> int:
