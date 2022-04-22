@@ -221,6 +221,17 @@ def augment_img_mask_pairs(x: npt.NDArray[np.float_], y: npt.NDArray[np.int_], r
     return x, y
 
 
+def augment_imgs(x: npt.NDArray[np.float_],  rs: RandomState, rot_options=(0, 90, 180, 270), expand_dims: bool=False) -> npt.NDArray[np.float_]:
+    m = len(x)
+    rots = rs.choice(rot_options, size=m)
+    hflips = rs.choice([True, False], size=m)
+    vflips = rs.choice([True, False], size=m)
+
+    x = d.compute([d.delayed(augment_img)(x[i], rots[i], hflips[i], vflips[i], expand_dims) for i in range(m)])[0]
+    return np.array(x)
+
+
+
 def map2bin(lab: npt.NDArray[np.int_], fg_vals: Sequence[int], bg_vals: Sequence[int], fg: int=1, bg: int=0) -> npt.NDArray[np.int_]:
     fg_mask = np.isin(lab, fg_vals)
     bg_mask = np.isin(lab, bg_vals)
