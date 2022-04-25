@@ -231,7 +231,6 @@ def augment_imgs(x: npt.NDArray[np.float_],  rs: RandomState, rot_options=(0, 90
     return np.array(x)
 
 
-
 def map2bin(lab: npt.NDArray[np.int_], fg_vals: Sequence[int], bg_vals: Sequence[int], fg: int=1, bg: int=0) -> npt.NDArray[np.int_]:
     fg_mask = np.isin(lab, fg_vals)
     bg_mask = np.isin(lab, bg_vals)
