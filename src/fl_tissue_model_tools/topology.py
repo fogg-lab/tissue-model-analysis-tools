@@ -5,7 +5,6 @@ import gudhi as gd
 import networkx as nx
 import numpy.typing as npt
 
-# import sys
 from .graph_recon_DM import graphRecon
 from . import defs
 
@@ -13,7 +12,7 @@ from . import defs
 def __compute_morse_skeleton_and_barcode_one_component(im: npt.ArrayLike, threshold: float, graph_recon_path: str):
     """Fit a Morse skeleton to the image `im`.
 
-        Fits a Morse Skeleton to all components of `im`.
+        Fits a Morse Skeleton to the entire image `im`.
         Also, compute the lower star filtration of the Morse skeleton where each
         vertex's filtration value is the negative distance from the graph center.
 
@@ -62,11 +61,11 @@ def __compute_morse_skeleton_and_barcode_one_component(im: npt.ArrayLike, thresh
         edges = edges.astype('int')
 
         # Create a networkx graph of Morse skeleton
-        # We use the graph to compute the distance of each vertex from the "center" of the graph
+        # We use the networkx graph to compute the distance of each vertex from the "center" of the graph
         # The center is a graph-theoretic notion defined here: https://en.wikipedia.org/wiki/Graph_center
         G = nx.Graph()
         for v0, v1, _ in edges:
-            # Add each graph to the graph with weight = Euclidean distance between endpoints
+            # Add each edge to the graph with weight = Euclidean distance between endpoints
             # Each row in `edges` is an array [i, j, _],
             #   where i and j are ints representing the index of the endpoints.
             # Each row in `verts` is an array [x, y],
@@ -120,9 +119,9 @@ def compute_morse_skeleton_and_barcode_parallel(im: npt.ArrayLike, mask: npt.Arr
 
         Fits a Morse Skeleton to all components of `im` with area larger than `component_min_size`.
         The components are specified by the binary image `mask`, which is a mask of the foreground pixels.
-        Each component is fit in parallel using dask.
-        Also, compute the lower star filtration of the Morse skeleton where each
-        vertex's filtration value is the negative distance from the graph center.
+        Each component is fit in parallel using the dask package.
+        Also, computes the lower star filtration of the Morse skeleton where each
+        vertex's filtration value is the negative distance from the graph center of its connected component
 
         Args:
             im (numpy array of uint8): Grayscale image
@@ -187,16 +186,15 @@ def compute_morse_skeleton_and_barcode_parallel(im: npt.ArrayLike, mask: npt.Arr
         # each row of verts are 2d coordinates of the vertex
         # the vertex coordinates are relative to the bounding box
         # so we translate them to be relative to the original image
-        # verts = np.array([[y + y_min, x + x_min] for y, x in verts])
         #
-        # stats contain the top left corner (x_min, y_min) of the connected component
+        # `component_stats` contain the top left corner (x_min, y_min) of the connected component
         y_min, x_min, _, _, _ = component_stats[idx]
         verts = verts + np.array([y_min, x_min])
         # concatenate vertices and edges with vertices and edges of other connected components
         #
-        # the indices of edges are relative to verts, not verts_total
-        # we need to add the number vertics previously in the Morse skeletons
-        # to each of these indices so they are relative to verts_total
+        # the indices of `edges` are relative to `verts`, not `verts_total`
+        # we need to add the number of vertics previously in the Morse skeletons
+        # to each of these indices so they are relative to `verts_total`
         # (we also ignore the last column of edges as this contains a mysterious variable
         # used by the graph_recon package.)
         num_prev_verts = verts_total.shape[0]
@@ -347,7 +345,7 @@ def compute_morse_skeleton_and_barcode(im: npt.ArrayLike, mask: npt.ArrayLike, g
 
             # concatenate vertices and edges with vertices and edges of other connected components
             #
-            # the indices of edges are relative to `verts`, not `verts_total`
+            # the indices of `edges` are relative to `verts`, not `verts_total`
             # we need to add the number vertics previously in the Morse skeletons
             # to each of these indices so they are relative to `verts_total`
             # (we also ignore the last column of edges as this contains a mysterious variable
