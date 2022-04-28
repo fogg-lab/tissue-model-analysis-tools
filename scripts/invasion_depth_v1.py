@@ -287,7 +287,7 @@ h1 = tl_model.fit(
 
 # # Load best frozen weights before fine tuning
 
-# In[19]:
+# In[ ]:
 
 
 tl_model.load_weights(cp_frozen_filepath)
@@ -295,33 +295,33 @@ tl_model.load_weights(cp_frozen_filepath)
 
 # # Train model (all layers)
 
-# In[20]:
+# In[ ]:
 
 
 # Make base model trainable (leave layers in inference mode)
 models.toggle_TL_freeze(tl_model)
 
 
-# In[21]:
+# In[ ]:
 
 
 tl_model.compile(optimizer=Adam(learning_rate=fine_tune_lr), loss=BinaryCrossentropy(), metrics=[BinaryAccuracy()])
 
 
-# In[22]:
+# In[ ]:
 
 
 tl_model.summary()
 
 
-# In[23]:
+# In[ ]:
 
 
 es_callback = EarlyStopping(monitor=es_criterion, mode=es_mode, min_delta=es_min_delta, patience=es_patience)
 cp_callback = ModelCheckpoint(cp_fine_tune_filepath, monitor=cp_criterion, mode=cp_mode, save_best_only=cp_best_only, save_weights_only=cp_weights_only)
 
 
-# In[24]:
+# In[ ]:
 
 
 h2 = tl_model.fit(
