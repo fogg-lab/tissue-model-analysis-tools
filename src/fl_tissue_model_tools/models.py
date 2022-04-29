@@ -227,15 +227,12 @@ class ResNet50TLHyperModel(kt.HyperModel):
     """ ResNet50 Hypermodel for use with KerasTuner.
 
     """
-    def __init__(self, n_outputs: int, img_shape: tuple[int, int], frozen_optimizer: Optimizer, fine_tune_optimizer: Callable[[Any], Optimizer], loss: Loss, metrics: Sequence, name: str=None, tunable: bool=True, base_init_weights: str="image_net", last_layer_options: Sequence[str]=["conv5_block3_out", "conv5_block2_out", "conv5_block1_out", "conv4_block6_out"], output_act: str="sigmoid", min_fine_tune_lr: float=1e-5, frozen_epochs: int=10, fine_tune_epochs: int=10, base_model_name: str="base_model") -> None:
+    def __init__(self, n_outputs: int, img_shape: tuple[int, int], loss: Loss, metrics: Sequence, name: str=None, tunable: bool=True, base_init_weights: str="image_net", last_layer_options: Sequence[str]=["conv5_block3_out", "conv5_block2_out", "conv5_block1_out", "conv4_block6_out"], output_act: str="sigmoid", adam_beta_1_range: tuple=(0.85, 0.95), adam_beta_2_range: tuple=(0.98, 0.999), frozen_lr_range: tuple=(1e-5, 1e-2), fine_tune_lr_range: tuple=(1e-5, 1e-3), frozen_epochs: int=10, fine_tune_epochs: int=10, base_model_name: str="base_model") -> None:
         """Create ResNet Hypermodel for use with KerasTuner.
 
         Args:
             n_outputs: Number of output units.
             img_shape: Shape (h, w) of input images.
-            frozen_optimizer: Optimizer used for frozen base model training.
-            fine_tune_optimizer: Optimizer used for fine-tune training. This is a function
-                because the fine tune learning rate will be optimized.
             loss: Loss used for training.
             metrics: Metrics to track during training.
             name: Name of transfer learning model (see KerasTuner documentation).
@@ -245,8 +242,10 @@ class ResNet50TLHyperModel(kt.HyperModel):
                 convolution block output layer, due to ResNet50 architecture. This will be
                 optimized.
             output_act: Output activation for classification.
-            min_fine_tune_lr: Minimum fine tune learning rate. Used to set optimization
-                range for fine tune learning rate.
+            adam_beta_1_range: Range of values (min, max) for beta_1. Used for Adam optimizer.
+            adam_beta_2_range: Range of values (min, max) for beta_2. Used for Adam optimizer.
+            frozen_lr_range: Range of values (min, max) for frozen learning rate.
+            fine_tune_lr_range: Range of values (min, max) for fine tune learning rate.
             frozen_epochs: Number of epochs to train frozen model.
             fine_tune_epochs: Number of epochs to fine tune model.
             base_model_name: Name of the base model. Important to know for toggling
@@ -258,15 +257,18 @@ class ResNet50TLHyperModel(kt.HyperModel):
         self.base_init_weights = base_init_weights
         self.last_layer_options = last_layer_options
         self.output_act = output_act
-        self.min_fine_tune_lr = min_fine_tune_lr
+        self.frozen_lr_range = deepcopy(frozen_lr_range)
+        self.fine_tune_lr_range = deepcopy(fine_tune_lr_range)
         self.frozen_epochs = frozen_epochs
         self.fine_tune_epochs = fine_tune_epochs
-        self.frozen_optimizer = frozen_optimizer
-        self.fine_tune_optimizer = fine_tune_optimizer
         self.loss = loss
         self.metrics = metrics
         self.base_model_name = base_model_name
         self.base_model: Model = None
+        self.adam_beta_1_range: float = adam_beta_1_range
+        self.adam_beta_2_range: float = adam_beta_2_range
+        self.adam_beta_1: kt.HyperParameters.Float = None
+        self.adam_beta_2: kt.HyperParameters.Float = None
 
     def build(self, hp: kt.HyperParameters) -> Model:
         ll = hp.Choice("last_resnet_layer", self.last_layer_options)
@@ -277,16 +279,41 @@ class ResNet50TLHyperModel(kt.HyperModel):
             output_act=self.output_act,
             base_model_name=self.base_model_name
         )
-        model.compile(self.frozen_optimizer, self.loss, self.metrics)
+        frozen_lr = hp.Float(
+            "frozen_lr",
+            min_value=self.frozen_lr_range[0],
+            max_value=self.frozen_lr_range[1],
+            sampling="log"
+        )
+        self.adam_beta_1 = hp.Float(
+            "adam_beta_1",
+            min_value=self.adam_beta_1_range[0],
+            max_value=self.adam_beta_1_range[1],
+            sampling="log"
+        )
+        self.adam_beta_2 = hp.Float(
+            "adam_beta_2",
+            min_value=self.adam_beta_2_range[0],
+            max_value=self.adam_beta_2_range[1],
+            sampling="log"
+        )
+        frozen_opt = Adam(learning_rate=frozen_lr, beta_1=self.adam_beta_1, beta_2=self.adam_beta_2)
+        model.compile(frozen_opt, self.loss, self.metrics)
         return model
 
     def fit(self, hp: kt.HyperParameters, model: Model, *args, **kwargs) -> History:
-        fine_tune_lr = hp.Float("fine_tune_lr", min_value=self.min_fine_tune_lr, max_value=1e-3, sampling="log")
+        fine_tune_lr = hp.Float(
+            "fine_tune_lr",
+            min_value=self.fine_tune_lr_range[0],
+            max_value=self.fine_tune_lr_range[1],
+            sampling="log"
+        )
+        fine_tune_opt = Adam(learning_rate=fine_tune_lr, beta_1=self.adam_beta_1, beta_2=self.adam_beta_2)
         # Fit with frozen base model
         model.fit(*args, **kwargs, epochs=self.frozen_epochs)
         # Fine tune full model
         toggle_TL_freeze(model, self.base_model_name)
-        model.compile(self.fine_tune_optimizer(fine_tune_lr), self.loss, self.metrics)
+        model.compile(fine_tune_opt, self.loss, self.metrics)
         return model.fit(*args, **kwargs, epochs=self.fine_tune_epochs)
 
 
