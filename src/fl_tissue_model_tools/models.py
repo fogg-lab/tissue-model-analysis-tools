@@ -7,12 +7,11 @@ import keras_tuner as kt
 import tensorflow.keras.backend as K
 
 from operator import lt, gt
-from ast import Global, Mod
 from copy import deepcopy
 from tensorflow.keras import Input, Model
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Softmax, Conv2D, BatchNormalization, Activation, SeparableConv2D, MaxPooling2D, Conv2DTranspose, UpSampling2D, add
 from tensorflow.keras.applications import resnet50
-from tensorflow.keras.callbacks import History, ModelCheckpoint
+from tensorflow.keras.callbacks import History, ModelCheckpoint, EarlyStopping
 from tensorflow.keras.losses import BinaryCrossentropy, Loss
 from tensorflow.keras.metrics import BinaryAccuracy
 from tensorflow.keras.optimizers import Adam, Optimizer
@@ -227,7 +226,7 @@ class ResNet50TLHyperModel(kt.HyperModel):
     """ ResNet50 Hypermodel for use with KerasTuner.
 
     """
-    def __init__(self, n_outputs: int, img_shape: tuple[int, int], loss: Loss, metrics: Sequence, name: str=None, tunable: bool=True, base_init_weights: str="image_net", last_layer_options: Sequence[str]=["conv5_block3_out", "conv5_block2_out", "conv5_block1_out", "conv4_block6_out"], output_act: str="sigmoid", adam_beta_1_range: tuple=(0.85, 0.95), adam_beta_2_range: tuple=(0.98, 0.999), frozen_lr_range: tuple=(1e-5, 1e-2), fine_tune_lr_range: tuple=(1e-5, 1e-3), frozen_epochs: int=10, fine_tune_epochs: int=10, base_model_name: str="base_model") -> None:
+    def __init__(self, n_outputs: int, img_shape: tuple[int, int], loss: Loss, metrics: Sequence, name: str=None, tunable: bool=True, base_init_weights: str="image_net", last_layer_options: Sequence[str]=["conv5_block3_out", "conv5_block2_out", "conv5_block1_out", "conv4_block6_out"], output_act: str="sigmoid", adam_beta_1_range: tuple=(0.85, 0.95), adam_beta_2_range: tuple=(0.98, 0.999), frozen_lr_range: tuple=(1e-5, 1e-2), fine_tune_lr_range: tuple=(1e-5, 1e-3), frozen_epochs: int=10, fine_tune_epochs: int=10, base_model_name: str="base_model", es_criterion: str="val_loss", es_mode: str="min", es_patience: int=5, es_min_delta: float=0.0001, mcp_criterion: str="val_loss", mcp_mode: str="min", mcp_best_frozen_weights_path: str="best_frozen_weights") -> None:
         """Create ResNet Hypermodel for use with KerasTuner.
 
         Args:
@@ -264,6 +263,13 @@ class ResNet50TLHyperModel(kt.HyperModel):
         self.loss = loss
         self.metrics = metrics
         self.base_model_name = base_model_name
+        self.es_criterion = es_criterion
+        self.es_mode = es_mode
+        self.es_patience = es_patience
+        self.es_min_delta = es_min_delta
+        self.mcp_criterion = mcp_criterion
+        self.mcp_mode = mcp_mode
+        self.mcp_best_frozen_weights_path = mcp_best_frozen_weights_path
         self.base_model: Model = None
         self.adam_beta_1_range: float = adam_beta_1_range
         self.adam_beta_2_range: float = adam_beta_2_range
@@ -302,19 +308,50 @@ class ResNet50TLHyperModel(kt.HyperModel):
         return model
 
     def fit(self, hp: kt.HyperParameters, model: Model, *args, **kwargs) -> History:
+        ### Callbacks ###
+        frozen_es_callback = EarlyStopping(
+            monitor=self.es_criterion,
+            mode=self.es_mode,
+            min_delta=self.es_min_delta,
+            patience=self.es_patience
+        )
+        frozen_mcp_callback = ModelCheckpoint(
+            filepath=self.mcp_best_frozen_weights_path,
+            monitor=self.mcp_criterion,
+            mode=self.mcp_mode,
+            save_best_only=True,
+            save_weights_only=True
+        )
         fine_tune_lr = hp.Float(
             "fine_tune_lr",
             min_value=self.fine_tune_lr_range[0],
             max_value=self.fine_tune_lr_range[1],
             sampling="log"
         )
+        fine_tune_es_callback = EarlyStopping(
+            monitor=self.es_criterion,
+            mode=self.es_mode,
+            min_delta=self.es_min_delta,
+            patience=self.es_patience
+        )
+        # Keras Tuner passes a callbacks argument, pop to remove from
+        # Kwargs (will add back later)
+        kt_callbacks = kwargs.pop("callbacks")
+
+        ### Optimizers ###
         fine_tune_opt = Adam(learning_rate=fine_tune_lr, beta_1=self.adam_beta_1, beta_2=self.adam_beta_2)
+
+        ### Fitting ###
         # Fit with frozen base model
-        model.fit(*args, **kwargs, epochs=self.frozen_epochs)
-        # Fine tune full model
+        model.fit(*args, **kwargs, epochs=self.frozen_epochs, callbacks=kt_callbacks + [frozen_es_callback, frozen_mcp_callback])
+
+        # Load best weights from training with frozen base model
+        model.load_weights(self.mcp_best_frozen_weights_path)
+
+        # Fit fine tuned full model
         toggle_TL_freeze(model, self.base_model_name)
         model.compile(fine_tune_opt, self.loss, self.metrics)
-        return model.fit(*args, **kwargs, epochs=self.fine_tune_epochs)
+        return model.fit(*args, **kwargs, epochs=self.fine_tune_epochs, callbacks=kt_callbacks + [fine_tune_es_callback])
 
 
 class UNetXceptionGridSearch():
