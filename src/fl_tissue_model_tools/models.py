@@ -135,7 +135,9 @@ def build_ResNet50_TL(n_outputs: int, img_shape: tuple[int, int], base_init_weig
     # for fine-tuning. 
     x = base_model(inputs, training=False)
     x = GlobalAveragePooling2D()(x)
-    outputs = Dense(n_outputs, activation=output_act)(x)
+    # outputs = Dense(n_outputs, activation=output_act)(x)
+    x = Dense(n_outputs)(x)
+    outputs = Activation(activation=output_act)(x)
     model = Model(inputs, outputs)
 
     # Set layer properties
