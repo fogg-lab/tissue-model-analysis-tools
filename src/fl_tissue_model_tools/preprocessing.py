@@ -13,7 +13,7 @@ from . import defs
 
 
 def min_max_(x: npt.NDArray, a: float, b: float, mn: float, mx: float) -> npt.NDArray[np.float64]:
-    """Normalize the `x` from the range [`mn`, `mx`] to the range [`a`, `b`]
+    """Normalize the array `x` from the range [`mn`, `mx`] to the range [`a`, `b`]
 
     Args:
         x: The array to be normalized.
@@ -66,7 +66,7 @@ def apply_mask(img: npt.NDArray, mask: npt.NDArray) -> npt.NDArray:
 
 
 def bin_thresh(img: npt.NDArray, img_max: npt.NDArray, threshold: float=0) -> npt.NDArray:
-    """Threshold an image by setting all pixels with value above `threshold` to `img_max`.
+    """Threshold an image by setting all pixels with value above `threshold` to `img_max` and all other pixels to 0.
 
     Args:
         img: Image to be thresholded.
@@ -99,8 +99,8 @@ def exec_threshold(masked: npt.NDArray, mask_idx: Sequence, sd_coef: float, rs: 
         sd_coef: Coefficient of foreground Gaussian standard deviation
             that determines foreground threshold strictness. A negative value
             means that intensities to the left of the
-            foreground Gaussian's mean will be retained. 
-        rs: A NumPy random state object to allow for reproducability. 
+            foreground Gaussian's mean will be retained.
+        rs: A NumPy random state object to allow for reproducability.
 
     Returns:
         Copy of original image with background pixels set to 0.
@@ -199,10 +199,10 @@ def augment_img(img: npt.NDArray[Union[np.float_, np.int_]], rot: int, hflip: bo
         img = cv2.flip(img, 0)
     # Rotation
     rot_mat = cv2.getRotationMatrix2D((hw[1] // 2, hw[0] // 2), rot, 1.0)
-    
+
     if expand_dims:
         img = np.expand_dims(cv2.warpAffine(img, rot_mat, hw), 2)
-    
+
     return img
 
 
@@ -221,6 +221,16 @@ def augment_img_mask_pairs(x: npt.NDArray[np.float_], y: npt.NDArray[np.int_], r
     return x, y
 
 
+def augment_imgs(x: npt.NDArray[np.float_],  rs: RandomState, rot_options=(0, 90, 180, 270), expand_dims: bool=False) -> npt.NDArray[np.float_]:
+    m = len(x)
+    rots = rs.choice(rot_options, size=m)
+    hflips = rs.choice([True, False], size=m)
+    vflips = rs.choice([True, False], size=m)
+
+    x = d.compute([d.delayed(augment_img)(x[i], rots[i], hflips[i], vflips[i], expand_dims) for i in range(m)])[0]
+    return np.array(x)
+
+
 def map2bin(lab: npt.NDArray[np.int_], fg_vals: Sequence[int], bg_vals: Sequence[int], fg: int=1, bg: int=0) -> npt.NDArray[np.int_]:
     fg_mask = np.isin(lab, fg_vals)
     bg_mask = np.isin(lab, bg_vals)
@@ -228,3 +238,23 @@ def map2bin(lab: npt.NDArray[np.int_], fg_vals: Sequence[int], bg_vals: Sequence
     lab_c[fg_mask] = fg
     lab_c[bg_mask] = bg
     return lab_c
+
+
+def balanced_class_weights_from_counts(class_counts) -> dict[Any, float]:
+    """Create balanced weights using class counts.
+
+    Args:
+        class_counts: Counts of number of items in each class. Example:
+            {c1: n_c1, c2: n_c2, ..., ck: n_ck}.
+
+    Returns:
+        dict[Any, float]: Weights for each class. Example:
+            {c1: w_c1, c2: w_c2, ..., ck: w_ck}.
+
+    """
+    n = np.sum(list(class_counts.values()))
+    n_c = len(class_counts.keys())
+    weights = {}
+    for ci, n_ci in class_counts.items():
+        weights[ci] = n / (n_c * n_ci)
+    return weights

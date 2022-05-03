@@ -1,6 +1,9 @@
 # Prototyping files
 oxford_pets_grid_search/
 oxford_pets_toy/
+model_training/resnet50_invasion_depth_demo_v1_best_frozen_weights.h5
+model_training/resnet50_invasion_depth_demo_v1_best_finetune_weights.h5
+model_training/malaria_hp_trials/
 
 # graphRecon files
 src/fl_tissue_model_tools/graph_recon_DM/dataset/
