@@ -79,7 +79,7 @@ with open("../model_training/invasion_depth_hp_space.json", 'r') as fp:
 hp_search_space
 
 
-# In[9]:
+# In[10]:
 
 
 root_data_path = f"{dirs.data_dir}/invasion_data/development"
@@ -122,11 +122,12 @@ adam_beta_2_range = tuple(hp_search_space["adam_beta_2_range"])
 frozen_lr_range = tuple(hp_search_space["frozen_lr_range"])
 fine_tune_lr_range = tuple(hp_search_space["fine_tune_lr_range"])
 last_layer_options = hp_search_space["last_layer_options"]
+num_initial_points = hp_search_space["num_initial_points"]
 max_opt_trials = hp_search_space["max_opt_trials"]
 class_labels = {"no_invasion": 0, "invasion": 1}
 
 
-# In[10]:
+# In[11]:
 
 
 data_prep.make_dir(hp_search_hp_path)
@@ -135,13 +136,13 @@ data_prep.make_dir(hp_search_weights_path)
 
 # # Prep for loading data
 
-# In[11]:
+# In[12]:
 
 
 rs = np.random.RandomState(seed)
 
 
-# In[12]:
+# In[13]:
 
 
 data_paths = {v: glob(f"{root_data_path}/train/{k}/*.tif") for k, v in class_labels.items()}
@@ -149,7 +150,7 @@ for k, v in data_paths.items():
     rs.shuffle(v)
 
 
-# In[13]:
+# In[14]:
 
 
 data_counts = {k: len(v) for k, v in data_paths.items()}
@@ -158,19 +159,19 @@ train_counts = {k: v - val_counts[k] for k, v in data_counts.items()}
 train_class_weights = prep.balanced_class_weights_from_counts(train_counts)
 
 
-# In[14]:
+# In[15]:
 
 
 data_counts
 
 
-# In[15]:
+# In[16]:
 
 
 train_class_weights
 
 
-# In[16]:
+# In[17]:
 
 
 train_data_paths = {k: v[val_counts[k]:] for k, v in data_paths.items()}
@@ -221,12 +222,13 @@ hypermodel = models.ResNet50TLHyperModel(
 )
 
 
-# In[20]:
+# In[21]:
 
 
 tuner = kt.BayesianOptimization(
     hypermodel=hypermodel,
     objective="val_loss",
+    num_initial_points=num_initial_points,
     max_trials=max_opt_trials,
     seed=seed,
     # directory="../model_training/",
@@ -235,7 +237,7 @@ tuner = kt.BayesianOptimization(
 )
 
 
-# In[21]:
+# In[ ]:
 
 
 # Cannot use external callbacks. Callbacks are defined inside the hypermodel's fit function
@@ -246,25 +248,25 @@ tuner.search(
 )
 
 
-# In[22]:
+# In[ ]:
 
 
 tuner.results_summary()
 
 
-# In[23]:
+# In[ ]:
 
 
 best_hp = tuner.get_best_hyperparameters()[0]
 
 
-# In[25]:
+# In[ ]:
 
 
 best_hp.values
 
 
-# In[26]:
+# In[ ]:
 
 
 # with open("../model_training/best_hp_values.json", "w") as fp:
@@ -272,13 +274,13 @@ with open(best_hp_file, "w") as fp:
     json.dump(best_hp.values, fp, sort_keys=True)
 
 
-# In[27]:
+# In[ ]:
 
 
 best_tl_model = tuner.get_best_models()[0]
 
 
-# In[28]:
+# In[ ]:
 
 
 best_tl_model.summary()
