@@ -1,0 +1,1 @@
+Notebook scripts (exported notebooks) should be saved here & added to .gitignore. These scripts are useful for training models on the HPC.
