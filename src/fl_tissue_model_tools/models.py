@@ -3,15 +3,15 @@ import numpy as np
 import dask as d
 import tensorflow as tf
 import keras_tuner as kt
-import keras.backend as K
+# import keras.backend as K
+import tensorflow.keras.backend as K
 
 from operator import lt, gt
-from ast import Global, Mod
 from copy import deepcopy
 from tensorflow.keras import Input, Model
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Softmax, Conv2D, BatchNormalization, Activation, SeparableConv2D, MaxPooling2D, Conv2DTranspose, UpSampling2D, add
 from tensorflow.keras.applications import resnet50
-from tensorflow.keras.callbacks import History, ModelCheckpoint
+from tensorflow.keras.callbacks import History, ModelCheckpoint, EarlyStopping
 from tensorflow.keras.losses import BinaryCrossentropy, Loss
 from tensorflow.keras.metrics import BinaryAccuracy
 from tensorflow.keras.optimizers import Adam, Optimizer
@@ -47,7 +47,7 @@ def _check_consec_factor(x: Sequence[float], factor: float, reverse: bool=False)
     for i in range(1, len(x)):
         res = res and (x[i] == x[i - 1] * factor)
     return res
-    
+
 
 def toggle_TL_freeze(tl_model: Model, base_model_name: str="base_model") -> None:
     """Toggle the `trainable` property of a transfer learning model.
@@ -70,7 +70,7 @@ def mean_iou_coef(y: tf.Tensor, yhat: tf.Tensor, smooth: float=1.0, obs_axes: tu
     Args:
         y: True labels.
         yhat: Predicted labels.
-        smooth: Accounts for case of zero union. 
+        smooth: Accounts for case of zero union.
         obs_axes: Axes to collapse when computing IoU.
         thresh: Threshold that decides classification. Value of > 0.5
             will yield a more "picky" classification.
@@ -96,7 +96,7 @@ def mean_iou_coef_factory(smooth: int=1, obs_axes: tuple[int, ...]=(1, 2, 3), th
     in with the values desired by the user.
 
     Args:
-        smooth: Accounts for case of zero union. 
+        smooth: Accounts for case of zero union.
         obs_axes: Axes to collapse when computing IoU.
         thresh: Threshold that decides classification. Value of > 0.5
             will yield a more "picky" classification.
@@ -132,10 +132,12 @@ def build_ResNet50_TL(n_outputs: int, img_shape: tuple[int, int], base_init_weig
     base_model = Model(inputs=resnet50_model.input, outputs=resnet50_model.layers[bll_idx].output)
     inputs = Input(shape=img_shape)
     # Base model layers should run in inference mode, even after unfreezing base model
-    # for fine-tuning. 
+    # for fine-tuning.
     x = base_model(inputs, training=False)
     x = GlobalAveragePooling2D()(x)
-    outputs = Dense(n_outputs, activation=output_act)(x)
+    # outputs = Dense(n_outputs, activation=output_act)(x)
+    x = Dense(n_outputs)(x)
+    outputs = Activation(activation=output_act)(x)
     model = Model(inputs, outputs)
 
     # Set layer properties
@@ -189,13 +191,13 @@ def build_UNetXception(n_outputs: int, img_shape: tuple[int, int], channels: int
         x = BatchNormalization()(x)
 
         x = MaxPooling2D(3, strides=2, padding="same")(x)
-        
+
         residual = Conv2D(filters, 1, strides=2, padding="same")(previous_block_activation)
 
         x = add([x, residual])
 
         previous_block_activation = x
-    
+
     # Upsampling
     for filters in list(reversed(filter_counts)):
         x = Activation("relu")(x)
@@ -212,7 +214,7 @@ def build_UNetXception(n_outputs: int, img_shape: tuple[int, int], channels: int
         residual = Conv2D(filters, 1, padding="same")(residual)
         x = add([x, residual])
         previous_block_activation = x
-    
+
     # Output
     outputs = Conv2D(n_outputs, 3, activation=output_act, padding="same")(x)
 
@@ -226,15 +228,12 @@ class ResNet50TLHyperModel(kt.HyperModel):
     """ ResNet50 Hypermodel for use with KerasTuner.
 
     """
-    def __init__(self, n_outputs: int, img_shape: tuple[int, int], frozen_optimizer: Optimizer, fine_tune_optimizer: Callable[[Any], Optimizer], loss: Loss, metrics: Sequence, name: str=None, tunable: bool=True, base_init_weights: str="image_net", last_layer_options: Sequence[str]=["conv5_block3_out", "conv5_block2_out", "conv5_block1_out", "conv4_block6_out"], output_act: str="sigmoid", min_fine_tune_lr: float=1e-5, frozen_epochs: int=10, fine_tune_epochs: int=10, base_model_name: str="base_model") -> None:
+    def __init__(self, n_outputs: int, img_shape: tuple[int, int], loss: Loss, weighted_metrics: Sequence, name: str=None, tunable: bool=True, base_init_weights: str="image_net", last_layer_options: Sequence[str]=["conv5_block3_out", "conv5_block2_out", "conv5_block1_out", "conv4_block6_out"], output_act: str="sigmoid", adam_beta_1_range: tuple=(0.85, 0.95), adam_beta_2_range: tuple=(0.98, 0.999), frozen_lr_range: tuple=(1e-5, 1e-2), fine_tune_lr_range: tuple=(1e-5, 1e-3), frozen_epochs: int=10, fine_tune_epochs: int=10, base_model_name: str="base_model", es_criterion: str="val_loss", es_mode: str="min", es_patience: int=5, es_min_delta: float=0.0001, mcp_criterion: str="val_loss", mcp_mode: str="min", mcp_best_frozen_weights_path: str="best_frozen_weights") -> None:
         """Create ResNet Hypermodel for use with KerasTuner.
 
         Args:
             n_outputs: Number of output units.
             img_shape: Shape (h, w) of input images.
-            frozen_optimizer: Optimizer used for frozen base model training.
-            fine_tune_optimizer: Optimizer used for fine-tune training. This is a function
-                because the fine tune learning rate will be optimized.
             loss: Loss used for training.
             metrics: Metrics to track during training.
             name: Name of transfer learning model (see KerasTuner documentation).
@@ -244,8 +243,10 @@ class ResNet50TLHyperModel(kt.HyperModel):
                 convolution block output layer, due to ResNet50 architecture. This will be
                 optimized.
             output_act: Output activation for classification.
-            min_fine_tune_lr: Minimum fine tune learning rate. Used to set optimization
-                range for fine tune learning rate.
+            adam_beta_1_range: Range of values (min, max) for beta_1. Used for Adam optimizer.
+            adam_beta_2_range: Range of values (min, max) for beta_2. Used for Adam optimizer.
+            frozen_lr_range: Range of values (min, max) for frozen learning rate.
+            fine_tune_lr_range: Range of values (min, max) for fine tune learning rate.
             frozen_epochs: Number of epochs to train frozen model.
             fine_tune_epochs: Number of epochs to fine tune model.
             base_model_name: Name of the base model. Important to know for toggling
@@ -257,15 +258,25 @@ class ResNet50TLHyperModel(kt.HyperModel):
         self.base_init_weights = base_init_weights
         self.last_layer_options = last_layer_options
         self.output_act = output_act
-        self.min_fine_tune_lr = min_fine_tune_lr
+        self.frozen_lr_range = deepcopy(frozen_lr_range)
+        self.fine_tune_lr_range = deepcopy(fine_tune_lr_range)
         self.frozen_epochs = frozen_epochs
         self.fine_tune_epochs = fine_tune_epochs
-        self.frozen_optimizer = frozen_optimizer
-        self.fine_tune_optimizer = fine_tune_optimizer
         self.loss = loss
-        self.metrics = metrics
+        self.weighted_metrics = weighted_metrics
         self.base_model_name = base_model_name
+        self.es_criterion = es_criterion
+        self.es_mode = es_mode
+        self.es_patience = es_patience
+        self.es_min_delta = es_min_delta
+        self.mcp_criterion = mcp_criterion
+        self.mcp_mode = mcp_mode
+        self.mcp_best_frozen_weights_path = mcp_best_frozen_weights_path
         self.base_model: Model = None
+        self.adam_beta_1_range: float = adam_beta_1_range
+        self.adam_beta_2_range: float = adam_beta_2_range
+        self.adam_beta_1: kt.HyperParameters.Float = None
+        self.adam_beta_2: kt.HyperParameters.Float = None
 
     def build(self, hp: kt.HyperParameters) -> Model:
         ll = hp.Choice("last_resnet_layer", self.last_layer_options)
@@ -276,17 +287,73 @@ class ResNet50TLHyperModel(kt.HyperModel):
             output_act=self.output_act,
             base_model_name=self.base_model_name
         )
-        model.compile(self.frozen_optimizer, self.loss, self.metrics)
+        frozen_lr = hp.Float(
+            "frozen_lr",
+            min_value=self.frozen_lr_range[0],
+            max_value=self.frozen_lr_range[1],
+            sampling="log"
+        )
+        self.adam_beta_1 = hp.Float(
+            "adam_beta_1",
+            min_value=self.adam_beta_1_range[0],
+            max_value=self.adam_beta_1_range[1],
+            sampling="log"
+        )
+        self.adam_beta_2 = hp.Float(
+            "adam_beta_2",
+            min_value=self.adam_beta_2_range[0],
+            max_value=self.adam_beta_2_range[1],
+            sampling="log"
+        )
+        frozen_opt = Adam(learning_rate=frozen_lr, beta_1=self.adam_beta_1, beta_2=self.adam_beta_2)
+        model.compile(frozen_opt, self.loss, weighted_metrics=self.weighted_metrics)
         return model
 
     def fit(self, hp: kt.HyperParameters, model: Model, *args, **kwargs) -> History:
-        fine_tune_lr = hp.Float("fine_tune_lr", min_value=self.min_fine_tune_lr, max_value=1e-3, sampling="log")
+        ### Callbacks ###
+        frozen_es_callback = EarlyStopping(
+            monitor=self.es_criterion,
+            mode=self.es_mode,
+            min_delta=self.es_min_delta,
+            patience=self.es_patience
+        )
+        frozen_mcp_callback = ModelCheckpoint(
+            filepath=self.mcp_best_frozen_weights_path,
+            monitor=self.mcp_criterion,
+            mode=self.mcp_mode,
+            save_best_only=True,
+            save_weights_only=True
+        )
+        fine_tune_lr = hp.Float(
+            "fine_tune_lr",
+            min_value=self.fine_tune_lr_range[0],
+            max_value=self.fine_tune_lr_range[1],
+            sampling="log"
+        )
+        fine_tune_es_callback = EarlyStopping(
+            monitor=self.es_criterion,
+            mode=self.es_mode,
+            min_delta=self.es_min_delta,
+            patience=self.es_patience
+        )
+        # Keras Tuner passes a callbacks argument, pop to remove from
+        # Kwargs (will add back later)
+        kt_callbacks = kwargs.pop("callbacks")
+
+        ### Optimizers ###
+        fine_tune_opt = Adam(learning_rate=fine_tune_lr, beta_1=self.adam_beta_1, beta_2=self.adam_beta_2)
+
+        ### Fitting ###
         # Fit with frozen base model
-        model.fit(*args, **kwargs, epochs=self.frozen_epochs)
-        # Fine tune full model
+        model.fit(*args, **kwargs, epochs=self.frozen_epochs, callbacks=kt_callbacks + [frozen_es_callback, frozen_mcp_callback])
+
+        # Load best weights from training with frozen base model
+        model.load_weights(self.mcp_best_frozen_weights_path)
+
+        # Fit fine tuned full model
         toggle_TL_freeze(model, self.base_model_name)
-        model.compile(self.fine_tune_optimizer(fine_tune_lr), self.loss, self.metrics)
-        return model.fit(*args, **kwargs, epochs=self.fine_tune_epochs)
+        model.compile(fine_tune_opt, self.loss, weighted_metrics=self.weighted_metrics)
+        return model.fit(*args, **kwargs, epochs=self.fine_tune_epochs, callbacks=kt_callbacks + [fine_tune_es_callback])
 
 
 class UNetXceptionGridSearch():
@@ -294,7 +361,7 @@ class UNetXceptionGridSearch():
 
     """
     def __init__(self, save_dir: str, filter_counts_options: Sequence[tuple[int, int, int, int]], n_outputs: int, img_shape: tuple[int, int], optimizer, loss, channels: int=1, output_act: str="sigmoid", callbacks=[], metrics=None) -> None:
-        """Create wrapper class for handling grid search for UNet model. 
+        """Create wrapper class for handling grid search for UNet model.
 
         Args:
             save_dir: Root directory for saving optimization output.
@@ -311,7 +378,7 @@ class UNetXceptionGridSearch():
             metrics: Metrics to track during training. Must include the metric passed to
                 `search()` as `objective`. Note: if the search objective will be "val_[metric]", only
                 [metric] needs to be included.
-    
+
         """
         self.best_filter_counts = []
         self.best_score = np.NaN
@@ -329,7 +396,7 @@ class UNetXceptionGridSearch():
         self.histories = []
 
         data_prep.make_dir(self.save_dir)
-    
+
     def search(self, objective: str, comparison: str, *args, search_verbose: bool=True, **kwargs) -> None:
         """Execute grid search using `objective` to assess performance.
 
@@ -337,11 +404,11 @@ class UNetXceptionGridSearch():
             objective: Objective function used to assess model performance. Should
                 be one of the metrics passed to __init__().
             comparison: One of ["min", "max"]. Used to assess hyperparameter performance.
-                If higher score of `objective` is good, use `max`, otherwise, use `min`. 
+                If higher score of `objective` is good, use `max`, otherwise, use `min`.
             search_verbose: Print out updates during grid search.
 
         """
-        assert comparison == "min" or comparison == "max", f"comparison operator must be either {min} or {max}"
+        assert comparison == "min" or comparison == "max", f"comparison operator must be either \"min\" or \"max\""
         if comparison == "min":
             self.best_score = np.inf
             compare = lt
@@ -352,8 +419,10 @@ class UNetXceptionGridSearch():
             compare = gt
             get_best = np.max
             get_best_idx = np.argmax
-        
 
+
+        # iterate through the input list of filter counts,
+        # fit a unet with each, and save the best
         for i, fc in enumerate(self.filter_counts_options):
             if search_verbose:
                 print(f"Testing filter counts: {fc}")
@@ -363,15 +432,15 @@ class UNetXceptionGridSearch():
             model.compile(optimizer=self.optimizer, loss=self.loss, metrics=self.metrics)
             h = model.fit(callbacks=self.callbacks + [cp_callback],*args, **kwargs)
             self.histories.append(h)
-            
+
             cur_best_score = get_best(h.history[objective])
             cur_best_score_idx = get_best_idx(h.history[objective])
             if search_verbose:
                 print(f"Best objective value observed: {cur_best_score}")
                 print(f"Best objective value observed on epoch: {cur_best_score_idx + 1}")
                 print(f"Previous best score: {self.best_score}")
-            
-            # If model is an improvement
+
+            # If model is an improvement, notify user and save model
             if compare(cur_best_score, self.best_score):
                 if search_verbose:
                     print(f"Current best ({cur_best_score}) is an improvement over previous best ({self.best_score}).")
