@@ -228,7 +228,7 @@ class ResNet50TLHyperModel(kt.HyperModel):
     """ ResNet50 Hypermodel for use with KerasTuner.
 
     """
-    def __init__(self, n_outputs: int, img_shape: tuple[int, int], loss: Loss, metrics: Sequence, name: str=None, tunable: bool=True, base_init_weights: str="image_net", last_layer_options: Sequence[str]=["conv5_block3_out", "conv5_block2_out", "conv5_block1_out", "conv4_block6_out"], output_act: str="sigmoid", adam_beta_1_range: tuple=(0.85, 0.95), adam_beta_2_range: tuple=(0.98, 0.999), frozen_lr_range: tuple=(1e-5, 1e-2), fine_tune_lr_range: tuple=(1e-5, 1e-3), frozen_epochs: int=10, fine_tune_epochs: int=10, base_model_name: str="base_model", es_criterion: str="val_loss", es_mode: str="min", es_patience: int=5, es_min_delta: float=0.0001, mcp_criterion: str="val_loss", mcp_mode: str="min", mcp_best_frozen_weights_path: str="best_frozen_weights") -> None:
+    def __init__(self, n_outputs: int, img_shape: tuple[int, int], loss: Loss, weighted_metrics: Sequence, name: str=None, tunable: bool=True, base_init_weights: str="image_net", last_layer_options: Sequence[str]=["conv5_block3_out", "conv5_block2_out", "conv5_block1_out", "conv4_block6_out"], output_act: str="sigmoid", adam_beta_1_range: tuple=(0.85, 0.95), adam_beta_2_range: tuple=(0.98, 0.999), frozen_lr_range: tuple=(1e-5, 1e-2), fine_tune_lr_range: tuple=(1e-5, 1e-3), frozen_epochs: int=10, fine_tune_epochs: int=10, base_model_name: str="base_model", es_criterion: str="val_loss", es_mode: str="min", es_patience: int=5, es_min_delta: float=0.0001, mcp_criterion: str="val_loss", mcp_mode: str="min", mcp_best_frozen_weights_path: str="best_frozen_weights") -> None:
         """Create ResNet Hypermodel for use with KerasTuner.
 
         Args:
@@ -263,7 +263,7 @@ class ResNet50TLHyperModel(kt.HyperModel):
         self.frozen_epochs = frozen_epochs
         self.fine_tune_epochs = fine_tune_epochs
         self.loss = loss
-        self.metrics = metrics
+        self.weighted_metrics = weighted_metrics
         self.base_model_name = base_model_name
         self.es_criterion = es_criterion
         self.es_mode = es_mode
@@ -306,7 +306,7 @@ class ResNet50TLHyperModel(kt.HyperModel):
             sampling="log"
         )
         frozen_opt = Adam(learning_rate=frozen_lr, beta_1=self.adam_beta_1, beta_2=self.adam_beta_2)
-        model.compile(frozen_opt, self.loss, self.metrics)
+        model.compile(frozen_opt, self.loss, weighted_metrics=self.weighted_metrics)
         return model
 
     def fit(self, hp: kt.HyperParameters, model: Model, *args, **kwargs) -> History:
@@ -352,7 +352,7 @@ class ResNet50TLHyperModel(kt.HyperModel):
 
         # Fit fine tuned full model
         toggle_TL_freeze(model, self.base_model_name)
-        model.compile(fine_tune_opt, self.loss, self.metrics)
+        model.compile(fine_tune_opt, self.loss, weighted_metrics=self.weighted_metrics)
         return model.fit(*args, **kwargs, epochs=self.fine_tune_epochs, callbacks=kt_callbacks + [fine_tune_es_callback])
 
 
