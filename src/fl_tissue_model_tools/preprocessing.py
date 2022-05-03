@@ -221,6 +221,16 @@ def augment_img_mask_pairs(x: npt.NDArray[np.float_], y: npt.NDArray[np.int_], r
     return x, y
 
 
+def augment_imgs(x: npt.NDArray[np.float_],  rs: RandomState, rot_options=(0, 90, 180, 270), expand_dims: bool=False) -> npt.NDArray[np.float_]:
+    m = len(x)
+    rots = rs.choice(rot_options, size=m)
+    hflips = rs.choice([True, False], size=m)
+    vflips = rs.choice([True, False], size=m)
+
+    x = d.compute([d.delayed(augment_img)(x[i], rots[i], hflips[i], vflips[i], expand_dims) for i in range(m)])[0]
+    return np.array(x)
+
+
 def map2bin(lab: npt.NDArray[np.int_], fg_vals: Sequence[int], bg_vals: Sequence[int], fg: int=1, bg: int=0) -> npt.NDArray[np.int_]:
     fg_mask = np.isin(lab, fg_vals)
     bg_mask = np.isin(lab, bg_vals)
@@ -228,3 +238,23 @@ def map2bin(lab: npt.NDArray[np.int_], fg_vals: Sequence[int], bg_vals: Sequence
     lab_c[fg_mask] = fg
     lab_c[bg_mask] = bg
     return lab_c
+
+
+def balanced_class_weights_from_counts(class_counts) -> dict[Any, float]:
+    """Create balanced weights using class counts.
+
+    Args:
+        class_counts: Counts of number of items in each class. Example:
+            {c1: n_c1, c2: n_c2, ..., ck: n_ck}.
+
+    Returns:
+        dict[Any, float]: Weights for each class. Example:
+            {c1: w_c1, c2: w_c2, ..., ck: w_ck}.
+
+    """
+    n = np.sum(list(class_counts.values()))
+    n_c = len(class_counts.keys())
+    weights = {}
+    for ci, n_ci in class_counts.items():
+        weights[ci] = n / (n_c * n_ci)
+    return weights
