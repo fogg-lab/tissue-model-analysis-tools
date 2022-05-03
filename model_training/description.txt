@@ -1,1 +1,1 @@
-Fitted model weights and hyperparameter files should be saved here.
+Fitted (best) model weights and hyperparameter files should be saved here. Also, parameters used across projects for training.
