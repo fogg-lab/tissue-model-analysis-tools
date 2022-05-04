@@ -279,14 +279,8 @@ class ResNet50TLHyperModel(kt.HyperModel):
         self.adam_beta_2: kt.HyperParameters.Float = None
 
     def build(self, hp: kt.HyperParameters) -> Model:
+        ### Hyperparameters ###
         ll = hp.Choice("last_resnet_layer", self.last_layer_options)
-        model = build_ResNet50_TL(
-            self.n_outputs,
-            self.img_shape,
-            base_last_layer=ll,
-            output_act=self.output_act,
-            base_model_name=self.base_model_name
-        )
         frozen_lr = hp.Float(
             "frozen_lr",
             min_value=self.frozen_lr_range[0],
@@ -305,7 +299,19 @@ class ResNet50TLHyperModel(kt.HyperModel):
             max_value=self.adam_beta_2_range[1],
             sampling="log"
         )
+
+        ### Build model ###
+        model = build_ResNet50_TL(
+            self.n_outputs,
+            self.img_shape,
+            base_last_layer=ll,
+            output_act=self.output_act,
+            base_model_name=self.base_model_name
+        )
+
+        ### Optimizer (frozen) ###
         frozen_opt = Adam(learning_rate=frozen_lr, beta_1=self.adam_beta_1, beta_2=self.adam_beta_2)
+
         model.compile(frozen_opt, self.loss, weighted_metrics=self.weighted_metrics)
         return model
 
@@ -324,23 +330,26 @@ class ResNet50TLHyperModel(kt.HyperModel):
             save_best_only=True,
             save_weights_only=True
         )
-        fine_tune_lr = hp.Float(
-            "fine_tune_lr",
-            min_value=self.fine_tune_lr_range[0],
-            max_value=self.fine_tune_lr_range[1],
-            sampling="log"
-        )
         fine_tune_es_callback = EarlyStopping(
             monitor=self.es_criterion,
             mode=self.es_mode,
             min_delta=self.es_min_delta,
             patience=self.es_patience
         )
+
+        ### Hyperparameters (fine tune) ###
+        fine_tune_lr = hp.Float(
+            "fine_tune_lr",
+            min_value=self.fine_tune_lr_range[0],
+            max_value=self.fine_tune_lr_range[1],
+            sampling="log"
+        )
+
         # Keras Tuner passes a callbacks argument, pop to remove from
         # Kwargs (will add back later)
         kt_callbacks = kwargs.pop("callbacks")
 
-        ### Optimizers ###
+        ### Optimizer (fine tune) ###
         fine_tune_opt = Adam(learning_rate=fine_tune_lr, beta_1=self.adam_beta_1, beta_2=self.adam_beta_2)
 
         ### Fitting ###

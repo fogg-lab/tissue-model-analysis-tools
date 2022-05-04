@@ -60,6 +60,7 @@ def save_class_imgs(img_paths: Sequence[str], split_list: Sequence[int], split_m
         img_n = img_p.split("/")[-1]
         shutil.copy(img_p, f"{dset_path}/{split_map[split_list[i]]}/{img_class}/{img_n}")
 
+
 class InvasionDataGenerator(utils.Sequence):
     def __init__(self, data_paths, class_labels, batch_size, img_shape, random_state, class_weights=None, shuffle=True, augmentation_function=None):
         self.data_paths = deepcopy(data_paths)
