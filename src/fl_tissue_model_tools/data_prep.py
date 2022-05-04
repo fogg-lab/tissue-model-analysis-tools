@@ -61,6 +61,22 @@ def save_class_imgs(img_paths: Sequence[str], split_list: Sequence[int], split_m
         shutil.copy(img_p, f"{dset_path}/{split_map[split_list[i]]}/{img_class}/{img_n}")
 
 
+# TODO: use this as a helper function in the InvasionDataGenerator
+# image loading code to avoid redundancy.
+def load_inv_depth_img(path, img_shape):
+        img = cv2.imread(path, cv2.IMREAD_ANYDEPTH)
+        img = prep.min_max_(cv2.resize(img, img_shape, cv2.INTER_LANCZOS4).astype(np.float32), defs.GS_MIN, defs.GS_MAX, defs.TIF_MIN, defs.TIF_MAX)
+        img = np.repeat(img[:, :, np.newaxis], 3, axis=2)
+        return img
+
+
+# TODO: use this as a helper function in the InvasionDataGenerator
+# image loading code to avoid redundancy.
+def prep_inv_depth_imgs(paths, img_shape):
+    imgs = np.array(d.compute((d.delayed(load_inv_depth_img)(p, img_shape) for p in paths))[0])
+    return resnet50.preprocess_input(imgs)
+
+
 class InvasionDataGenerator(utils.Sequence):
     def __init__(self, data_paths, class_labels, batch_size, img_shape, random_state, class_weights=None, shuffle=True, augmentation_function=None):
         self.data_paths = deepcopy(data_paths)
@@ -110,7 +126,6 @@ class InvasionDataGenerator(utils.Sequence):
 
         return X, y[:, np.newaxis]
 
-    
     def _get_paths_and_counts(self, data_paths):
         self.class_paths = deepcopy(data_paths)
         self.class_counts = {c: len(pn) for c, pn in self.class_paths.items()}
