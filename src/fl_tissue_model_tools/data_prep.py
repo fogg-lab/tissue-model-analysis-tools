@@ -76,11 +76,12 @@ class InvasionDataGenerator(utils.Sequence):
         self.augmentation_function = augmentation_function
         self._get_paths_and_counts(data_paths)
         self.indices = np.arange(len(self.img_paths), dtype=np.uint)
+        if self.shuffle:
+            self.shuffle_indices()
         if class_weights != None:
             self.class_weights = deepcopy(class_weights)
         else:
             self.class_weights = None
-        self.shuffle_indices()
 
     def __len__(self):
         # return len()
