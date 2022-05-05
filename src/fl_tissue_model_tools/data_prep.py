@@ -3,6 +3,8 @@ import shutil
 import numpy as np
 import dask as d
 import cv2
+import numpy.typing as npt
+
 from typing import Sequence
 from copy import deepcopy
 
@@ -63,17 +65,35 @@ def save_class_imgs(img_paths: Sequence[str], split_list: Sequence[int], split_m
 
 # TODO: use this as a helper function in the InvasionDataGenerator
 # image loading code to avoid redundancy.
-def load_inv_depth_img(path, img_shape):
-        img = cv2.imread(path, cv2.IMREAD_ANYDEPTH)
-        img = prep.min_max_(cv2.resize(img, img_shape, cv2.INTER_LANCZOS4).astype(np.float32), defs.GS_MIN, defs.GS_MAX, defs.TIF_MIN, defs.TIF_MAX)
-        img = np.repeat(img[:, :, np.newaxis], 3, axis=2)
-        return img
+def load_inv_depth_img(path: str, img_hw: tuple[int, int]) -> npt.NDarray:
+    """Load an invasion depth image and convert it to grayscale with 3 redundant channels.
+
+    Args:
+        path: Path to image. Assumed to be .tif.
+        img_hw: Desired height and width for image to be resized to.
+
+    Returns:
+        Preprocessed invasion depth image.
+    """
+    img = cv2.imread(path, cv2.IMREAD_ANYDEPTH)
+    img = prep.min_max_(cv2.resize(img, img_hw, cv2.INTER_LANCZOS4).astype(np.float32), defs.GS_MIN, defs.GS_MAX, defs.TIF_MIN, defs.TIF_MAX)
+    img = np.repeat(img[:, :, np.newaxis], 3, axis=2)
+    return img
 
 
 # TODO: use this as a helper function in the InvasionDataGenerator
 # image loading code to avoid redundancy.
-def prep_inv_depth_imgs(paths, img_shape):
-    imgs = np.array(d.compute((d.delayed(load_inv_depth_img)(p, img_shape) for p in paths))[0])
+def prep_inv_depth_imgs(paths: Sequence[str], img_hw: tuple[int, int]) -> npt.NDArray:
+    """Prepare a batch of invasion depth images.
+
+    Args:
+        paths: Paths to each image in batch.
+        img_hw: Desired height and width for each image to be resized to.
+
+    Returns:
+        Preprocessed invasion depth images.
+    """
+    imgs = np.array(d.compute((d.delayed(load_inv_depth_img)(p, img_hw) for p in paths))[0])
     return resnet50.preprocess_input(imgs)
 
 
