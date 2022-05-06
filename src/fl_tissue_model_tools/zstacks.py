@@ -101,6 +101,14 @@ def z_stack_from_dir(z_stack_dir: str, file_ext: str="tif", descending: bool=Tru
     return sorted_z_paths, np.array([cv2.imread(img_n, flag) for img_n in sorted_z_paths])
 
 
+def z_stack_paths_from_dir(z_stack_dir: str, file_ext: str="tif", descending: bool=True, get_zpos: Optional[Callable[[str], int]]=None) -> Sequence[str]:
+    z_paths = [fn.replace("\\", "/") for fn in glob(f"{z_stack_dir}/*.{file_ext}")]
+    if get_zpos == None:
+        get_zpos = _default_get_zpos
+    sorted_z_paths = sorted(z_paths, key = lambda zp: get_zpos(zp), reverse = descending)
+    return sorted_z_paths
+
+
 def proj_focus_stacking(stack: npt.NDArray, axis: int=0, kernel_size:int=5) -> npt.NDArray:
     """Project image stack along given axis using focus stacking.
 
