@@ -13,7 +13,7 @@ from . import defs
 
 
 def min_max_(x: npt.NDArray, a: float, b: float, mn: float, mx: float) -> npt.NDArray[np.float64]:
-    """Normalize the `x` from the range [`mn`, `mx`] to the range [`a`, `b`]
+    """Normalize the array `x` from the range [`mn`, `mx`] to the range [`a`, `b`]
 
     Args:
         x: The array to be normalized.
@@ -66,7 +66,7 @@ def apply_mask(img: npt.NDArray, mask: npt.NDArray) -> npt.NDArray:
 
 
 def bin_thresh(img: npt.NDArray, img_max: npt.NDArray, threshold: float=0) -> npt.NDArray:
-    """Threshold an image by setting all pixels with value above `threshold` to `img_max`.
+    """Threshold an image by setting all pixels with value above `threshold` to `img_max` and all other pixels to 0.
 
     Args:
         img: Image to be thresholded.
@@ -99,8 +99,8 @@ def exec_threshold(masked: npt.NDArray, mask_idx: Sequence, sd_coef: float, rs: 
         sd_coef: Coefficient of foreground Gaussian standard deviation
             that determines foreground threshold strictness. A negative value
             means that intensities to the left of the
-            foreground Gaussian's mean will be retained. 
-        rs: A NumPy random state object to allow for reproducability. 
+            foreground Gaussian's mean will be retained.
+        rs: A NumPy random state object to allow for reproducability.
 
     Returns:
         Copy of original image with background pixels set to 0.
