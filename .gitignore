@@ -1,3 +1,7 @@
+# Notebook scripts (for HPC)
+scripts/invasion_depth_demo_v1.py
+scripts/invasion_depth_hp_v1.py
+
 # Prototyping files
 oxford_pets_grid_search/
 oxford_pets_toy/
