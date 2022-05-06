@@ -199,9 +199,10 @@ def augment_img(img: npt.NDArray[Union[np.float_, np.int_]], rot: int, hflip: bo
         img = cv2.flip(img, 0)
     # Rotation
     rot_mat = cv2.getRotationMatrix2D((hw[1] // 2, hw[0] // 2), rot, 1.0)
-    
+    img = cv2.warpAffine(img, rot_mat, hw)
+
     if expand_dims:
-        img = np.expand_dims(cv2.warpAffine(img, rot_mat, hw), 2)
+        img = np.expand_dims(img, 2)
     
     return img
 
