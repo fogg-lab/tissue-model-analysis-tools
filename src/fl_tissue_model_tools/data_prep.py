@@ -5,14 +5,18 @@ import dask as d
 import cv2
 import numpy.typing as npt
 
-from typing import Sequence
+from typing import Sequence, Callable
 from copy import deepcopy
+from numpy.random import RandomState
 
 from tensorflow.keras import utils
 from tensorflow.keras.applications import resnet50
 
 from . import defs
 from . import preprocessing as prep
+
+
+AugmentationFunction = Callable[[npt.NDArray, RandomState], npt.NDArray]
 
 
 def make_dir(path: str) -> None:
@@ -65,7 +69,7 @@ def save_class_imgs(img_paths: Sequence[str], split_list: Sequence[int], split_m
 
 # TODO: use this as a helper function in the InvasionDataGenerator
 # image loading code to avoid redundancy.
-def load_inv_depth_img(path: str, img_hw: tuple[int, int]) -> npt.NDarray:
+def load_inv_depth_img(path: str, img_hw: tuple[int, int]) -> npt.NDArray:
     """Load an invasion depth image and convert it to grayscale with 3 redundant channels.
 
     Args:
@@ -98,20 +102,44 @@ def prep_inv_depth_imgs(paths: Sequence[str], img_hw: tuple[int, int]) -> npt.ND
 
 
 class InvasionDataGenerator(utils.Sequence):
-    def __init__(self, data_paths, class_labels, batch_size, img_shape, random_state, class_weights=None, shuffle=True, augmentation_function=None):
-        self.data_paths = deepcopy(data_paths)
-        self.batch_size = batch_size
-        self.img_shape = img_shape
+    """Sequence class for handling invasion depth images. 
+
+    """
+    def __init__(self, class_paths: Sequence[str], class_labels: dict[str, int], batch_size: int, img_shape: tuple[int, int], random_state: RandomState, class_weights: dict[int, float]=None, shuffle: bool=True, augmentation_function: AugmentationFunction=None):
+        """Create sequence class for handling invasion depth images.
+
+        Args:
+            class_paths: Map of class label (integer 0...k) to list of full paths for
+                images within that class.
+            class_labels (dict[str, int]): Mapping from class name (directory name) to number
+                representing class.
+            batch_size: Batch size for training step.
+            img_shape: Desired (H, W) of images.
+            random_state: RandomState object used to allow for reproducability. Seed of
+                RandomState object can be set to `None`.
+            class_weights: Map from class label (integer 0...k) to weights for each class.
+                Used to generate sample weights. Useful for imbalanced data.
+            shuffle: Whether to shuffle data upon generator creation and after each epoch.
+            augmentation_function: Function that can be used to augment the image data.
+                This function must take the specified arguments and an `expand_dims` argument
+                that allows or prevents images from being given an extra depth axis.
+
+        """
+        self.class_paths = deepcopy(class_paths)
         self.class_labels = deepcopy(class_labels)
-        self.class_paths = {}
+        self.batch_size = batch_size
+        self.img_shape = img_shape        
+        self.rs = random_state
+        self.shuffle = shuffle
+        self.augmentation_function = augmentation_function
+
         self.class_counts = {}
         self.img_paths = []
         self.img_labels = []
-        self.shuffle = shuffle
-        self.rs = random_state
-        self.augmentation_function = augmentation_function
-        self._get_paths_and_counts(data_paths)
+
+        self._get_class_counts()
         self.indices = np.arange(len(self.img_paths), dtype=np.uint)
+
         if self.shuffle:
             self.shuffle_indices()
         if class_weights != None:
@@ -120,7 +148,6 @@ class InvasionDataGenerator(utils.Sequence):
             self.class_weights = None
 
     def __len__(self):
-        # return len()
         return len(self.img_paths) // self.batch_size
 
     def __getitem__(self, index):        
@@ -129,11 +156,10 @@ class InvasionDataGenerator(utils.Sequence):
         batch_indices = self.indices[batch_idx_start: batch_idx_end]
 
         img_paths = [self.img_paths[i] for i in batch_indices]
-        # Should it be (B,) or (B,1)?
         y = np.array([self.img_labels[i] for i in batch_indices])
 
         # Generate data
-        X = self.prep_images(img_paths)
+        X = prep_inv_depth_imgs(img_paths, self.img_shape)
         
         if self.augmentation_function != None:
             X = self.augmentation_function(X, self.rs, expand_dims=False)
@@ -146,8 +172,7 @@ class InvasionDataGenerator(utils.Sequence):
 
         return X, y[:, np.newaxis]
 
-    def _get_paths_and_counts(self, data_paths):
-        self.class_paths = deepcopy(data_paths)
+    def _get_class_counts(self):
         self.class_counts = {c: len(pn) for c, pn in self.class_paths.items()}
         for k, v in self.class_paths.items():
             # Paths to each image
@@ -155,21 +180,16 @@ class InvasionDataGenerator(utils.Sequence):
             # Associate labels with each image path
             self.img_labels.extend(list(np.repeat(k, len(v))))
             
-    def _load_img(self, path):
-        img = cv2.imread(path, cv2.IMREAD_ANYDEPTH)
-        img = prep.min_max_(cv2.resize(img, self.img_shape, cv2.INTER_LANCZOS4).astype(np.float32), defs.GS_MIN, defs.GS_MAX, defs.TIF_MIN, defs.TIF_MAX)
-        img = np.repeat(img[:, :, np.newaxis], 3, axis=2)
-        return img
-            
-    def shuffle_indices(self):
-        # print("shuffling")
+    def shuffle_indices(self) -> None:
+        """Shuffle indices used to select image paths for loading into batch.
+
+        """
         self.rs.shuffle(self.indices)
     
-    def on_epoch_end(self):
+    def on_epoch_end(self) -> None:
+        """Perform designated actions at the end of each training epoch.
+
+        """
         self.indices = np.arange(len(self.img_paths), dtype=np.uint)
         if self.shuffle == True:
             self.shuffle_indices()
-
-    def prep_images(self, paths):
-        imgs = np.array(d.compute((d.delayed(self._load_img)(p) for p in paths))[0])
-        return resnet50.preprocess_input(imgs)
