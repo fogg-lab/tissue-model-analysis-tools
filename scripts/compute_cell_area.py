@@ -86,9 +86,11 @@ def main():
         args = su.parse_cell_area_args({"thresh_subdir": thresh_subdir, "calc_subdir": calc_subdir, "default_config_path": default_config_path})
         verbose = args.verbose
 
+
         ### Tidy up paths ###
         in_root = args.in_root.replace("\\", "/")
         out_root = args.out_root.replace("\\", "/")
+
 
         ### Verify input source ###
         extension = args.extension.replace(".", "")
@@ -98,12 +100,14 @@ def main():
             print(f"{su.SFM.failure} {e}")
             sys.exit()
 
+
         ### Verify output destination ###
         try:
             su.cell_area_verify_output_dir(out_root, thresh_subdir, calc_subdir, verbose=verbose)
         except Exception as e:
             print(f"{su.SFM.failure}{e}")
             sys.exit()
+
 
         ### Load config ###
         config_path = args.config
@@ -116,6 +120,8 @@ def main():
         if verbose:
             su.verbose_header("Performing Analysis")
             print("Computing areas...")
+
+
         ### Prep images ###
         dsamp_size = config["dsamp_size"]
         sd_coef = config["sd_coef"]
@@ -130,11 +136,13 @@ def main():
         # Threshold images
         gmm_thresh_all = threshold_images(gs_ds_imgs, circ_mask, pinhole_idx, sd_coef, rs)
 
+
         ### Compute areas ###
         area_prop = compute_areas(gmm_thresh_all, circ_pix_area)
 
         if verbose:
             print("... Arease computed successfully.")
+
 
         ### Save results ###
         if verbose:
