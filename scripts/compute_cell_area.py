@@ -57,6 +57,15 @@ def prep_images(img_names: Sequence[str], dsamp_size: int) -> list[npt.NDArray]:
     return gs_ds_imgs
 
 
+def circ_mask_setup(img_shape: tuple[int, int], pinhole_cut) -> tuple[npt.NDArray, tuple[npt.NDArray, npt.NDArray], int]:
+        img_center = (img_shape[0] // 2, img_shape[1] // 2)
+        circ_rad = img_center[0] - (pinhole_cut)
+        circ_mask = prep.gen_circ_mask(img_center, circ_rad, img_shape, defs.GS_MAX)
+        pinhole_idx = np.where(circ_mask > 0)
+        circ_pix_area = np.sum(circ_mask > 0)
+        return circ_mask, pinhole_idx, circ_pix_area
+
+
 def threshold_images(imgs: list[npt.NDArray], circ_mask: npt.NDArray, pinhole_idx: tuple[npt.NDArray, npt.NDArray], sd_coef: float, rs: np.random.RandomState) -> list[npt.NDArray]:
     gmm_thresh_all = d.compute(
         [d.delayed(mask_and_threshold)(img, circ_mask, pinhole_idx, sd_coef, rs) for img in imgs]
@@ -104,37 +113,37 @@ def main():
             print(f"{su.SFM.failure} {e}")
             sys.exit()
 
+        if verbose:
+            su.verbose_header("Performing Analysis")
+            print("Computing areas...")
         ### Prep images ###
         dsamp_size = config["dsamp_size"]
         sd_coef = config["sd_coef"]
         rs_seed = None if (config["rs_seed"] == "None") else config["rs_seed"]
         pinhole_buffer = config["pinhole_buffer"]
+        rs = np.random.RandomState(rs_seed)
         pinhole_cut = int(round(dsamp_size * pinhole_buffer))
         gs_ds_imgs = prep_images(img_paths, dsamp_size)
 
         # variables for image masking
-        img_shape = gs_ds_imgs[0].shape
-        img_center = (img_shape[0] // 2, img_shape[1] // 2)
-        circ_rad = img_center[0] - (pinhole_cut)
-        circ_mask = prep.gen_circ_mask(img_center, circ_rad, img_shape, defs.GS_MAX)
-        pinhole_idx = np.where(circ_mask > 0)
-        circ_pix_area = np.sum(circ_mask > 0)
-
-        rs = np.random.RandomState(rs_seed)
-
-        ### Threshold images ###
+        circ_mask, pinhole_idx, circ_pix_area = circ_mask_setup(gs_ds_imgs[0].shape, pinhole_cut)
+        # Threshold images
         gmm_thresh_all = threshold_images(gs_ds_imgs, circ_mask, pinhole_idx, sd_coef, rs)
 
         ### Compute areas ###
         area_prop = compute_areas(gmm_thresh_all, circ_pix_area)
 
+        if verbose:
+            print("... Arease computed successfully.")
+
         ### Save results ###
+        if verbose:
+            print(f"{linesep}Saving results...")
+
         img_ids = [img_n.split("/")[-1] for img_n in img_paths]
         area_df = pd.DataFrame(
             data = {"image_id": img_ids, "area_pct": area_prop * 100}
         )
-        if verbose:
-            print(f"{linesep}Saving results...")
         for i in range(len(img_ids)):
             out_img = gmm_thresh_all[i].astype(np.uint8)
             img_id = img_ids[i]
@@ -144,11 +153,12 @@ def main():
                 out_img
             )
         if verbose:
-            print(f"{linesep}\tThresholded images saved for reference.")
+            print(f"... Thresholded images saved to:{os.linesep}\t{out_root}/{thresh_subdir}")
         area_df.to_csv(f"{out_root}/{calc_subdir}/area_results.csv", index=False)
         if verbose:
-            print(f"{linesep}\tArea calculations saved.")
-            print(f"{linesep}All analysis results saved to: {linesep}\t{out_root}")
+            print(f"... Area calculations saved to:{os.linesep}\t{out_root}/{calc_subdir}")
+            print(su.SFM.success)
+            print(su.verbose_end)
     except PermissionError:
         raise PermissionError(f"{linesep*2}Must ensure that no previous analysis output files located in {linesep}\t{out_root}/{thresh_subdir} or {linesep}\t{out_root}/{calc_subdir} {linesep}are open in another application. {linesep*2}Close any such files and try again.{linesep}")
 
