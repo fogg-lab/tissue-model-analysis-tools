@@ -1,5 +1,5 @@
-import argparse
 import os
+import sys
 import cv2
 import numpy as np
 import dask as d
@@ -14,74 +14,13 @@ from typing import Sequence
 from fl_tissue_model_tools import data_prep, defs
 from fl_tissue_model_tools import preprocessing as prep
 from fl_tissue_model_tools import analysis as an
+from fl_tissue_model_tools import script_util as su
 
 
 linesep = os.linesep
 default_config_path = f"../config/default_cell_area_computation.json"
 thresh_subdir = "thresholded"
 calc_subdir = "calculations"
-
-
-def parse_args() -> argparse.Namespace:
-    ### Parse commandline arguments ###
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument("in_root", type=str, help="Full path to root directory of input images. Ex: [...]/my_data/images/experiment_1_yyyy_mm_dd/")
-
-    parser.add_argument("out_root", type=str, help=f"Full path to root directory where output will be stored. Ex: [...]/my_data/analysis_output/experiment_1_yyyy_mm_dd/. In this example, experiment_1_yyyy_mm_dd/ will be created if it does not already exist. If it does exist then the contents of experiment_1_yyyy_mm_dd/{thresh_subdir}/ and experiment_1_yyyy_mm_dd/{calc_subdir}/ will be overwritten.")
-
-    parser.add_argument("-c", "--config", type=str, default=default_config_path, help="Full path to cell area computation configuration file. Ex: C:/my_config/cell_area_comp_config.json. If no argument supplied, default configuration will be used.")
-
-    parser.add_argument("-e", "--extension", type=str, default="tif", help="File extension type of images. If no argument supplied, defaults to tif.")
-
-    parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output during script execution.")
-
-    args = parser.parse_args()
-    return args
-
-
-def verify_input_dir(path: str, extension: str, verbose: bool=False) -> Sequence[str]:
-    if not os.path.isdir(path):
-        raise FileNotFoundError(f"Input data directory not found: {path}")
-    img_paths = [fp.replace("\\", "/") for fp in glob(f"{path}/*.{extension}")]
-    if len(img_paths) == 0:
-        raise FileNotFoundError(f"Input data directory contains no files with extension: {extension}")
-    if verbose:
-        print(f"{linesep}Found {len(img_paths)} .{extension} images in: {linesep}\t{path}")
-    return img_paths
-
-
-def verify_output_dir(path: str, verbose: bool=False):
-    if not os.path.isdir(path):
-        if verbose:
-            print(f"{linesep}Did not find output dir: {linesep}\t{path}")
-            print(f"Creating...")
-        data_prep.make_dir(path)
-        if verbose:
-            print(f"{linesep}Created dir: {linesep}\t{path}")
-    if verbose:
-        print(f"{linesep}Creating subdirs (overwriting if previously existed):")
-        print(f"\t{path}/{thresh_subdir}")
-        print(f"\t{path}/{calc_subdir}")
-    data_prep.make_dir(f"{path}/{thresh_subdir}")
-    data_prep.make_dir(f"{path}/{calc_subdir}")
-
-
-def verify_config_dir(path: str, verbose: bool=False):
-    if not os.path.isfile(path):
-        raise FileNotFoundError(f"Config file not found: {path}")
-    with open(path, 'r') as fp:
-        config = json.load(fp)
-    if verbose:
-        print(f"{linesep}Using config file: {linesep}\t{path}")
-        print(f"{linesep}Parameter values:")
-        for k, v in config.items():
-            print(f"{k:<20}{v:>20}")
-    return config
-
-
-def replace_path_chars(path: str):
-    return path.replace("\\", "/")
 
 
 def load_img(img_name, dsamp=True, dsize=250):
@@ -135,25 +74,35 @@ def compute_areas(imgs: list[npt.NDArray], circ_pix_area: int) -> npt.NDArray[np
 
 def main():
     try:
-        args = parse_args()
+        args = su.parse_cell_area_args({"thresh_subdir": thresh_subdir, "calc_subdir": calc_subdir, "default_config_path": default_config_path})
         verbose = args.verbose
 
         ### Tidy up paths ###
-        in_root = replace_path_chars(args.in_root)
-        # print(in_root)
-        out_root = replace_path_chars(args.out_root)
-        # print(out_root)
+        in_root = args.in_root.replace("\\", "/")
+        out_root = args.out_root.replace("\\", "/")
 
-        ### Verify input ###
+        ### Verify input source ###
         extension = args.extension.replace(".", "")
-        img_paths = verify_input_dir(in_root, extension, verbose=verbose)
+        try:
+            img_paths = su.cell_area_verify_input_dir(in_root, extension, verbose=verbose)
+        except FileNotFoundError as e:
+            print(f"{su.SFM.failure} {e}")
+            sys.exit()
 
         ### Verify output destination ###
-        verify_output_dir(out_root, verbose)
+        try:
+            su.cell_area_verify_output_dir(out_root, thresh_subdir, calc_subdir, verbose=verbose)
+        except Exception as e:
+            print(f"{su.SFM.failure}{e}")
+            sys.exit()
 
-        ### Load config. ###
+        ### Load config ###
         config_path = args.config
-        config = verify_config_dir(config_path, verbose)
+        try:
+            config = su.cell_area_verify_config_file(config_path, verbose)
+        except FileNotFoundError as e:
+            print(f"{su.SFM.failure} {e}")
+            sys.exit()
 
         ### Prep images ###
         dsamp_size = config["dsamp_size"]
