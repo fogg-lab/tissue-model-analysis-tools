@@ -67,7 +67,7 @@ def parse_zproj_args(arg_defaults: dict[str, Any]) -> argparse.Namespace:
 
     parser.add_argument("-m", "--method", type=str, default="fs", choices=["min", "max", "med", "avg", "fs"], help="Z projection method. If no argument supplied, defaults to 'fs' (focus stacking).")
 
-    parser.add_argument("-o", "--order", type=int, default=1, choices=[0, 1], help=f"Interpretation of Z stack order. 0=Ascending, 1=Descending. For Z stack of size k: -o 0 means Z0 is the TOP of well while -o 1 means Z0 is the BOTTOM of well. If no argument supplied, defaults to 1=Descending: (TOP -> BOTTOM) = (Zk -> Z0).")
+    parser.add_argument("-o", "--order", type=int, default=1, choices=[0, 1], help=f"Interpretation of Z stack order. 0=Ascending, 1=Descending. For Z stack of size k: -o 0 means (TOP -> BOTTOM) = (Z0 -> Zk) while -o 1 means (TOP -> BOTTOM) = (Zk -> Z0).")
 
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output during script execution.")
 
@@ -81,6 +81,8 @@ def parse_inv_depth_args(arg_defaults: dict[str, Any]) -> argparse.Namespace:
     parser.add_argument("in_root", type=str, help="Full path to root directory of input zstacks. Ex: [...]/my_data/z_stacks/experiment_1_yyyy_mm_dd/. Images must be .tif.")
 
     parser.add_argument("out_root", type=str, help="Full path to root directory where output will be stored. Ex: [...]/my_data/z_projections/experiment_1_yyyy_mm_dd/. In this example, experiment_1_yyyy_mm_dd/ will be created if it does not already exist.")
+
+    parser.add_argument("-o", "--order", type=int, default=1, choices=[0, 1], help=f"Interpretation of Z stack order. 0=Ascending, 1=Descending. For Z stack of size k: -o 0 means (TOP -> BOTTOM) = (Z0 -> Zk) while -o 1 means (TOP -> BOTTOM) = (Zk -> Z0).")
 
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output during script execution.")
 
@@ -183,6 +185,13 @@ def zproj_verify_output_dir(path: str, verbose=True) -> None:
         data_prep.make_dir(path)
         if verbose:
             print(f"... Created dir:{os.linesep}\t{path}")
+    else:
+        if verbose:
+            print(f"Found dir:{os.linesep}\t{path}")
+            print("Clearing...")
+        data_prep.make_dir(path)
+        if verbose:
+            print(f"... Cleared dir:{os.linesep}\t{path}")
 
     if verbose:
         print(SFM.success)
@@ -200,7 +209,7 @@ def inv_depth_verify_input_dir(path: str, verbose: bool=False) -> Sequence[str]:
 
     zstack_paths = [fp.replace("\\", "/") for fp in glob(f"{path}/*")]
     if verbose:
-        print(f"{'Z Stack ID':<40}{'No. Z Positions':>20}")
+        print(f"{'Z Stack ID':<60}{'No. Z Positions':>20}")
     
     for zsp in zstack_paths:
         img_paths = [fp.replace("\\", "/") for fp in glob(f"{zsp}/*.{extension}")]
@@ -214,7 +223,7 @@ def inv_depth_verify_input_dir(path: str, verbose: bool=False) -> Sequence[str]:
                 raise FileNotFoundError(f"Image file{os.linesep}\t{iname}{os.linesep}does not contain the expected pattern to denote Z position. Files must have ...Z[pos]_... in their name, where [pos] is a number denoting Z stack position.")
         if verbose:
             zsp_id = zsp.split("/")[-1]
-            print(f"{zsp_id:.<40}{n_imgs:.>20}")
+            print(f"{zsp_id:.<60}{n_imgs:.>20}")
 
     if verbose:
         print(SFM.success)
@@ -232,6 +241,13 @@ def inv_depth_verify_output_dir(path: str, verbose=True) -> None:
             data_prep.make_dir(path)
             if verbose:
                 print(f"... Created dir:{os.linesep}\t{path}")
+    else:
+        if verbose:
+            print(f"Found dir:{os.linesep}\t{path}")
+            print("Clearing...")
+        data_prep.make_dir(path)
+        if verbose:
+            print(f"... Cleared dir:{os.linesep}\t{path}")
 
     if verbose:
         print(SFM.success)

@@ -87,6 +87,7 @@ def main():
         su.verbose_header("Constructing Z projections")
 
     zp_method = args.method
+    desc = bool(args.order)
     z_ids = [zsp.split("/")[-1] for zsp in zstack_paths]
     if verbose:
         print(f"Loading Z stacks...")
