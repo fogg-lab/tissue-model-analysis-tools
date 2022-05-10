@@ -83,8 +83,13 @@ def main():
 
 
     ### Compute Z projections ###
+    if verbose:
+        su.verbose_header("Constructing Z projections")
+
     zp_method = args.method
     z_ids = [zsp.split("/")[-1] for zsp in zstack_paths]
+    if verbose:
+        print(f"Loading Z stacks...")
     try:
         zstacks = d.compute(
             d.delayed({z_ids[i]: get_zstack(zsp, "tif", True) for i, zsp in enumerate(zstack_paths)})
@@ -92,15 +97,31 @@ def main():
     except OSError as e:
         print(f"{su.SFM.failure}{e}")
         sys.exit()
+
+    if verbose:
+        print(f"... Z stacks loaded.")
+
     pm = proj_method[zp_method]
+
+    if verbose:
+        print(f"{os.linesep}Computing projections...")
+
     zprojs = d.compute(
         d.delayed({z_id: pm(zstacks[z_id]) for z_id in z_ids})
     )[0]
-
+    if verbose:
+            print(f"... Projections computed.")
     
     ### Save Z projections ###
+    if verbose:
+        print(f"{os.linesep}Saving projections...")
     for z_id, zproj in zprojs.items():
         save_zproj(zproj, out_root, z_id, zp_method, extension, verbose=verbose)
+    
+    if verbose:
+        print(f"... Projections saved.")
+        print(su.SFM.success)
+        print(su.verbose_end)
 
 
 if __name__ == "__main__":
