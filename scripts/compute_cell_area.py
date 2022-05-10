@@ -23,21 +23,35 @@ thresh_subdir = "thresholded"
 calc_subdir = "calculations"
 
 
-def load_img(img_name, dsamp=True, dsize=250):
+def load_img(img_name, dsamp=True, dsize=250, extension="tif"):
     """Load and downsample image.
     
     """
-    # cv.IMREAD_ANYDEPTH loads the image as a 16 bit grayscale image
-    img = cv2.imread(img_name, cv2.IMREAD_ANYDEPTH)
+    if extension == "tif":
+        # cv.IMREAD_ANYDEPTH loads the image as a 16 bit grayscale image
+        img = cv2.imread(img_name, cv2.IMREAD_ANYDEPTH)
+    elif extension == "png":
+        img = cv2.imread(img_name, cv2.IMREAD_GRAYSCALE)
     if dsamp:
         img = cv2.resize(img, dsize, cv2.INTER_AREA)
     return img
 
 
-def load_and_norm(img_name, a, b, mn, mx, dsamp=True, dsize=250):
+def load_and_norm(img_name, extension, dsamp=True, dsize=250):
     """ Load and normalize image to new range.
     
     """
+    a = defs.GS_MIN
+    b = defs.GS_MAX
+
+    if extension == "png":
+        mn = a
+        mx = b
+    elif extension == "tif":
+        mn = defs.TIF_MIN
+        mx = defs.TIF_MAX
+    else:
+        raise OSError(f"Unsupported file type for analysis: {extension}")
     img = load_img(img_name, dsamp=True, dsize=dsize)
     return prep.min_max_(img, a, b, mn, mx)
 
@@ -50,9 +64,9 @@ def mask_and_threshold(img, circ_mask, pinhole_idx, sd_coef, rs):
     return prep.exec_threshold(masked, pinhole_idx, sd_coef, rs)
 
 
-def prep_images(img_names: Sequence[str], dsamp_size: int) -> list[npt.NDArray]:
+def prep_images(img_names: Sequence[str], dsamp_size: int, extension: str) -> list[npt.NDArray]:
     gs_ds_imgs = d.compute(
-        [d.delayed(load_and_norm)(img_n, defs.GS_MIN, defs.GS_MAX, defs.TIF_MIN, defs.TIF_MAX, dsamp=True, dsize=(dsamp_size, dsamp_size)) for img_n in img_names]
+        [d.delayed(load_and_norm)(img_n, extension, dsamp=True, dsize=(dsamp_size, dsamp_size)) for img_n in img_names]
     )[0]
     return gs_ds_imgs
 
@@ -129,7 +143,11 @@ def main():
         pinhole_buffer = config["pinhole_buffer"]
         rs = np.random.RandomState(rs_seed)
         pinhole_cut = int(round(dsamp_size * pinhole_buffer))
-        gs_ds_imgs = prep_images(img_paths, dsamp_size)
+        try:
+            gs_ds_imgs = prep_images(img_paths, dsamp_size, extension)
+        except OSError as e:
+            print(f"{su.SFM.failure}{e}")
+            sys.exit()
 
         # variables for image masking
         circ_mask, pinhole_idx, circ_pix_area = circ_mask_setup(gs_ds_imgs[0].shape, pinhole_cut)
