@@ -158,7 +158,7 @@ def main():
     area_prop = compute_areas(gmm_thresh_all, circ_pix_area)
 
     if verbose:
-        print("... Arease computed successfully.")
+        print("... Areas computed successfully.")
 
 
     ### Save results ###
