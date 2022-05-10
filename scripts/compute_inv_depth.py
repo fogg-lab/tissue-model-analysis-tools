@@ -48,7 +48,8 @@ def main():
 
     ### Load model config ###
     with open("../model_training/invasion_depth_training_values.json", 'r') as fp:
-        training_values = json.load(fp)
+       training_values = json.load(fp)
+    training_values["rs_seed"] = None if (training_values["rs_seed"] == "None") else training_values["rs_seed"]
 
     
     ### Set model variables ###
