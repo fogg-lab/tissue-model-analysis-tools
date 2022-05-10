@@ -4,7 +4,7 @@ import shutil
 import json
 from glob import glob
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Sequence, Any
 
 from . import defs, data_prep
 
@@ -24,7 +24,7 @@ dash = "="
 chunk_width = shutil.get_terminal_size((10, 10)).columns
 verbose_end = f"{SFM.cyan}{dash * chunk_width}{SFM.reset}{os.linesep}"
 
-
+### Verbose Output ###
 def verbose_header(title: str) -> None:
     print(f"{os.linesep}{SFM.cyan}{f'[{title}]':{dash}<{chunk_width}}{SFM.reset}")
 
@@ -33,12 +33,12 @@ def verbose_footer() -> None:
     pass
 
 
-def parse_cell_area_args(arg_defaults: dict[str, str]) -> argparse.Namespace:
+### Parse Arguments ###
+def parse_cell_area_args(arg_defaults: dict[str, Any]) -> argparse.Namespace:
     thresh_subdir = arg_defaults["thresh_subdir"]
     calc_subdir = arg_defaults["calc_subdir"]
     default_config_path = arg_defaults["default_config_path"]
 
-    ### Parse commandline arguments ###
     parser = argparse.ArgumentParser()
 
     parser.add_argument("in_root", type=str, help="Full path to root directory of input images. Ex: [...]/my_data/images/experiment_1_yyyy_mm_dd/")
@@ -55,6 +55,18 @@ def parse_cell_area_args(arg_defaults: dict[str, str]) -> argparse.Namespace:
     return args
 
 
+def parse_zproj_args(arg_defaults: dict[str, Any]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("in_root", type=str, help="Full path to root directory of input zstacks. Ex: [...]/my_data/images/experiment_1_yyyy_mm_dd/")
+
+    parser.add_argument("out_root", type=str, help="Full path to root directory where output will be stored. Ex: [...]/my_data/analysis_output/experiment_1_yyyy_mm_dd/. In this example, experiment_1_yyyy_mm_dd/ will be created if it does not already exist.")
+
+    args = parser.parse_args()
+    return args
+
+
+### File/Directory Validation ###
 def cell_area_verify_input_dir(path: str, extension: str, verbose: bool=False) -> Sequence[str]:
     if verbose:
         verbose_header("Verifying Input Directory")
