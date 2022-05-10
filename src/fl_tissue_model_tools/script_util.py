@@ -140,7 +140,7 @@ def zproj_verify_input_dir(path: str, extension: str, verbose: bool=False) -> Se
     zstack_paths = [fp.replace("\\", "/") for fp in glob(f"{path}/*")]
     # zs_counts = {}
     if verbose:
-        print(f"{'Z Stack ID':<40}{'Image Count':>20}")
+        print(f"{'Z Stack ID':<40}{'No. Z Positions':>20}")
     for zsp in zstack_paths:
         img_paths = [fp.replace("\\", "/") for fp in glob(f"{zsp}/*.{extension}")]
         n_imgs = len(img_paths)
