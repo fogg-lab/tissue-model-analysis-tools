@@ -96,97 +96,94 @@ def compute_areas(imgs: list[npt.NDArray], circ_pix_area: int) -> npt.NDArray[np
 
 
 def main():
+    args = su.parse_cell_area_args({"thresh_subdir": thresh_subdir, "calc_subdir": calc_subdir, "default_config_path": default_config_path})
+    verbose = args.verbose
+
+
+    ### Tidy up paths ###
+    in_root = args.in_root.replace("\\", "/")
+    out_root = args.out_root.replace("\\", "/")
+
+
+    ### Verify input source ###
+    extension = args.extension.replace(".", "")
     try:
-        args = su.parse_cell_area_args({"thresh_subdir": thresh_subdir, "calc_subdir": calc_subdir, "default_config_path": default_config_path})
-        verbose = args.verbose
+        img_paths = su.cell_area_verify_input_dir(in_root, extension, verbose=verbose)
+    except FileNotFoundError as e:
+        print(f"{su.SFM.failure} {e}")
+        sys.exit()
 
 
-        ### Tidy up paths ###
-        in_root = args.in_root.replace("\\", "/")
-        out_root = args.out_root.replace("\\", "/")
+    ### Verify output destination ###
+    try:
+        su.cell_area_verify_output_dir(out_root, thresh_subdir, calc_subdir, verbose=verbose)
+    except PermissionError as e:
+        print(f"{su.SFM.failure} {e}")
+        sys.exit()
 
 
-        ### Verify input source ###
-        extension = args.extension.replace(".", "")
-        try:
-            img_paths = su.cell_area_verify_input_dir(in_root, extension, verbose=verbose)
-        except FileNotFoundError as e:
-            print(f"{su.SFM.failure} {e}")
-            sys.exit()
+    ### Load config ###
+    config_path = args.config
+    try:
+        config = su.cell_area_verify_config_file(config_path, verbose)
+    except FileNotFoundError as e:
+        print(f"{su.SFM.failure} {e}")
+        sys.exit()
+
+    if verbose:
+        su.verbose_header("Performing Analysis")
+        print("Computing areas...")
 
 
-        ### Verify output destination ###
-        try:
-            su.cell_area_verify_output_dir(out_root, thresh_subdir, calc_subdir, verbose=verbose)
-        except Exception as e:
-            print(f"{su.SFM.failure}{e}")
-            sys.exit()
+    ### Prep images ###
+    dsamp_size = config["dsamp_size"]
+    sd_coef = config["sd_coef"]
+    rs_seed = None if (config["rs_seed"] == "None") else config["rs_seed"]
+    pinhole_buffer = config["pinhole_buffer"]
+    rs = np.random.RandomState(rs_seed)
+    pinhole_cut = int(round(dsamp_size * pinhole_buffer))
+    try:
+        gs_ds_imgs = prep_images(img_paths, dsamp_size, extension)
+    except OSError as e:
+        print(f"{su.SFM.failure}{e}")
+        sys.exit()
+
+    # variables for image masking
+    circ_mask, pinhole_idx, circ_pix_area = circ_mask_setup(gs_ds_imgs[0].shape, pinhole_cut)
+    # Threshold images
+    gmm_thresh_all = threshold_images(gs_ds_imgs, circ_mask, pinhole_idx, sd_coef, rs)
 
 
-        ### Load config ###
-        config_path = args.config
-        try:
-            config = su.cell_area_verify_config_file(config_path, verbose)
-        except FileNotFoundError as e:
-            print(f"{su.SFM.failure} {e}")
-            sys.exit()
+    ### Compute areas ###
+    area_prop = compute_areas(gmm_thresh_all, circ_pix_area)
 
-        if verbose:
-            su.verbose_header("Performing Analysis")
-            print("Computing areas...")
+    if verbose:
+        print("... Arease computed successfully.")
 
 
-        ### Prep images ###
-        dsamp_size = config["dsamp_size"]
-        sd_coef = config["sd_coef"]
-        rs_seed = None if (config["rs_seed"] == "None") else config["rs_seed"]
-        pinhole_buffer = config["pinhole_buffer"]
-        rs = np.random.RandomState(rs_seed)
-        pinhole_cut = int(round(dsamp_size * pinhole_buffer))
-        try:
-            gs_ds_imgs = prep_images(img_paths, dsamp_size, extension)
-        except OSError as e:
-            print(f"{su.SFM.failure}{e}")
-            sys.exit()
+    ### Save results ###
+    if verbose:
+        print(f"{linesep}Saving results...")
 
-        # variables for image masking
-        circ_mask, pinhole_idx, circ_pix_area = circ_mask_setup(gs_ds_imgs[0].shape, pinhole_cut)
-        # Threshold images
-        gmm_thresh_all = threshold_images(gs_ds_imgs, circ_mask, pinhole_idx, sd_coef, rs)
-
-
-        ### Compute areas ###
-        area_prop = compute_areas(gmm_thresh_all, circ_pix_area)
-
-        if verbose:
-            print("... Arease computed successfully.")
-
-
-        ### Save results ###
-        if verbose:
-            print(f"{linesep}Saving results...")
-
-        img_ids = [img_n.split("/")[-1] for img_n in img_paths]
-        area_df = pd.DataFrame(
-            data = {"image_id": img_ids, "area_pct": area_prop * 100}
+    img_ids = [img_n.split("/")[-1] for img_n in img_paths]
+    area_df = pd.DataFrame(
+        data = {"image_id": img_ids, "area_pct": area_prop * 100}
+    )
+    for i in range(len(img_ids)):
+        out_img = gmm_thresh_all[i].astype(np.uint8)
+        img_id = img_ids[i]
+        out_path = f"{out_root}/{thresh_subdir}/{img_id}_thresholded.png"
+        cv2.imwrite(
+            out_path,
+            out_img
         )
-        for i in range(len(img_ids)):
-            out_img = gmm_thresh_all[i].astype(np.uint8)
-            img_id = img_ids[i]
-            out_path = f"{out_root}/{thresh_subdir}/{img_id}_thresholded.png"
-            cv2.imwrite(
-                out_path,
-                out_img
-            )
-        if verbose:
-            print(f"... Thresholded images saved to:{os.linesep}\t{out_root}/{thresh_subdir}")
-        area_df.to_csv(f"{out_root}/{calc_subdir}/area_results.csv", index=False)
-        if verbose:
-            print(f"... Area calculations saved to:{os.linesep}\t{out_root}/{calc_subdir}")
-            print(su.SFM.success)
-            print(su.verbose_end)
-    except PermissionError:
-        raise PermissionError(f"{linesep*2}Must ensure that no previous analysis output files located in {linesep}\t{out_root}/{thresh_subdir} or {linesep}\t{out_root}/{calc_subdir} {linesep}are open in another application. {linesep*2}Close any such files and try again.{linesep}")
+    if verbose:
+        print(f"... Thresholded images saved to:{os.linesep}\t{out_root}/{thresh_subdir}")
+    area_df.to_csv(f"{out_root}/{calc_subdir}/area_results.csv", index=False)
+    if verbose:
+        print(f"... Area calculations saved to:{os.linesep}\t{out_root}/{calc_subdir}")
+        print(su.SFM.success)
+        print(su.verbose_end)
 
 
 if __name__ == "__main__":

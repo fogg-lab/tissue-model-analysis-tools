@@ -51,7 +51,7 @@ def _blur_and_lap(image: npt.NDArray, kernel_size: int=5) -> npt.NDArray:
     return cv2.Laplacian(blurred, cv2.CV_64F, ksize=kernel_size)
 
 
-def z_stack_from_dir(z_stack_dir: str, file_ext: str="tif", descending: bool=True, get_zpos: Optional[Callable[[str], int]]=None) -> tuple[Sequence[str], npt.NDArray]:
+def zstack_from_dir(z_stack_dir: str, file_ext: str="tif", descending: bool=True, get_zpos: Optional[Callable[[str], int]]=None) -> tuple[Sequence[str], npt.NDArray]:
     """Return sorted (by z-position) z-stack image paths and z-stack.
 
     IMPORTANT: To use the default `get_zpos` function, each z-position image
@@ -101,7 +101,7 @@ def z_stack_from_dir(z_stack_dir: str, file_ext: str="tif", descending: bool=Tru
     return sorted_z_paths, np.array([cv2.imread(img_n, flag) for img_n in sorted_z_paths])
 
 
-def z_stack_paths_from_dir(z_stack_dir: str, file_ext: str="tif", descending: bool=True, get_zpos: Optional[Callable[[str], int]]=None) -> Sequence[str]:
+def zstack_paths_from_dir(z_stack_dir: str, file_ext: str="tif", descending: bool=True, get_zpos: Optional[Callable[[str], int]]=None) -> Sequence[str]:
     z_paths = [fn.replace("\\", "/") for fn in glob(f"{z_stack_dir}/*.{file_ext}")]
     if get_zpos == None:
         get_zpos = _default_get_zpos
