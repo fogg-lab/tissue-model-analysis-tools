@@ -1,1 +1,0 @@
-{"resnet_inp_shape": [128, 128, 3], "class_labels": {"no_invasion": 0, "invasion": 1}, "cls_thresh": 0.5, "n_models": 5}
