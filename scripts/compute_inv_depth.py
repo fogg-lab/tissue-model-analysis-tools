@@ -11,6 +11,7 @@ from fl_tissue_model_tools import models, data_prep
 from fl_tissue_model_tools import script_util as su
 from fl_tissue_model_tools import zstacks as zs
 
+
 def main():
     args = su.parse_inv_depth_args({})
     verbose = args.verbose
@@ -46,15 +47,15 @@ def main():
     
 
     ### Load model config ###
-    with open("../config/default_inv_depth_computation.json", 'r') as fp:
-        model_config = json.load(fp)
+    with open("../model_training/invasion_depth_training_values.json", 'r') as fp:
+        training_values = json.load(fp)
 
     
     ### Set model variables ###
-    cls_thresh = model_config["cls_thresh"]
-    resnet_inp_shape = tuple(model_config["resnet_inp_shape"])
-    class_labels = model_config["class_labels"]
-    n_models = model_config["n_models"]
+    cls_thresh = training_values["cls_thresh"]
+    resnet_inp_shape = tuple(training_values["resnet_inp_shape"])
+    class_labels = training_values["class_labels"]
+    n_models = training_values["n_models"]
     n_outputs = 1
     last_resnet_layer = best_hp["last_resnet_layer"]
     descending = bool(args.order)
