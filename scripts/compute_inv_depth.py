@@ -12,8 +12,10 @@ from fl_tissue_model_tools import script_util as su
 from fl_tissue_model_tools import zstacks as zs
 
 
+default_config_path = f"../config/default_invasion_depth_computation.json"
+
 def main():
-    args = su.parse_inv_depth_args({})
+    args = su.parse_inv_depth_args({"default_config_path": default_config_path})
     verbose = args.verbose
 
 
@@ -37,20 +39,20 @@ def main():
         print(f"{su.SFM.failure} {e}")
         sys.exit()
 
-    
+
     ### Load best hyperparameters ###
     if verbose:
         su.verbose_header("Loading Classifier")
 
     with open("../model_training/invasion_depth_best_hp.json", 'r') as fp:
         best_hp = json.load(fp)
-    
 
-    ### Load model config ###
+
+    ### Load model training parameters ###
     with open("../model_training/invasion_depth_training_values.json", 'r') as fp:
        training_values = json.load(fp)
     training_values["rs_seed"] = None if (training_values["rs_seed"] == "None") else training_values["rs_seed"]
-
+    
     
     ### Set model variables ###
     cls_thresh = training_values["cls_thresh"]
@@ -62,18 +64,38 @@ def main():
     descending = bool(args.order)
 
 
-    # Create models
+    ### Load config ###
+    config_path = args.config
+    try:
+        config = su.inv_depth_verify_config_file(config_path, n_models, verbose=verbose)
+    except FileNotFoundError as e:
+        print(f"{su.SFM.failure} {e}")
+        sys.exit()
+    n_pred_models = config["n_pred_models"]
+
+
+    ### Create models ###
+    best_val_losses = np.zeros(n_models)
+    for i in range(n_models):
+        h_df = pd.read_csv(f"../model_training/best_ensemble/best_model_history_{i}.csv")
+        ft_h_df = h_df.query("training_stage=='finetune'")
+        best_val_losses[i] = ft_h_df.val_loss.min()
+
+    sorted_best_model_idx = best_val_losses.argsort()
+    
+
     K.clear_session()
     inv_depth_models = [
-        models.build_ResNet50_TL(n_outputs, resnet_inp_shape, base_last_layer=last_resnet_layer, base_model_trainable=False) for _ in range(n_models)
+        models.build_ResNet50_TL(n_outputs, resnet_inp_shape, base_last_layer=last_resnet_layer, base_model_trainable=False) for _ in range(n_pred_models)
     ]
     for i, m in enumerate(inv_depth_models):
         if verbose:
             print(f"Loading classifier {i}...")
         # Weights don't load properly in trainable set to False for model
         # Set trainable to True, load weights, then set back to False
+        ith_best_idx = sorted_best_model_idx[i]
         m.trainable = True
-        m.load_weights(f"../model_training/best_ensemble/best_finetune_weights_{i}.h5")
+        m.load_weights(f"../model_training/best_ensemble/best_finetune_weights_{ith_best_idx}.h5")
         m.trainable = False
         if verbose:
             print(f"... Classifier {i} loaded.")
@@ -83,7 +105,8 @@ def main():
         print(su.SFM.success)
         su.verbose_footer()
 
-    # Generate predictions
+
+    ### Generate predictions ###
     if verbose:
         su.verbose_header("Making predictions")
 
