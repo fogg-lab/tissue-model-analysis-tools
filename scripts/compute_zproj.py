@@ -3,6 +3,7 @@ import sys
 import dask as d
 import numpy as np
 import cv2
+import numpy.typing as npt
 
 from fl_tissue_model_tools import defs
 from fl_tissue_model_tools import preprocessing as prep
@@ -19,7 +20,23 @@ proj_method = {
 }
 
 
-def get_zstack(zs_path, extension, descending):
+def get_zstack(zs_path: str, extension: str, descending: bool) -> npt.NDArray:
+    """Given path to Z stack, return Z stack as array of images.
+
+    Args:
+        zs_path: Path to Z stack.
+        extension: File extension for image. Only tif & png
+            currently supported.
+        descending: Whether to consider 0 to be the bottom or top. If
+            descending=True, 0 is considered to be the bottom.
+
+    Raises:
+        OSError: Unsupported file extension supplied.
+
+    Returns:
+        Z stack as array of images.
+
+    """
     a = defs.GS_MIN
     b = defs.GS_MAX
 
@@ -36,7 +53,21 @@ def get_zstack(zs_path, extension, descending):
     return zstack
 
 
-def save_zproj(zproj, out_root, zid, zp_type, extension, verbose=False):
+def save_zproj(zproj: npt.NDArray, out_root: str, zid: str, zproj_type: str, extension: str) -> None:
+    """Save Z projected image.
+
+    Args:
+        zproj: Z projected image.
+        out_root: Path to root output directory.
+        zid: Base filename of Z projected image.
+        zproj_type: Projection type, appended to zid.
+        extension: File extension for image. Only tif & png
+            currently supported.
+
+    Raises:
+        OSError: Unsupported file extension supplied.
+
+    """
     mn = defs.GS_MIN
     mx = defs.GS_MAX
     if extension == "tif":
@@ -50,7 +81,7 @@ def save_zproj(zproj, out_root, zid, zp_type, extension, verbose=False):
     else:
         raise OSError(f"Unsupported file type for analysis: {extension}")
     cv2.imwrite(
-        f"{out_root}/{zid}_{zp_type}.{extension}",
+        f"{out_root}/{zid}_{zproj_type}.{extension}",
         prep.min_max_(zproj, a, b, mn, mx).astype(cast_type)
     )
 
@@ -87,13 +118,13 @@ def main():
         su.verbose_header("Constructing Z projections")
 
     zp_method = args.method
-    desc = bool(args.order)
+    descending = bool(args.order)
     z_ids = [zsp.split("/")[-1] for zsp in zstack_paths]
     if verbose:
         print(f"Loading Z stacks...")
     try:
         zstacks = d.compute(
-            d.delayed({z_ids[i]: get_zstack(zsp, "tif", True) for i, zsp in enumerate(zstack_paths)})
+            d.delayed({z_ids[i]: get_zstack(zsp, extension, descending) for i, zsp in enumerate(zstack_paths)})
         )[0]
     except OSError as e:
         print(f"{su.SFM.failure}{e}")
