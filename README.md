@@ -56,7 +56,7 @@ g++ --version
 ## Capabilities
 
 #### Cell Area
-Cell area computation is performed using a Gaussian Mixture Model based algorithm. Two Gaussian curves are fit to pixel intensities where one curve fits the "background" pixels and one curve fits the "foreground" pixels. Cell area is computed by thresholding based on
+The cell area estimation is performed using a procedure that incorporates a Gaussian Mixture Model. Two Gaussian curves are fit to the pixel intensities of an image. One curve fits the "background" pixels and one curve fits the "foreground" pixels. Cell area is computed by thresholding based on
 
 $$\mu_{\text{foreground}} + \gamma \times \sigma_{\text{foreground}} ,$$
 
@@ -80,3 +80,9 @@ There commandline tools which handle the following common operations:
 * Cell area computation (of Z projected images)
 * Z projection of image Z stacks
 * Invasion depth computation (of Z stacks)
+
+#### Cell Area
+1. Change into the `scripts` directory
+```
+python compute_cell_area.py -v ...
+```
