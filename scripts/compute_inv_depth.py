@@ -83,7 +83,7 @@ def main():
 
     sorted_best_model_idx = best_val_losses.argsort()
     
-
+    # Create the (n_pred_models) best models from the saved weights
     K.clear_session()
     inv_depth_models = [
         models.build_ResNet50_TL(n_outputs, resnet_inp_shape, base_last_layer=last_resnet_layer, base_model_trainable=False) for _ in range(n_pred_models)
