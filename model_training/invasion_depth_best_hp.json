@@ -1,1 +1,1 @@
-{"adam_beta_1": 0.9066466810625207, "adam_beta_2": 0.9947698608592066, "fine_tune_lr": 9.141354728081903e-05, "frozen_lr": 0.00022767552973325001, "last_resnet_layer": "conv5_block1_out"}
+{"adam_beta_1": 0.8690806056354333, "adam_beta_2": 0.9817045929249536, "fine_tune_lr": 4.837200625807212e-05, "frozen_lr": 0.00023296415902195254, "last_resnet_layer": "conv5_block1_out"}
