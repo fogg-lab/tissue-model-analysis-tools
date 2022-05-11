@@ -95,7 +95,7 @@ def parse_zproj_args(arg_defaults: dict[str, Any]) -> argparse.Namespace:
 
     parser.add_argument("-m", "--method", type=str, default="fs", choices=["min", "max", "med", "avg", "fs"], help="Z projection method. If no argument supplied, defaults to 'fs' (focus stacking).")
 
-    parser.add_argument("-o", "--order", type=int, default=1, choices=[0, 1], help=f"Interpretation of Z stack order. 0=Ascending, 1=Descending. For Z stack of size k: -o 0 means (TOP -> BOTTOM) = (Z0 -> Zk) while -o 1 means (TOP -> BOTTOM) = (Zk -> Z0).")
+    parser.add_argument("-o", "--order", type=int, default=1, choices=[0, 1], help=f"Interpretation of Z stack order. 0=Ascending, 1=Descending. For Z stack of size k: -o 0 means (TOP -> BOTTOM) = (Z0 -> Zk) while -o 1 means (TOP -> BOTTOM) = (Zk -> Z0). If no argument supplied, defaults to 1=Descending.")
 
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output during script execution.")
 
@@ -113,13 +113,17 @@ def parse_inv_depth_args(arg_defaults: dict[str, Any]) -> argparse.Namespace:
         Parsed commandline arguments.
 
     """
+    default_config_path = arg_defaults["default_config_path"]
+
     parser = argparse.ArgumentParser()
 
     parser.add_argument("in_root", type=str, help="Full path to root directory of input zstacks. Ex: [...]/my_data/z_stacks/experiment_1_yyyy_mm_dd/. Images must be .tif.")
 
     parser.add_argument("out_root", type=str, help="Full path to root directory where output will be stored. Ex: [...]/my_data/z_projections/experiment_1_yyyy_mm_dd/. In this example, experiment_1_yyyy_mm_dd/ will be created if it does not already exist.")
 
-    parser.add_argument("-o", "--order", type=int, default=1, choices=[0, 1], help=f"Interpretation of Z stack order. 0=Ascending, 1=Descending. For Z stack of size k: -o 0 means (TOP -> BOTTOM) = (Z0 -> Zk) while -o 1 means (TOP -> BOTTOM) = (Zk -> Z0).")
+    parser.add_argument("-c", "--config", type=str, default=default_config_path, help="Full path to invasion depth computation configuration file. Ex: C:/my_config/inv_depth_comp_config.json. If no argument supplied, default configuration will be used.")
+
+    parser.add_argument("-o", "--order", type=int, default=1, choices=[0, 1], help=f"Interpretation of Z stack order. 0=Ascending, 1=Descending. For Z stack of size k: -o 0 means (TOP -> BOTTOM) = (Z0 -> Zk) while -o 1 means (TOP -> BOTTOM) = (Zk -> Z0). If no argument supplied, defaults to 1=Descending.")
 
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output during script execution.")
 
@@ -422,3 +426,26 @@ def inv_depth_verify_output_dir(output_path: str, verbose: bool=True) -> None:
     if verbose:
         print(SFM.success)
         verbose_footer()
+
+
+def inv_depth_verify_config_file(config_path: str, n_models: int, verbose: bool=False) -> dict[str, Any]:
+    if not os.path.isfile(config_path):
+        raise FileNotFoundError(f"Config file not found: {config_path}")
+
+    if verbose:
+        print(f"Using config file: {os.linesep}\t{config_path}")
+
+    with open(config_path, 'r') as fp:
+        config = json.load(fp)
+    n_pred_models = config["n_pred_models"]
+    if not n_pred_models <= n_models:
+        raise AssertionError(f"Desired number of ensemble members ({n_pred_models}) is greater than number of saved models.")
+
+    if verbose:
+        print(f"{os.linesep}Parameter values:")
+        for k, v in config.items():
+            print(f"{k:<20}{v:>20}")
+        print(SFM.success)
+        verbose_footer()
+
+    return config
