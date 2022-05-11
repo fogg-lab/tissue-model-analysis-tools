@@ -102,6 +102,23 @@ def zstack_from_dir(z_stack_dir: str, file_ext: str="tif", descending: bool=True
 
 
 def zstack_paths_from_dir(z_stack_dir: str, file_ext: str="tif", descending: bool=True, get_zpos: Optional[Callable[[str], int]]=None) -> Sequence[str]:
+    """Get sorted z-stack image paths.
+
+    Args:
+        z_stack_dir: Directory where z-stack images are located.
+        file_ext: File extension of z-stack images.
+        descending: Whether z-position index is numbered from top to bottom
+            or bottom to top. For example, descending means z-position 3 is
+            located _above_ z-position 2.
+        get_zpos: A function to sort the z-position images. Must take in a
+            z-position image name and return that image's z-position. The
+            z-position is used to sort the z-stack.
+
+    Returns:
+        A list of the full paths to each z-poistion image
+        in the z-stack (sorted by z-position)
+
+    """
     z_paths = [fn.replace("\\", "/") for fn in glob(f"{z_stack_dir}/*.{file_ext}")]
     if get_zpos == None:
         get_zpos = _default_get_zpos
