@@ -55,22 +55,7 @@ g++ --version
 
 ## Capabilities
 
-#### Cell Area
-The cell area estimation is performed using a procedure that incorporates a Gaussian Mixture Model. Two Gaussian curves are fit to the pixel intensities of an image. One curve fits the "background" pixels and one curve fits the "foreground" pixels. Cell area is computed by thresholding based on
-
-$$\mu_{\text{foreground}} + \gamma \times \sigma_{\text{foreground}} ,$$
-
-Where $\gamma$ is some multiplier of the foreground standard deviation.
-
-* If $\gamma > 0$, only pixels with intensities greater than $\mu_{\text{foreground}}$ plus some positive value will be retained after thresholding (more strict)
-* If $\gamma < 0$, pixels with intensities greater than $\mu_{\text{foreground}}$ minus some value will be retained after thresholding (less strinct)
-* If $\gamma = 0$, pixels with intensities greater than $\mu_{\text{foreground}}$ will be retained after thresholding.
-
-#### Z Projection
-
-
-#### Invasion Depth
-
+For a detailed description of analysis capabilities, see the [capabilities overview notebook](notebooks/capabilities_overview.ipynb)
 
 ## Usage
 
