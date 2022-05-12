@@ -2,6 +2,7 @@
 
 ## Table of Contents
 **[Environment](#environment-setup)**<br>
+**[Capabilities](#capabilities)**<br>
 **[Usage](#usage)**<br>
 
 ## Environment Setup
@@ -66,8 +67,30 @@ There commandline tools which handle the following common operations:
 * Z projection of image Z stacks
 * Invasion depth computation (of Z stacks)
 
+To use these tools:
+
+1. Ensure `conda` environment is active & all setup procedures have been followed (see [Install `fl_tissue_model_tools` Package](#install-fltissuemodeltools-package) )
+2. Within a terminal window, change into the `scripts` directory
+3. Execute the commandline tools via (see sections below for details)
+```
+python [command_script].py [-flags] [arguments]
+```
+It is strongly recommeded that the `-v` (verbose) flag be used for each command.
+
+For input data paths, it is usually easiest to copy the path from the file explorer search bar.
+
 #### Cell Area
-1. Change into the `scripts` directory
+Basic usage:
 ```
-python compute_cell_area.py -v ...
+python compute_cell_area.py -v [input_path] [output_path]
 ```
+
+Advanced usage:
+
+* Create custom configuration `.json` file, using `config/default_cell_area_computation.json` as a template.
+    * `dsamp_size`: Size that input images will be downsampled to for analysis. Smaller sizes mean faster, less accurate analysis.
+    * `sd_coef`: Strictness of thresholding. Positive numbers are more strict, negative numbers are less strict. This is a multiplier of the foreground pixel standard deviation, so values in the range (-2, 2) are the most reasonable.
+    * `pinhole_buffer`: Used to compute radius of circular mask. For a 250 pixel downsampled image, `pinhole_buffer` = 0.04 means the circular mask radius will extend from the center of the image to 0.04 * 250 = 10 pixels from the top of the image. In other words, the diameter of the circular mask will be 250 - (10*2) = 230 pixels.
+    * `rs_seed`: A random seed for the algorithm. Allows for reproducability since the Gaussian curves are randomly initialized.
+
+
