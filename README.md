@@ -99,7 +99,7 @@ Here, `input_path` is the full path to a directory of images which will be analy
 ```
 python compute_zproj.py -v [input_root_path] [output_root_path]
 ```
-Here, `input_root_path` is the full path to a directory of Z stack subdirectories which will be analyzed. Each Z stack subdirectory should contain all images for a given Z stack with files containing the pattern "...Z[pos]\_..." in their name. For example "...Z01\_..." denotes Z position 1 for a given image.
+Here, `input_root_path` is the full path to a directory of Z stack subdirectories which will be analyzed. Each Z stack subdirectory should contain all images for a given Z stack with files containing the pattern `...Z[pos]_...` in their name. For example `...Z01_...` denotes Z position 1 for a given image.
 
 For N Z stacks, the input directory structure would be:
 ```
@@ -115,6 +115,7 @@ Root directory
 |    |    Z position 2 image
 |    |    ...
 |    ...
+|
 |----Z Stack N subdirectory
 |    |    Z position 1 image
 |    |    Z position 2 image
@@ -131,3 +132,11 @@ Root directory
     * Focus Stacking
 
 See [Capabilities](#capabilities) for details.
+
+#### Invasion Depth
+**Basic usage:**
+```
+python compute_inv_depth.py -v [input_root_path] [output_root_path]
+```
+
+For a description of `input_root_path` directory structure, see [Z Projection](#z-projection).
