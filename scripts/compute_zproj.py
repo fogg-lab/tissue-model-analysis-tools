@@ -148,7 +148,7 @@ def main():
     if verbose:
         print(f"{os.linesep}Saving projections...")
     for z_id, zproj in zprojs.items():
-        save_zproj(zproj, out_root, z_id, zp_method, extension, verbose=verbose)
+        save_zproj(zproj, out_root, z_id, zp_method, extension)
     
     if verbose:
         print(f"... Projections saved.")
