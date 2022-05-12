@@ -56,7 +56,7 @@ g++ --version
 
 ## Capabilities
 
-For a detailed description of analysis capabilities, see the [capabilities overview notebook](notebooks/capabilities_overview.ipynb)
+For a detailed description of analysis capabilities, see the [capabilities overview notebook](notebooks/capabilities_overview.ipynb).
 
 ## Usage
 
@@ -78,6 +78,15 @@ python [command_script].py [-flags] [arguments]
 It is strongly recommeded that the `-v` (verbose) flag be used for each command.
 
 For input data paths, it is usually easiest to copy the path from the file explorer search bar.
+
+For a description of all parameters that each commandline tool accepts, execute the command using
+```
+python [command_script].py -h
+```
+or
+```
+python [command_script].py --help
+```
 
 #### Cell Area
 **Basic usage:**
