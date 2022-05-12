@@ -80,12 +80,13 @@ It is strongly recommeded that the `-v` (verbose) flag be used for each command.
 For input data paths, it is usually easiest to copy the path from the file explorer search bar.
 
 #### Cell Area
-Basic usage:
+**Basic usage:**
 ```
-python compute_cell_area.py -v [input_path] [output_path]
+python compute_cell_area.py -v [input_root_path] [output_root_path]
 ```
+Here, `input_path` is the full path to a directory of images which will be analyzed.
 
-Advanced usage:
+**Advanced usage:**
 
 * Create custom configuration `.json` file, using `config/default_cell_area_computation.json` as a template.
     * `dsamp_size`: Size that input images will be downsampled to for analysis. Smaller sizes mean faster, less accurate analysis.
@@ -93,4 +94,40 @@ Advanced usage:
     * `pinhole_buffer`: Used to compute radius of circular mask. For a 250 pixel downsampled image, `pinhole_buffer` = 0.04 means the circular mask radius will extend from the center of the image to 0.04 * 250 = 10 pixels from the top of the image. In other words, the diameter of the circular mask will be 250 - (10*2) = 230 pixels.
     * `rs_seed`: A random seed for the algorithm. Allows for reproducability since the Gaussian curves are randomly initialized.
 
+#### Z Projection
+**Basic usage:**
+```
+python compute_zproj.py -v [input_root_path] [output_root_path]
+```
+Here, `input_root_path` is the full path to a directory of Z stack subdirectories which will be analyzed. Each Z stack subdirectory should contain all images for a given Z stack with files containing the pattern "...Z[pos]\_..." in their name. For example "...Z01\_..." denotes Z position 1 for a given image.
 
+For N Z stacks, the input directory structure would be:
+```
+Root directory
+|
+|----Z Stack 1 subdirectory
+|    |    Z position 1 image
+|    |    Z position 2 image
+|    |    ...
+|
+|----Z Stack 2 subdirectory
+|    |    Z position 1 image
+|    |    Z position 2 image
+|    |    ...
+|    ...
+|----Z Stack N subdirectory
+|    |    Z position 1 image
+|    |    Z position 2 image
+|    |    ...
+```
+
+**Advanced usage:**
+
+* Select custom Z projection method from:
+    * Minimum
+    * Maximum
+    * Median
+    * Average
+    * Focus Stacking
+
+See [Capabilities](#capabilities) for details.
