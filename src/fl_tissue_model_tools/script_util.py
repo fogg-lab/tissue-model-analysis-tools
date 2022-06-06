@@ -12,6 +12,8 @@ from . import defs, data_prep, zstacks
 
 @dataclass
 class SFM:
+    """Colorized messages for success/failure output (uses ANSI escape codes)
+    """
     red = "\u001b[31m"
     green = "\u001b[32m"
     cyan = "\u001b[36m"
@@ -429,6 +431,20 @@ def inv_depth_verify_output_dir(output_path: str, verbose: bool=True) -> None:
 
 
 def inv_depth_verify_config_file(config_path: str, n_models: int, verbose: bool=False) -> dict[str, Any]:
+    """Verifies that the config file exists and is valid.
+
+    Args:
+        config_path: Path to config file.
+        n_models: The number of saved models.
+        verbose: Using verbose output prints out the config path and parameter values. Defaults to False.
+
+    Raises:
+        FileNotFoundError: Raised when the config file is not found.
+        AssertionError: Raised when the desired number of ensemble models is greater than the number of saved models.
+
+    Returns:
+        A dictionary of config parameters.
+    """
     if not os.path.isfile(config_path):
         raise FileNotFoundError(f"Config file not found: {config_path}")
 
