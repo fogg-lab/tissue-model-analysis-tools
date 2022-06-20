@@ -190,6 +190,19 @@ def blur(img: npt.NDArray, blur_itr: int, k_size: int=3, gs: bool=True) -> npt.N
 
 
 def augment_img(img: npt.NDArray[Union[np.float_, np.int_]], rot: int, hflip: bool, vflip: bool, expand_dims: bool=True) -> npt.NDArray[Union[np.float_, np.int_]]:
+    """Augment an image using rotations and horizontal/vertical flips
+
+    Args:
+        img: Original image.
+        rot: Rotation angle for image.
+        hflip: Whether to horizontally flip image.
+        vflip: Whether to vertically flip image.
+        expand_dims: Whether to add a depth axis to the image after
+            augmentation steps.
+
+    Returns:
+        Augmented image.
+    """
     hw = img.shape[:2]
     # Horizontal flip
     if hflip:
@@ -199,14 +212,25 @@ def augment_img(img: npt.NDArray[Union[np.float_, np.int_]], rot: int, hflip: bo
         img = cv2.flip(img, 0)
     # Rotation
     rot_mat = cv2.getRotationMatrix2D((hw[1] // 2, hw[0] // 2), rot, 1.0)
+    img = cv2.warpAffine(img, rot_mat, hw)
 
     if expand_dims:
-        img = np.expand_dims(cv2.warpAffine(img, rot_mat, hw), 2)
-
+        img = np.expand_dims(img, 2)
+    
     return img
 
 
 def augment_img_mask_pairs(x: npt.NDArray[np.float_], y: npt.NDArray[np.int_], rs: RandomState) -> tuple[npt.NDArray[np.float_], npt.NDArray[np.int_]]:
+    """Augment a set of image/mask pairs using rotations and horizontal/vertical flips
+
+    Args:
+        x: Original images.
+        y: Original masks.
+        rs: RandomState object to allow for reproducability.
+
+    Returns:
+        (Augmented images, matched augmented masks)
+    """
     assert len(x) == len(y), f"x and y must have the same shape, x: {x.shape} != y: {y.shape}"
     m = len(x)
     # Cannot parallelize (random state ensures reproducibility)
@@ -222,6 +246,18 @@ def augment_img_mask_pairs(x: npt.NDArray[np.float_], y: npt.NDArray[np.int_], r
 
 
 def augment_imgs(x: npt.NDArray[np.float_],  rs: RandomState, rot_options=(0, 90, 180, 270), expand_dims: bool=False) -> npt.NDArray[np.float_]:
+    """Augment a set of images using rotations and horizontal/vertical flips.
+
+    Args:
+        x: Original images.
+        rs: RandomState object to allow for reproducability.
+        rot_options: Random rotation angle choices.
+        expand_dims: Whether to add a depth axis to each image after
+            augmentation steps.
+
+    Returns:
+        Augmented image set.
+    """
     m = len(x)
     rots = rs.choice(rot_options, size=m)
     hflips = rs.choice([True, False], size=m)
@@ -232,6 +268,19 @@ def augment_imgs(x: npt.NDArray[np.float_],  rs: RandomState, rot_options=(0, 90
 
 
 def map2bin(lab: npt.NDArray[np.int_], fg_vals: Sequence[int], bg_vals: Sequence[int], fg: int=1, bg: int=0) -> npt.NDArray[np.int_]:
+    """Convert a mask n-map (e.g., trimap) to a simple binary map.
+
+    Args:
+        lab: Label mask.
+        fg_vals: Foreground mask values.
+        bg_vals: Background mask values.
+        fg: Desired mask foreground value.
+        bg: Desired mask background value.
+
+    Returns:
+        Binary mask of same dimension as input mask.
+
+    """
     fg_mask = np.isin(lab, fg_vals)
     bg_mask = np.isin(lab, bg_vals)
     lab_c = lab.copy()
