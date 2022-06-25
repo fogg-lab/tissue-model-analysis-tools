@@ -1,4 +1,4 @@
-name: fogg_lab
+name: fogg-lab
 channels:
   - defaults
 dependencies:
