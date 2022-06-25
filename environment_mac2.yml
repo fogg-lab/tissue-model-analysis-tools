@@ -1,4 +1,4 @@
-name: env_mac
+name: fogg_lab
 channels:
   - defaults
 dependencies:
