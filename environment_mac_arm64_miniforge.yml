@@ -15,6 +15,6 @@ dependencies:
   - pip:
     - keras==2.8.0
     - keras-preprocessing==1.1.2
-    - tensorflow-macos==2.8.0
+    - tensorflow-macos==2.9.0
     - tensorflow-metal==0.5.0
     - protobuf==3.20.*
