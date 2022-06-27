@@ -4,7 +4,7 @@ channels:
   - apple
 dependencies:
   - dask=2022.5.0
-  - opencv=4.5.4
+  - opencv=4.5.5
   - pandas=1.4.2
   - numpy==1.22.3
   - pip=21.2.4
