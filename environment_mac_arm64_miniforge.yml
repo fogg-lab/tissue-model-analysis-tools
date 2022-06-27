@@ -1,6 +1,7 @@
 name: fogg-lab
 channels:
   - defaults
+  - apple
 dependencies:
   - dask=2022.5.0
   - numpy=1.21.5
@@ -12,7 +13,7 @@ dependencies:
   - setuptools=61.2.0
   - tensorflow-deps=2.9.0
   - pip:
-    - gudhi==3.5.0
+    - gudhi==3.5.0rc2
     - keras==2.8.0
     - keras-preprocessing==1.1.2
     - tensorflow-macos==2.9.0
