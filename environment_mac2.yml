@@ -2,17 +2,19 @@ name: fogg-lab
 channels:
   - defaults
 dependencies:
-  - dask=2022.5.0=py310hecd8cb5_0
-  - numpy=1.21.5=py310h1ad2b02_1
-  - opencv=4.5.4=py310h540bb42_3
-  - pandas=1.4.2=py310he9d5cce_0
-  - pip=21.2.4=py310hecd8cb5_0
-  - scikit-learn=1.0.2=py310hc081a56_0
-  - scipy=1.7.3=py310hbd46d07_0
-  - setuptools=61.2.0=py310hecd8cb5_0
+  - dask=2022.5.0
+  - numpy=1.21.5
+  - opencv=4.5.4
+  - pandas=1.4.2
+  - pip=21.2.4
+  - scikit-learn=1.0.2
+  - scipy=1.7.3
+  - setuptools=61.2.0
+  - tensorflow-deps=2.9.0
   - pip:
     - gudhi==3.5.0
     - keras==2.8.0
     - keras-preprocessing==1.1.2
-    - tensorflow==2.8.0
+    - tensorflow-macos==2.9.0
+    - tensorflow-metal==0.5.0
     - protobuf==3.20.*
