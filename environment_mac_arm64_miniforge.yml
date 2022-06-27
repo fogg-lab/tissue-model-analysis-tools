@@ -13,7 +13,6 @@ dependencies:
   - setuptools=61.2.0
   - tensorflow-deps=2.8.0
   - pip:
-    - gudhi==3.5.0rc2
     - keras==2.8.0
     - keras-preprocessing==1.1.2
     - tensorflow-macos==2.8.0
