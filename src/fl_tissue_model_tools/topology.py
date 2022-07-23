@@ -1,15 +1,18 @@
 import cv2 as cv
 import dask as d
 import numpy as np
-import gudhi as gd
-import networkx as nx
 import numpy.typing as npt
 
+import gudhi as gd
+import networkx as nx
+
+
 from .graph_recon_DM import graphRecon
-from . import defs
 
 
-def __compute_morse_skeleton_and_barcode_one_component(im: npt.ArrayLike, threshold: float, graph_recon_path: str):
+def __compute_morse_skeleton_and_barcode_one_component(
+    im: npt.ArrayLike, threshold: float, graph_recon_path: str
+):
     """Fit a Morse skeleton to the image `im`.
 
         Fits a Morse Skeleton to the entire image `im`.
@@ -18,27 +21,28 @@ def __compute_morse_skeleton_and_barcode_one_component(im: npt.ArrayLike, thresh
 
         Args:
             im (numpy array of uint8): Grayscale image
-            threshold (float): threshold for the Morse skeleton simplification step. See paper.
+            threshold (float):
+                threshold for the Morse skeleton simplification step. See paper.
             graph_recon_path (str): path to the graph_recon_DM directory.
-                                    By default, the function assumes we are running the code
-                                    in fogg_lab_tissue_model_analysis_tools/notebooks
-
+                By default, the function assumes we are running the code in
+                fogg_lab_tissue_model_analysis_tools/notebooks
 
         Returns:
-            verts_total (V x 2 numpy array of floats): Array where ith row stores
-                                                        2d coordinate of ith vertex in Morse skeleton
-            edges_total (E x 3 numpy array of floats): array where kth row [i, j, _]
-                                                        storing the indices i and j of the kth edge's
-                                                        endpoints in `verts_total`
-            bc_total (n x 2 numpy array of bars): array where each row is a bar in the barcode
-                                                   of the filtration on the Morse skeleton
-
+            verts_total (V x 2 numpy array of floats):
+                Array where ith row stores 2d coordinate of ith vertex in
+                Morse skeleton
+            edges_total (E x 3 numpy array of floats):
+                array where kth row [i, j, _] storing the indices i and j of
+                the kth edge's endpoints in `verts_total`
+            bc_total (n x 2 numpy array of bars):
+                array where each row is a bar in the barcode of the filtration
+                on the Morse skeleton
     """
 
     # compute the Morse skeleton
     #
-    # NOTICE: This function will return a warning about opening an empty file if the Morse skeleton is empty.
-    #         Don't be alarmed. This is safe.
+    # NOTICE: This function will return a warning about opening an empty file
+    #         if the Morse skeleton is empty. Don't be alarmed. This is safe.
     verts, edges = graphRecon.cmp_dm_img_grid2D(im, threshold, graph_recon_path)
 
 
@@ -61,8 +65,10 @@ def __compute_morse_skeleton_and_barcode_one_component(im: npt.ArrayLike, thresh
         edges = edges.astype('int')
 
         # Create a networkx graph of Morse skeleton
-        # We use the networkx graph to compute the distance of each vertex from the "center" of the graph
-        # The center is a graph-theoretic notion defined here: https://en.wikipedia.org/wiki/Graph_center
+        # We use the networkx graph to compute the distance of each vertex from
+        #   the "center" of the graph
+        # The center is a graph-theoretic notion defined here:
+        #   https://en.wikipedia.org/wiki/Graph_center
         G = nx.Graph()
         for v0, v1, _ in edges:
             # Add each edge to the graph with weight = Euclidean distance between endpoints
@@ -114,7 +120,11 @@ def __compute_morse_skeleton_and_barcode_one_component(im: npt.ArrayLike, thresh
 
         return verts, edges, bc
 
-def compute_morse_skeleton_and_barcode_parallel(im: npt.ArrayLike, mask: npt.ArrayLike, graph_recon_path: str, threshold: float=0.5, component_min_size: int=1000):
+def compute_morse_skeleton_and_barcode_parallel(im: npt.ArrayLike,
+                                                mask: npt.ArrayLike,
+                                                graph_recon_path: str,
+                                                threshold: float=0.5,
+                                                component_min_size: int=1000):
     """Fit a Morse skeleton to all sufficiently large components of the image `im`.
 
         Fits a Morse Skeleton to all components of `im` with area larger than `component_min_size`.
@@ -144,13 +154,20 @@ def compute_morse_skeleton_and_barcode_parallel(im: npt.ArrayLike, mask: npt.Arr
 
     """
     # Compute the connected components of `im`
-    _, im_components, component_stats, _ = cv.connectedComponentsWithStats(mask.astype('uint8'))
+    _, im_components, component_stats, _ = cv.connectedComponentsWithStats(
+        mask.astype('uint8')
+    )
 
     # `component_stats[1:,4]` contains the area of each connected component,
     #   exluding the background which is row 0
     # `components_idx` contains indices of all components larger than `component_min_size`.
     #  We add 1 to the index because we removed the first row of `component_stats`.
-    components_idx = [idx+1 for idx, area in enumerate(component_stats[1:,4]) if area > component_min_size]
+    components_idx = [
+        idx+1
+        for idx, area
+        in enumerate(component_stats[1:,4])
+        if area > component_min_size
+    ]
     print(f"{len(components_idx)} connected components found\n\n")
 
     # Arrays that will store all vertices, edges, and barcodes of the disconnected Morse skeletons
@@ -169,7 +186,8 @@ def compute_morse_skeleton_and_barcode_parallel(im: npt.ArrayLike, mask: npt.Arr
         component = component.astype('uint8') * im
         # rescale the image to the range [0,1]
         component = component / 255
-        # stats contain the top left corner (x_min, y_min) and weight and height of bounding box around the connected component
+        # stats contain the top left corner (x_min, y_min) and weight and height
+        # of bounding box around the connected component
         y_min, x_min, h, w, _ = component_stats[idx]
         # crop the image to a bounding box of the connected component
         cropped_component = component[x_min:x_min+w, y_min:y_min+h]
@@ -178,7 +196,12 @@ def compute_morse_skeleton_and_barcode_parallel(im: npt.ArrayLike, mask: npt.Arr
 
     # compute the Morse skeleton and barcode of each connected component in parallel
     output_all = d.compute(
-        [d.delayed(__compute_morse_skeleton_and_barcode_one_component)(comp, threshold, graph_recon_path) for comp in components_list]
+        [
+            d.delayed(
+                __compute_morse_skeleton_and_barcode_one_component
+            )(comp, threshold, graph_recon_path)
+            for comp in components_list
+        ]
     )[0]
 
     # concatenate the output from each connected component
@@ -207,7 +230,9 @@ def compute_morse_skeleton_and_barcode_parallel(im: npt.ArrayLike, mask: npt.Arr
     return verts_total, edges_total, bc_total
 
 
-def compute_morse_skeleton_and_barcode(im: npt.ArrayLike, mask: npt.ArrayLike, graph_recon_path: str, threshold: float=0.5, component_min_size: int=1000):
+def compute_morse_skeleton_and_barcode(im: npt.ArrayLike, mask: npt.ArrayLike,
+                                       graph_recon_path: str, threshold: float=0.5,
+                                       component_min_size: int=1000):
     """Fit a Morse skeleton to all sufficiently large components of the image `im`.
 
         Fits a Morse Skeleton to all components of `im` with area larger than `component_min_size`.
@@ -237,7 +262,9 @@ def compute_morse_skeleton_and_barcode(im: npt.ArrayLike, mask: npt.ArrayLike, g
 
     """
     # compute the connected components of im
-    _, im_components, component_stats, _ = cv.connectedComponentsWithStats(mask.astype('uint8'))
+    _, im_components, component_stats, _ = cv.connectedComponentsWithStats(
+        mask.astype('uint8')
+    )
 
     # indices of connected components sorted in increasing order by area
     # component_idx_sorted = np.argsort(component_stats[:, 4])
@@ -246,7 +273,12 @@ def compute_morse_skeleton_and_barcode(im: npt.ArrayLike, mask: npt.ArrayLike, g
     #   exluding the background which is row 0
     # {components_idx} contains indices of all components larger than {component_min_size}
     #   we add 1 to the idx because we removed the first row of {component_stats}
-    components_idx = [idx+1 for idx, area in enumerate(component_stats[1:,4]) if area > component_min_size]
+    components_idx = [
+        idx+1
+        for idx, area
+        in enumerate(component_stats[1:,4])
+        if area > component_min_size
+    ]
     print(f"{len(components_idx)} connected components found\n\n")
 
     # Arrays that will store all vertices, edges, and barcodes of the disconnected Morse skeletons
@@ -276,7 +308,8 @@ def compute_morse_skeleton_and_barcode(im: npt.ArrayLike, mask: npt.ArrayLike, g
         #
         # NOTICE: This function will return a warning about opening an empty file if the Morse skeleton is empty.
         #         Don't be alarmed. This is safe.
-        verts, edges = graphRecon.cmp_dm_img_grid2D(component[x_min:x_min+w, y_min:y_min+h], threshold, graph_recon_path)
+        verts, edges = graphRecon.cmp_dm_img_grid2D(
+            component[x_min:x_min+w, y_min:y_min+h], threshold, graph_recon_path)
 
         # If the graph is not empty, we compute and plot the barcode of the Morse skeleton.
         # The filtration adds the vertices and edges in decreasing order of distance from the center.

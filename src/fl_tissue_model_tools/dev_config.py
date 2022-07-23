@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from matplotlib import docstring
 
 
 @dataclass
