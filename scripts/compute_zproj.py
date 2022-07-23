@@ -2,8 +2,8 @@ import os
 import sys
 import dask as d
 import numpy as np
-import cv2
 import numpy.typing as npt
+import cv2
 
 from fl_tissue_model_tools import defs
 from fl_tissue_model_tools import preprocessing as prep
@@ -48,12 +48,14 @@ def get_zstack(zs_path: str, extension: str, descending: bool) -> npt.NDArray:
         mx = defs.TIF_MAX
     else:
         raise OSError(f"Unsupported file type for analysis: {extension}")
-    zpaths, zstack = zs.zstack_from_dir(zs_path, extension, descending)
+    zstack = zs.zstack_from_dir(zs_path, extension, descending)
     zstack = prep.min_max_(zstack, a, b, mn, mx)
     return zstack
 
 
-def save_zproj(zproj: npt.NDArray, out_root: str, zid: str, zproj_type: str, extension: str) -> None:
+def save_zproj(
+    zproj: npt.NDArray, out_root: str, zid: str, zproj_type: str, extension: str
+) -> None:
     """Save Z projected image.
 
     Args:
@@ -87,23 +89,22 @@ def save_zproj(zproj: npt.NDArray, out_root: str, zid: str, zproj_type: str, ext
 
 
 def main():
-    args = su.parse_zproj_args({})
+    args = su.parse_zproj_args()
     verbose = args.verbose
-
+    compute_cell_area = args.compute_cell_area
 
     ### Tidy up paths ###
     in_root = args.in_root.replace("\\", "/")
     out_root = args.out_root.replace("\\", "/")
 
-
     ### Verify input source ###
     extension = args.extension.replace(".", "")
     try:
-        zstack_paths = su.zproj_verify_input_dir(in_root, extension, verbose=verbose)
+        zstack_paths = su.zproj_verify_input_dir(in_root, extension,
+                                                 verbose=verbose)
     except FileNotFoundError as e:
         print(f"{su.SFM.failure} {e}")
         sys.exit()
-
 
     ### Verify output destination ###
     try:
@@ -111,7 +112,6 @@ def main():
     except PermissionError as e:
         print(f"{su.SFM.failure} {e}")
         sys.exit()
-
 
     ### Compute Z projections ###
     if verbose:
@@ -121,17 +121,18 @@ def main():
     descending = bool(args.order)
     z_ids = [zsp.split("/")[-1] for zsp in zstack_paths]
     if verbose:
-        print(f"Loading Z stacks...")
+        print("Loading Z stacks...")
     try:
         zstacks = d.compute(
-            d.delayed({z_ids[i]: get_zstack(zsp, extension, descending) for i, zsp in enumerate(zstack_paths)})
+            d.delayed({z_ids[i]: get_zstack(zsp, extension, descending)
+                        for i, zsp in enumerate(zstack_paths)})
         )[0]
     except OSError as e:
         print(f"{su.SFM.failure}{e}")
         sys.exit()
 
     if verbose:
-        print(f"... Z stacks loaded.")
+        print("... Z stacks loaded.")
 
     pm = proj_method[zp_method]
 
@@ -142,16 +143,16 @@ def main():
         d.delayed({z_id: pm(zstacks[z_id]) for z_id in z_ids})
     )[0]
     if verbose:
-            print(f"... Projections computed.")
-    
+        print("... Projections computed.")
+
     ### Save Z projections ###
     if verbose:
         print(f"{os.linesep}Saving projections...")
     for z_id, zproj in zprojs.items():
         save_zproj(zproj, out_root, z_id, zp_method, extension)
-    
+
     if verbose:
-        print(f"... Projections saved.")
+        print("... Projections saved.")
         print(su.SFM.success)
         print(su.verbose_end)
 

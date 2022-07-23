@@ -1,29 +1,26 @@
 import os
 import sys
+from typing import Sequence, Tuple, List
 import cv2
 import numpy as np
+import numpy.typing as npt
 import dask as d
 import pandas as pd
-import json
-import numpy.typing as npt
 
-from glob import glob
-from typing import Sequence
-
-
-from fl_tissue_model_tools import data_prep, defs
+from fl_tissue_model_tools import defs
 from fl_tissue_model_tools import preprocessing as prep
 from fl_tissue_model_tools import analysis as an
 from fl_tissue_model_tools import script_util as su
 
-
 linesep = os.linesep
-default_config_path = f"../config/default_cell_area_computation.json"
+default_config_path = "../config/default_cell_area_computation.json"
 thresh_subdir = "thresholded"
 calc_subdir = "calculations"
 
 
-def load_img(img_path: str, dsamp: bool=True, dsize: int=250, extension: str="tif") -> npt.NDArray:
+def load_img(
+    img_path: str, dsamp: bool=True, dsize: int=250, extension: str="tif"
+) -> npt.NDArray:
     """Load and downsample image.
 
     Args:
@@ -47,14 +44,14 @@ def load_img(img_path: str, dsamp: bool=True, dsize: int=250, extension: str="ti
     return img
 
 
-def load_and_norm(img_path: str, extension: str, dsamp: bool=True, dsize: int=250) -> npt.NDArray:
+def load_and_norm(
+    img_path: str, extension: str, dsize: int=250
+) -> npt.NDArray:
     """Load and normalize image to new range.
 
     Args:
         img_path: Path to image.
         extension: File extension for image.
-        dsamp: Whether to downsample the image. Only tif & png
-            currently supported.
         dsize: If downsampling image, size to downsample to.
 
     Raises:
@@ -79,8 +76,13 @@ def load_and_norm(img_path: str, extension: str, dsamp: bool=True, dsize: int=25
     return prep.min_max_(img, a, b, mn, mx)
 
 
-def mask_and_threshold(img: npt.NDArray, circ_mask: npt.NDArray, pinhole_idx: tuple[npt.NDArray, npt.NDArray], sd_coef: float, rs: np.random.RandomState) -> npt.NDArray:
-    """Apply circle mask to image and perform foreground thresholding on the masked image.
+def mask_and_threshold(
+    img: npt.NDArray, circ_mask: npt.NDArray,
+    pinhole_idx: Tuple[npt.NDArray, npt.NDArray], sd_coef: float,
+    rs: np.random.RandomState
+) -> npt.NDArray:
+    """Apply circular mask to image and perform foreground thresholding on the
+    masked image.
 
     Args:
         img: Original image.
@@ -97,7 +99,8 @@ def mask_and_threshold(img: npt.NDArray, circ_mask: npt.NDArray, pinhole_idx: tu
     return prep.exec_threshold(masked, pinhole_idx, sd_coef, rs)
 
 
-def prep_images(img_paths: Sequence[str], dsamp_size: int, extension: str) -> list[npt.NDArray]:
+def prep_images(img_paths: Sequence[str], dsamp_size: int, extension: str) -> \
+                List[npt.NDArray]:
     """Create grayscale, downsampled versions of original images.
 
     Args:
@@ -110,12 +113,14 @@ def prep_images(img_paths: Sequence[str], dsamp_size: int, extension: str) -> li
 
     """
     gs_ds_imgs = d.compute(
-        [d.delayed(load_and_norm)(img_p, extension, dsamp=True, dsize=(dsamp_size, dsamp_size)) for img_p in img_paths]
+        [d.delayed(load_and_norm)(img_p, extension, dsamp=True,
+        dsize=(dsamp_size, dsamp_size)) for img_p in img_paths]
     )[0]
     return gs_ds_imgs
 
 
-def circ_mask_setup(img_shape: tuple[int, int], pinhole_cut: int) -> tuple[npt.NDArray, tuple[npt.NDArray, npt.NDArray], int]:
+def circ_mask_setup(img_shape: Tuple[int, int], pinhole_cut: int) -> \
+                    Tuple[npt.NDArray, Tuple[npt.NDArray, npt.NDArray], int]:
     """Compute values needed to apply circular mask to images.
 
     Args:
@@ -136,7 +141,11 @@ def circ_mask_setup(img_shape: tuple[int, int], pinhole_cut: int) -> tuple[npt.N
     return circ_mask, pinhole_idx, circ_pix_area
 
 
-def threshold_images(imgs: list[npt.NDArray], circ_mask: npt.NDArray, pinhole_idx: tuple[npt.NDArray, npt.NDArray], sd_coef: float, rs: np.random.RandomState) -> list[npt.NDArray]:
+def threshold_images(
+    imgs: List[npt.NDArray], circ_mask: npt.NDArray,
+    pinhole_idx: Tuple[npt.NDArray, npt.NDArray], sd_coef: float,
+    rs: np.random.RandomState
+) -> List[npt.NDArray]:
     """Apply mask & threshold to all images.
 
     Args:
@@ -151,12 +160,15 @@ def threshold_images(imgs: list[npt.NDArray], circ_mask: npt.NDArray, pinhole_id
 
     """
     gmm_thresh_all = d.compute(
-        [d.delayed(mask_and_threshold)(img, circ_mask, pinhole_idx, sd_coef, rs) for img in imgs]
+        [d.delayed(mask_and_threshold)(img, circ_mask, pinhole_idx, sd_coef, rs)
+            for img in imgs]
     )[0]
     return gmm_thresh_all
 
 
-def compute_areas(imgs: list[npt.NDArray], circ_pix_area: int) -> npt.NDArray[np.float_]:
+def compute_areas(
+    imgs: List[npt.NDArray], circ_pix_area: int
+) -> npt.NDArray[np.float_]:
     """Compute non-zero pixel area of thresholded images.
 
     Args:
@@ -175,7 +187,11 @@ def compute_areas(imgs: list[npt.NDArray], circ_pix_area: int) -> npt.NDArray[np
 
 
 def main():
-    args = su.parse_cell_area_args({"thresh_subdir": thresh_subdir, "calc_subdir": calc_subdir, "default_config_path": default_config_path})
+    args = su.parse_cell_area_args({
+        "thresh_subdir": thresh_subdir,
+        "calc_subdir": calc_subdir,
+        "default_config_path": default_config_path}
+    )
     verbose = args.verbose
 
 
@@ -195,7 +211,8 @@ def main():
 
     ### Verify output destination ###
     try:
-        su.cell_area_verify_output_dir(out_root, thresh_subdir, calc_subdir, verbose=verbose)
+        su.cell_area_verify_output_dir(out_root, thresh_subdir, calc_subdir,
+                                        verbose=verbose)
     except PermissionError as e:
         print(f"{su.SFM.failure} {e}")
         sys.exit()

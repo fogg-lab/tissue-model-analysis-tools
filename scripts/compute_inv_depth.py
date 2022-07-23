@@ -12,7 +12,7 @@ from fl_tissue_model_tools import script_util as su
 from fl_tissue_model_tools import zstacks as zs
 
 
-default_config_path = f"../config/default_invasion_depth_computation.json"
+default_config_path = "../config/default_invasion_depth_computation.json"
 
 def main():
     args = su.parse_inv_depth_args({"default_config_path": default_config_path})
@@ -51,13 +51,12 @@ def main():
     ### Load model training parameters ###
     with open("../model_training/invasion_depth_training_values.json", 'r') as fp:
        training_values = json.load(fp)
-    training_values["rs_seed"] = None if (training_values["rs_seed"] == "None") else training_values["rs_seed"]
-    
-    
+    if training_values["rs_seed"] == "None":
+        training_values["rs_seed"] = None
+
     ### Set model variables ###
     cls_thresh = training_values["cls_thresh"]
     resnet_inp_shape = tuple(training_values["resnet_inp_shape"])
-    class_labels = training_values["class_labels"]
     n_models = training_values["n_models"]
     n_outputs = 1
     last_resnet_layer = best_hp["last_resnet_layer"]
@@ -82,11 +81,13 @@ def main():
         best_val_losses[i] = ft_h_df.val_loss.min()
 
     sorted_best_model_idx = best_val_losses.argsort()
-    
+
     # Create the (n_pred_models) best models from the saved weights
     K.clear_session()
     inv_depth_models = [
-        models.build_ResNet50_TL(n_outputs, resnet_inp_shape, base_last_layer=last_resnet_layer, base_model_trainable=False) for _ in range(n_pred_models)
+        models.build_ResNet50_TL(n_outputs, resnet_inp_shape,
+            base_last_layer=last_resnet_layer, base_model_trainable=False)
+            for _ in range(n_pred_models)
     ]
     for i, m in enumerate(inv_depth_models):
         if verbose:
@@ -95,7 +96,8 @@ def main():
         # Set trainable to True, load weights, then set back to False
         ith_best_idx = sorted_best_model_idx[i]
         m.trainable = True
-        m.load_weights(f"../model_training/best_ensemble/best_finetune_weights_{ith_best_idx}.h5")
+        m.load_weights("../model_training/best_ensemble/best_finetune_weights_"
+            f"{ith_best_idx}.h5")
         m.trainable = False
         if verbose:
             print(f"... Classifier {i} loaded.")
@@ -117,7 +119,8 @@ def main():
             zpaths = zs.zstack_paths_from_dir(zstack_dir, descending=descending)
 
             if verbose:
-                print(f"Making predictions for Z stack:{os.linesep}\t{zstack_id}{os.linesep}...")
+                print(f"Making predictions for Z stack:{os.linesep}\t{zstack_id}"
+                        f"{os.linesep}...")
 
             x = data_prep.prep_inv_depth_imgs(zpaths, resnet_inp_shape[:-1])
             # Convert to tensor before calling predict() to speed up execution
@@ -126,22 +129,24 @@ def main():
             # Make predictions
             # Probability predictions of each model
             yhatp_m = np.array(
-                d.compute([d.delayed(m.predict)(x).squeeze() for m in inv_depth_models])[0]
+                d.compute([d.delayed(m.predict)(x).squeeze()
+                            for m in inv_depth_models])[0]
             ).T
             # Mean probability predictions (ensemble predictions)
             yhatp = np.mean(yhatp_m, axis=1, keepdims=True)
             # Threshold probability predictions
             yhat = (yhatp > cls_thresh).astype(np.int32)
             if verbose:
-                print(f"... Predictions finished.")
+                print("... Predictions finished.")
             
             # Save outputs
             if verbose:
-                print(f"Saving results...")
-            output_file = pd.DataFrame({"img_name": [zp.split("/")[-1] for zp in zpaths], "inv_prob": yhatp.squeeze(), "inv_label": yhat.squeeze()})
+                print("Saving results...")
+            output_file = pd.DataFrame({"img_name": [zp.split("/")[-1]for zp in zpaths],
+                            "inv_prob": yhatp.squeeze(), "inv_label": yhat.squeeze()})
             output_file.to_csv(f"{out_root}/{zstack_id}.csv", index=False)
             if verbose:
-                print(f"... Results saved.")
+                print("... Results saved.")
 
         if verbose:
             print(su.SFM.success)

@@ -1,18 +1,18 @@
+from typing import Union, Sequence, Any
+from typing import Tuple, Dict
 import cv2
 import numpy as np
+import numpy.typing as npt
+from numpy.random import RandomState
 import dask as d
 from sklearn.mixture import GaussianMixture
 
-# Typing
-import numpy.typing as npt
-from numpy.random import RandomState
-from typing import Union, Sequence, Any
-
-# Custom
 from . import defs
 
 
-def min_max_(x: npt.NDArray, a: float, b: float, mn: float, mx: float) -> npt.NDArray[np.float64]:
+def min_max_(
+    x: npt.NDArray, a: float, b: float, mn: float, mx: float
+) -> npt.NDArray[np.float64]:
     """Normalize the array `x` from the range [`mn`, `mx`] to the range [`a`, `b`]
 
     Args:
@@ -24,13 +24,15 @@ def min_max_(x: npt.NDArray, a: float, b: float, mn: float, mx: float) -> npt.ND
 
     Returns:
         The normalized array.
-
     """
+
     x = x.astype(np.float64)
     return a + ( (x - mn) * (b - a) ) / (mx - mn)
 
 
-def gen_circ_mask(center: tuple[int, int], rad: float, shape: tuple[int, int], mask_val: np.uint8) -> npt.NDArray[np.uint8]:
+def gen_circ_mask(
+    center: Tuple[int, int], rad: float, shape: Tuple[int, int], mask_val: np.uint8
+) -> npt.NDArray[np.uint8]:
     """Generate a 2D circular mask.
 
     The circle mask is a size `shape` array of uint8, where an element
@@ -65,8 +67,11 @@ def apply_mask(img: npt.NDArray, mask: npt.NDArray) -> npt.NDArray:
     return cv2.bitwise_and(img, img, mask=mask)
 
 
-def bin_thresh(img: npt.NDArray, img_max: npt.NDArray, threshold: float=0) -> npt.NDArray:
-    """Threshold an image by setting all pixels with value above `threshold` to `img_max` and all other pixels to 0.
+def bin_thresh(
+    img: npt.NDArray, img_max: npt.NDArray, threshold: float=0
+) -> npt.NDArray:
+    """Threshold an image by setting all pixels with value above `threshold` to `img_max`
+    and all other pixels to 0.
 
     Args:
         img: Image to be thresholded.
@@ -83,7 +88,9 @@ def bin_thresh(img: npt.NDArray, img_max: npt.NDArray, threshold: float=0) -> np
     return img
 
 
-def exec_threshold(masked: npt.NDArray, mask_idx: Sequence, sd_coef: float, rs: RandomState) -> npt.NDArray:
+def exec_threshold(
+    masked: npt.NDArray, mask_idx: Sequence, sd_coef: float, rs: RandomState
+) -> npt.NDArray:
     """Apply threshold to obtain the foreground (cell content) of a plate image.
 
     A 2-component Gaussian mixture model is fit to pixel the intensities of
@@ -104,7 +111,6 @@ def exec_threshold(masked: npt.NDArray, mask_idx: Sequence, sd_coef: float, rs: 
 
     Returns:
         Copy of original image with background pixels set to 0.
-
     """
     # Select pixels within the mask. Exclude masked-out pixels since they
     # will alter the shape of the background distribution.
@@ -122,7 +128,9 @@ def exec_threshold(masked: npt.NDArray, mask_idx: Sequence, sd_coef: float, rs: 
     return gmm_masked
 
 
-def dt_blur(img: npt.NDArray, blur_itr: int, dist_metric: int=cv2.DIST_L2, k_size: int=3) -> npt.NDArray[np.uint8]:
+def dt_blur(
+    img: npt.NDArray, blur_itr: int, dist_metric: int=cv2.DIST_L2, k_size: int=3
+) -> npt.NDArray[np.uint8]:
     """Apply distance transform and blur the image for `blur_itr` iterations.
 
     Args:
@@ -136,11 +144,15 @@ def dt_blur(img: npt.NDArray, blur_itr: int, dist_metric: int=cv2.DIST_L2, k_siz
         Distance transformed and blurred image in grayscale format.
     """
 
-    proc_img = cv2.distanceTransform(bin_thresh(img, defs.GS_MAX).round().astype(np.uint8), dist_metric, 5)
+    proc_img = cv2.distanceTransform(
+        bin_thresh(img, defs.GS_MAX).round().astype(np.uint8), dist_metric, 5
+    )
     return blur(proc_img, blur_itr, k_size)
 
 
-def sdt_blur(img: npt.NDArray, blur_itr: int, dist_metric: int=cv2.DIST_L2, k_size: int=3) -> npt.NDArray[np.uint8]:
+def sdt_blur(
+    img: npt.NDArray, blur_itr: int, dist_metric: int=cv2.DIST_L2, k_size: int=3
+) -> npt.NDArray[np.uint8]:
     """Apply the signed distance and blur the image for `blur_itr` iterations.
 
     The signed distance transform assigns each pixel in a binary mask
@@ -163,11 +175,14 @@ def sdt_blur(img: npt.NDArray, blur_itr: int, dist_metric: int=cv2.DIST_L2, k_si
     # distance of pixels in the mask
     proc_img = cv2.distanceTransform(mask, dist_metric, 5)
     # distance of pixels not in the mask
-    proc_img = proc_img - cv2.distanceTransform(np.logical_not(mask).astype(np.uint8), dist_metric, 5)
+    proc_img -= cv2.distanceTransform(np.logical_not(mask).astype(np.uint8),
+                                      dist_metric, 5)
     return blur(proc_img, blur_itr, k_size, gs=False)
 
 
-def blur(img: npt.NDArray, blur_itr: int, k_size: int=3, gs: bool=True) -> npt.NDArray[np.uint8]:
+def blur(
+    img: npt.NDArray, blur_itr: int, k_size: int=3, gs: bool=True
+) -> npt.NDArray[np.uint8]:
     """Blur an image for `blur_itr` iterations.
 
     Args:
@@ -189,7 +204,10 @@ def blur(img: npt.NDArray, blur_itr: int, k_size: int=3, gs: bool=True) -> npt.N
     return proc_img.round().astype(np.uint8)
 
 
-def augment_img(img: npt.NDArray[Union[np.float_, np.int_]], rot: int, hflip: bool, vflip: bool, expand_dims: bool=True) -> npt.NDArray[Union[np.float_, np.int_]]:
+def augment_img(
+    img: npt.NDArray[Union[np.float_, np.int_]], rot: int, hflip: bool,
+    vflip: bool, expand_dims: bool=True
+) -> npt.NDArray[Union[np.float_, np.int_]]:
     """Augment an image using rotations and horizontal/vertical flips
 
     Args:
@@ -220,7 +238,9 @@ def augment_img(img: npt.NDArray[Union[np.float_, np.int_]], rot: int, hflip: bo
     return img
 
 
-def augment_img_mask_pairs(x: npt.NDArray[np.float_], y: npt.NDArray[np.int_], rs: RandomState) -> tuple[npt.NDArray[np.float_], npt.NDArray[np.int_]]:
+def augment_img_mask_pairs(
+    x: npt.NDArray[np.float_], y: npt.NDArray[np.int_], rs: RandomState
+) -> Tuple[npt.NDArray[np.float_], npt.NDArray[np.int_]]:
     """Augment a set of image/mask pairs using rotations and horizontal/vertical flips
 
     Args:
@@ -231,7 +251,8 @@ def augment_img_mask_pairs(x: npt.NDArray[np.float_], y: npt.NDArray[np.int_], r
     Returns:
         (Augmented images, matched augmented masks)
     """
-    assert len(x) == len(y), f"x and y must have the same shape, x: {x.shape} != y: {y.shape}"
+    assert len(x) == len(y), ("x and y must have the same shape, x: "
+                              f"{x.shape} != y: {y.shape}")
     m = len(x)
     # Cannot parallelize (random state ensures reproducibility)
     rots = rs.choice([0, 90, 180, 270], size=m)
@@ -239,13 +260,22 @@ def augment_img_mask_pairs(x: npt.NDArray[np.float_], y: npt.NDArray[np.int_], r
     vflips = rs.choice([True, False], size=m)
 
     def aug_imgs(imgs):
-        return np.array([augment_img(imgs[i], rots[i], hflips[i], vflips[i]) for i in range(m)])
+        return np.array(
+            [
+                augment_img(
+                    imgs[i], rots[i], hflips[i], vflips[i]
+                ) for i in range(m)
+            ]
+        )
 
     x, y = d.compute((d.delayed(aug_imgs)(x), d.delayed(aug_imgs)(y)))[0]
     return x, y
 
 
-def augment_imgs(x: npt.NDArray[np.float_],  rs: RandomState, rot_options=(0, 90, 180, 270), expand_dims: bool=False) -> npt.NDArray[np.float_]:
+def augment_imgs(
+    x: npt.NDArray[np.float_],  rs: RandomState, rot_options=(0, 90, 180, 270),
+    expand_dims: bool=False
+) -> npt.NDArray[np.float_]:
     """Augment a set of images using rotations and horizontal/vertical flips.
 
     Args:
@@ -263,11 +293,17 @@ def augment_imgs(x: npt.NDArray[np.float_],  rs: RandomState, rot_options=(0, 90
     hflips = rs.choice([True, False], size=m)
     vflips = rs.choice([True, False], size=m)
 
-    x = d.compute([d.delayed(augment_img)(x[i], rots[i], hflips[i], vflips[i], expand_dims) for i in range(m)])[0]
+    x = d.compute(
+        [d.delayed(augment_img)(x[i], rots[i], hflips[i], vflips[i], expand_dims)
+            for i in range(m)]
+    )[0]
     return np.array(x)
 
 
-def map2bin(lab: npt.NDArray[np.int_], fg_vals: Sequence[int], bg_vals: Sequence[int], fg: int=1, bg: int=0) -> npt.NDArray[np.int_]:
+def map2bin(
+    lab: npt.NDArray[np.int_], fg_vals: Sequence[int], bg_vals: Sequence[int],
+    fg: int=1, bg: int=0
+) -> npt.NDArray[np.int_]:
     """Convert a mask n-map (e.g., trimap) to a simple binary map.
 
     Args:
@@ -279,7 +315,6 @@ def map2bin(lab: npt.NDArray[np.int_], fg_vals: Sequence[int], bg_vals: Sequence
 
     Returns:
         Binary mask of same dimension as input mask.
-
     """
     fg_mask = np.isin(lab, fg_vals)
     bg_mask = np.isin(lab, bg_vals)
@@ -289,7 +324,7 @@ def map2bin(lab: npt.NDArray[np.int_], fg_vals: Sequence[int], bg_vals: Sequence
     return lab_c
 
 
-def balanced_class_weights_from_counts(class_counts) -> dict[Any, float]:
+def balanced_class_weights_from_counts(class_counts) -> Dict[Any, float]:
     """Create balanced weights using class counts.
 
     Args:
@@ -299,7 +334,6 @@ def balanced_class_weights_from_counts(class_counts) -> dict[Any, float]:
     Returns:
         dict[Any, float]: Weights for each class. Example:
             {c1: w_c1, c2: w_c2, ..., ck: w_ck}.
-
     """
     n = np.sum(list(class_counts.values()))
     n_c = len(class_counts.keys())
