@@ -4,14 +4,14 @@ https://github.com/cmcguinness/focusstack
 
 """
 
-import cv2
 import re
-import numpy as np
-import dask as d
 from glob import glob
-import numpy.typing as npt
-from typing import Optional, Sequence, Union, Callable
+from typing import Optional, Sequence, Callable, Tuple
 import numbers
+import dask as d
+import numpy.typing as npt
+import numpy as np
+import cv2
 
 from . import defs
 
@@ -51,7 +51,10 @@ def _blur_and_lap(image: npt.NDArray, kernel_size: int=5) -> npt.NDArray:
     return cv2.Laplacian(blurred, cv2.CV_64F, ksize=kernel_size)
 
 
-def zstack_from_dir(z_stack_dir: str, file_ext: str="tif", descending: bool=True, get_zpos: Optional[Callable[[str], int]]=None) -> tuple[Sequence[str], npt.NDArray]:
+def zstack_from_dir(
+    z_stack_dir: str, file_ext: str="tif", descending: bool=True,
+    get_zpos: Optional[Callable[[str], int]]=None
+) -> Tuple[Sequence[str], npt.NDArray]:
     """Return sorted (by z-position) z-stack image paths and z-stack.
 
     IMPORTANT: To use the default `get_zpos` function, each z-position image
@@ -101,7 +104,8 @@ def zstack_from_dir(z_stack_dir: str, file_ext: str="tif", descending: bool=True
     return sorted_z_paths, np.array([cv2.imread(img_n, flag) for img_n in sorted_z_paths])
 
 
-def zstack_paths_from_dir(z_stack_dir: str, file_ext: str="tif", descending: bool=True, get_zpos: Optional[Callable[[str], int]]=None) -> Sequence[str]:
+def zstack_paths_from_dir(z_stack_dir: str, file_ext: str="tif", descending: bool=True,
+                        get_zpos: Optional[Callable[[str], int]]=None) -> Sequence[str]:
     """Get sorted z-stack image paths.
 
     Args:
@@ -126,7 +130,9 @@ def zstack_paths_from_dir(z_stack_dir: str, file_ext: str="tif", descending: boo
     return sorted_z_paths
 
 
-def proj_focus_stacking(stack: npt.NDArray, axis: int=0, kernel_size:int=5) -> npt.NDArray:
+def proj_focus_stacking(
+    stack: npt.NDArray, axis: int=0, kernel_size:int=5
+) -> npt.NDArray:
     """Project image stack along given axis using focus stacking.
 
     This procedure projects an image stack by retaining the maximum
