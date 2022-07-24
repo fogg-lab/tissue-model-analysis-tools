@@ -160,8 +160,8 @@ class InvasionDataGenerator(utils.Sequence):
         self.class_paths = deepcopy(class_paths)
         self.class_labels = deepcopy(class_labels)
         self.batch_size = batch_size
-        self.img_shape = img_shape        
-        self.rs = random_state
+        self.img_shape = img_shape
+        self.rand_state = random_state
         self.shuffle = shuffle
         self.augmentation_function = augmentation_function
 
@@ -171,7 +171,7 @@ class InvasionDataGenerator(utils.Sequence):
 
         self._get_class_counts_and_create_master_image_and_label_lists()
         self.indices = np.arange(len(self.img_paths), dtype=np.uint)
-        if type(class_weights) == Dict:
+        if isinstance(class_weights, Dict):
             self.class_weights = deepcopy(class_weights)
         elif class_weights == True:
             self.class_weights = prep.balanced_class_weights_from_counts(self.class_counts)
@@ -212,9 +212,9 @@ class InvasionDataGenerator(utils.Sequence):
 
         # Generate data
         X = prep_inv_depth_imgs(img_paths, self.img_shape)
-        
+
         if self.augmentation_function != None:
-            X = self.augmentation_function(X, self.rs, expand_dims=False)
+            X = self.augmentation_function(X, self.rand_state, expand_dims=False)
         
         # Set y to be (m,1) rather than (m,)
         if self.class_weights != None:
@@ -240,7 +240,7 @@ class InvasionDataGenerator(utils.Sequence):
 
     def shuffle_indices(self) -> None:
         """Shuffle indices used to select image paths for loading into batch."""
-        self.rs.shuffle(self.indices)
+        self.rand_state.shuffle(self.indices)
 
     def on_epoch_end(self) -> None:
         """Perform designated actions at the end of each training epoch."""

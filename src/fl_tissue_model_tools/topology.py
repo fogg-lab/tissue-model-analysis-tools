@@ -6,7 +6,6 @@ import numpy.typing as npt
 import gudhi as gd
 import networkx as nx
 
-
 from .graph_recon_DM import graphRecon
 
 
@@ -92,10 +91,12 @@ def __compute_morse_skeleton_and_barcode_one_component(
         # center of the graph
         centers = nx.algorithms.distance_measures.center(G)
         center = centers[0]
-        # Use a random vertex instead of the actual center as centers can take a while to compute
+        # Use a random vertex instead of the actual center,
+        #  as centers can take a while to compute
         # center = np.random.randint(len(verts))
         # Distances of each vertex to the center
-        distances = nx.algorithms.shortest_paths.weighted.single_source_dijkstra_path_length(G, center)
+        distances = nx.algorithms.shortest_paths.weighted.single_source_dijkstra_path_length(
+            G, center)
 
         # Now, we use the distances to compute the barcode of the Morse skeleton
         #
@@ -127,11 +128,14 @@ def compute_morse_skeleton_and_barcode_parallel(im: npt.ArrayLike,
                                                 component_min_size: int=1000):
     """Fit a Morse skeleton to all sufficiently large components of the image `im`.
 
-        Fits a Morse Skeleton to all components of `im` with area larger than `component_min_size`.
-        The components are specified by the binary image `mask`, which is a mask of the foreground pixels.
+        Fits a Morse Skeleton to all components of `im` with area larger than
+        `component_min_size`.
+        The components are specified by the binary image `mask`,
+        which is a mask of the foreground pixels.
         Each component is fit in parallel using the dask package.
-        Also, computes the lower star filtration of the Morse skeleton where each
-        vertex's filtration value is the negative distance from the graph center of its connected component
+        Also, computes the lower star filtration of the Morse skeleton where
+        each vertex's filtration value is the negative distance from the graph
+        center of its connected component.
 
         Args:
             im (numpy array of uint8): Grayscale image
@@ -144,13 +148,13 @@ def compute_morse_skeleton_and_barcode_parallel(im: npt.ArrayLike,
 
 
         Returns:
-            verts_total (V x 2 numpy array of floats): Array where ith row stores
-                                                        2d coordinate of ith vertex in Morse skeleton
+            verts_total (V x 2 numpy array of floats): Array where ith row stores the 2d
+                                                       coordinate of ith vertex in Morse skeleton
             edges_total (E x 3 numpy array of floats): array where kth row [i, j, _]
-                                                        storing the indices i and j of the kth edge's
-                                                        endpoints in `verts_total`
+                                                       storing the indices i and j of the kth
+                                                       edge's endpoints in `verts_total`
             bc_total (n x 2 numpy array of bars): array where each row is a bar in the barcode
-                                                   of the filtration on the Morse skeleton
+                                                  of the filtration on the Morse skeleton
 
     """
     # Compute the connected components of `im`
@@ -236,7 +240,8 @@ def compute_morse_skeleton_and_barcode(im: npt.ArrayLike, mask: npt.ArrayLike,
     """Fit a Morse skeleton to all sufficiently large components of the image `im`.
 
         Fits a Morse Skeleton to all components of `im` with area larger than `component_min_size`.
-        The components are specified by the binary image `mask`, which is a mask of the foreground pixels.
+        The components are specified by the binary image `mask`,
+         which is a mask of the foreground pixels.
         Each component is fit in parallel using dask.
         Also, compute the lower star filtration of the Morse skeleton where each
         vertex's filtration value is the negative distance from the graph center.
@@ -253,10 +258,10 @@ def compute_morse_skeleton_and_barcode(im: npt.ArrayLike, mask: npt.ArrayLike,
 
         Returns:
             verts_total (V x 2 numpy array of floats): Array where ith row stores
-                                                        2d coordinate of ith vertex in Morse skeleton
+                                                       2d coordinate of ith vertex in Morse skeleton
             edges_total (E x 3 numpy array of floats): array where kth row [i, j, _]
-                                                        storing the indices i and j of the kth edge's
-                                                        endpoints in `verts_total`
+                                                       storing the indices i and j of the kth edge's
+                                                       endpoints in `verts_total`
             bc_total (n x 2 numpy array of bars): array where each row is a bar in the barcode
                                                    of the filtration on the Morse skeleton
 
@@ -300,19 +305,21 @@ def compute_morse_skeleton_and_barcode(im: npt.ArrayLike, mask: npt.ArrayLike,
         # rescale the image to the range [0,1]
         component = component / 255
 
-        # stats contain the top left corner (x_min, y_min) and weight and height of bounding box around the connected component
+        # stats contain the top left corner (x_min, y_min) and weight and height
+        # of bounding box around the connected component
         y_min, x_min, h, w, _ = component_stats[idx]
 
         # compute the Morse skeleton
         # we slice a bounding box of the connected component to speed up computation
         #
-        # NOTICE: This function will return a warning about opening an empty file if the Morse skeleton is empty.
-        #         Don't be alarmed. This is safe.
+        # NOTICE: This function will return a warning about opening an empty file
+        #         if the Morse skeleton is empty. Don't be alarmed. This is safe.
         verts, edges = graphRecon.cmp_dm_img_grid2D(
             component[x_min:x_min+w, y_min:y_min+h], threshold, graph_recon_path)
 
         # If the graph is not empty, we compute and plot the barcode of the Morse skeleton.
-        # The filtration adds the vertices and edges in decreasing order of distance from the center.
+        # The filtration adds the vertices and edges in decreasing order of
+        # distance from the center.
         if(len(edges) > 0):
             # the elements of edges are indices of verts
             # edges are returned as floats for some reason, so we cast them to ints
@@ -324,7 +331,8 @@ def compute_morse_skeleton_and_barcode(im: npt.ArrayLike, mask: npt.ArrayLike,
 
             # create a networkx graph of Morse skeleton
             # we use {G} to compute the distance of each vertex from the "center" of the graph
-            # The center is a graph-theoretic notion defined here: https://en.wikipedia.org/wiki/Graph_center
+            # The center is a graph-theoretic notion defined here:
+            #   https://en.wikipedia.org/wiki/Graph_center
             G = nx.Graph()
             for v0, v1, _ in edges:
                 # add each graph to the graph with weight = Euclidean distance between endpoints
@@ -347,10 +355,12 @@ def compute_morse_skeleton_and_barcode(im: npt.ArrayLike, mask: npt.ArrayLike,
             # center of the graph
             centers = nx.algorithms.distance_measures.center(G)
             center = centers[0]
-            # I am using a random vertex instead of the actual center as centers can take a while to compute
+            # I am using a random vertex instead of the actual center,
+            # as centers can take a while to compute
             # center = np.random.randint(len(verts))
             # distances of each point to the center
-            distances = nx.algorithms.shortest_paths.weighted.single_source_dijkstra_path_length(G, center)
+            distances = nx.algorithms.shortest_paths.weighted.single_source_dijkstra_path_length(
+                G, center)
 
             # Now, we use the {distances} to compute the barcode of the Morse skeleton
             #

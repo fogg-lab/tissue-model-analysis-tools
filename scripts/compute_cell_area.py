@@ -12,10 +12,10 @@ from fl_tissue_model_tools import preprocessing as prep
 from fl_tissue_model_tools import analysis as an
 from fl_tissue_model_tools import script_util as su
 
-linesep = os.linesep
-default_config_path = "../config/default_cell_area_computation.json"
-thresh_subdir = "thresholded"
-calc_subdir = "calculations"
+LINESEP = os.linesep
+DEFAULT_CONFIG_PATH = "../config/default_cell_area_computation.json"
+THRESH_SUBDIR = "thresholded"
+CALC_SUBDIR = "calculations"
 
 
 def load_img(
@@ -61,25 +61,25 @@ def load_and_norm(
         Normalized image located at img_path.
 
     """
-    a = defs.GS_MIN
-    b = defs.GS_MAX
+    new_min = defs.GS_MIN
+    new_max = defs.GS_MAX
 
     if extension == "png":
-        mn = a
-        mx = b
+        old_min = new_min
+        old_max = new_max
     elif extension == "tif":
-        mn = defs.TIF_MIN
-        mx = defs.TIF_MAX
+        old_min = defs.TIF_MIN
+        old_max = defs.TIF_MAX
     else:
         raise OSError(f"Unsupported file type for analysis: {extension}")
     img = load_img(img_path, dsamp=True, dsize=dsize)
-    return prep.min_max_(img, a, b, mn, mx)
+    return prep.min_max_(img, new_min, new_max, old_min, old_max)
 
 
 def mask_and_threshold(
     img: npt.NDArray, circ_mask: npt.NDArray,
     pinhole_idx: Tuple[npt.NDArray, npt.NDArray], sd_coef: float,
-    rs: np.random.RandomState
+    rand_state: np.random.RandomState
 ) -> npt.NDArray:
     """Apply circular mask to image and perform foreground thresholding on the
     masked image.
@@ -89,14 +89,14 @@ def mask_and_threshold(
         circ_mask: Circular mask.
         pinhole_idx: Indices within circular mask.
         sd_coef: Threshold pixels with less than sd_coef * foreground_mean.
-        rs: RandomState object to allow for reproducability.
+        rand_state: RandomState object to allow for reproducability.
 
     Returns:
         Thresholded images.
 
     """
     masked = prep.apply_mask(img, circ_mask).astype(float)
-    return prep.exec_threshold(masked, pinhole_idx, sd_coef, rs)
+    return prep.exec_threshold(masked, pinhole_idx, sd_coef, rand_state)
 
 
 def prep_images(img_paths: Sequence[str], dsamp_size: int, extension: str) -> \
@@ -144,7 +144,7 @@ def circ_mask_setup(img_shape: Tuple[int, int], pinhole_cut: int) -> \
 def threshold_images(
     imgs: List[npt.NDArray], circ_mask: npt.NDArray,
     pinhole_idx: Tuple[npt.NDArray, npt.NDArray], sd_coef: float,
-    rs: np.random.RandomState
+    rand_state: np.random.RandomState
 ) -> List[npt.NDArray]:
     """Apply mask & threshold to all images.
 
@@ -153,14 +153,14 @@ def threshold_images(
         circ_mask: Circular mask.
         pinhole_idx: Indices within circular mask.
         sd_coef: Threshold pixels with less than sd_coef * foreground_mean.
-        rs: RandomState object to allow for reproducability.
+        rand_state: RandomState object to allow for reproducability.
 
     Returns:
         List of masked/thresholded images.
 
     """
     gmm_thresh_all = d.compute(
-        [d.delayed(mask_and_threshold)(img, circ_mask, pinhole_idx, sd_coef, rs)
+        [d.delayed(mask_and_threshold)(img, circ_mask, pinhole_idx, sd_coef, rand_state)
             for img in imgs]
     )[0]
     return gmm_thresh_all
@@ -187,10 +187,12 @@ def compute_areas(
 
 
 def main():
+    '''Computes cell area and saves to output directory.'''
+
     args = su.parse_cell_area_args({
-        "thresh_subdir": thresh_subdir,
-        "calc_subdir": calc_subdir,
-        "default_config_path": default_config_path}
+        "thresh_subdir": THRESH_SUBDIR,
+        "calc_subdir": CALC_SUBDIR,
+        "default_config_path": DEFAULT_CONFIG_PATH}
     )
     verbose = args.verbose
 
@@ -204,17 +206,17 @@ def main():
     extension = args.extension.replace(".", "")
     try:
         img_paths = su.cell_area_verify_input_dir(in_root, extension, verbose=verbose)
-    except FileNotFoundError as e:
-        print(f"{su.SFM.failure} {e}")
+    except FileNotFoundError as error:
+        print(f"{su.SFM.failure} {error}")
         sys.exit()
 
 
     ### Verify output destination ###
     try:
-        su.cell_area_verify_output_dir(out_root, thresh_subdir, calc_subdir,
+        su.cell_area_verify_output_dir(out_root, THRESH_SUBDIR, CALC_SUBDIR,
                                         verbose=verbose)
-    except PermissionError as e:
-        print(f"{su.SFM.failure} {e}")
+    except PermissionError as error:
+        print(f"{su.SFM.failure} {error}")
         sys.exit()
 
 
@@ -222,8 +224,8 @@ def main():
     config_path = args.config
     try:
         config = su.cell_area_verify_config_file(config_path, verbose)
-    except FileNotFoundError as e:
-        print(f"{su.SFM.failure} {e}")
+    except FileNotFoundError as error:
+        print(f"{su.SFM.failure} {error}")
         sys.exit()
 
     if verbose:
@@ -236,18 +238,18 @@ def main():
     sd_coef = config["sd_coef"]
     rs_seed = None if (config["rs_seed"] == "None") else config["rs_seed"]
     pinhole_buffer = config["pinhole_buffer"]
-    rs = np.random.RandomState(rs_seed)
+    rand_state = np.random.RandomState(rs_seed)
     pinhole_cut = int(round(dsamp_size * pinhole_buffer))
     try:
         gs_ds_imgs = prep_images(img_paths, dsamp_size, extension)
-    except OSError as e:
-        print(f"{su.SFM.failure}{e}")
+    except OSError as error:
+        print(f"{su.SFM.failure}{error}")
         sys.exit()
 
     # variables for image masking
     circ_mask, pinhole_idx, circ_pix_area = circ_mask_setup(gs_ds_imgs[0].shape, pinhole_cut)
     # Threshold images
-    gmm_thresh_all = threshold_images(gs_ds_imgs, circ_mask, pinhole_idx, sd_coef, rs)
+    gmm_thresh_all = threshold_images(gs_ds_imgs, circ_mask, pinhole_idx, sd_coef, rand_state)
 
 
     ### Compute areas ###
@@ -259,25 +261,25 @@ def main():
 
     ### Save results ###
     if verbose:
-        print(f"{linesep}Saving results...")
+        print(f"{LINESEP}Saving results...")
 
     img_ids = [img_n.split("/")[-1] for img_n in img_paths]
     area_df = pd.DataFrame(
         data = {"image_id": img_ids, "area_pct": area_prop * 100}
     )
-    for i in range(len(img_ids)):
+    for i, img_id in enumerate(img_ids):
         out_img = gmm_thresh_all[i].astype(np.uint8)
-        img_id = img_ids[i]
-        out_path = f"{out_root}/{thresh_subdir}/{img_id}_thresholded.png"
+        out_path = f"{out_root}/{THRESH_SUBDIR}/{img_id}_thresholded.png"
         cv2.imwrite(
             out_path,
             out_img
         )
+
     if verbose:
-        print(f"... Thresholded images saved to:{os.linesep}\t{out_root}/{thresh_subdir}")
-    area_df.to_csv(f"{out_root}/{calc_subdir}/area_results.csv", index=False)
+        print(f"... Thresholded images saved to:{os.linesep}\t{out_root}/{THRESH_SUBDIR}")
+    area_df.to_csv(f"{out_root}/{CALC_SUBDIR}/area_results.csv", index=False)
     if verbose:
-        print(f"... Area calculations saved to:{os.linesep}\t{out_root}/{calc_subdir}")
+        print(f"... Area calculations saved to:{os.linesep}\t{out_root}/{CALC_SUBDIR}")
         print(su.SFM.success)
         print(su.verbose_end)
 

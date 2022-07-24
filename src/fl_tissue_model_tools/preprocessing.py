@@ -11,23 +11,24 @@ from . import defs
 
 
 def min_max_(
-    x: npt.NDArray, a: float, b: float, mn: float, mx: float
+    img: npt.NDArray, new_min: float, new_max: float, old_min: float, old_max: float
 ) -> npt.NDArray[np.float64]:
-    """Normalize the array `x` from the range [`mn`, `mx`] to the range [`a`, `b`]
+    """Normalize the array `img` from the range [`old_min`, `old_max`]
+       to the range [`new_min`, `new_max`]
 
     Args:
-        x: The array to be normalized.
-        a: The new min value.
-        b: The new max value.
-        mn: The old min value.
-        mx: The old max value.
+        img: The array to be normalized.
+        new_min: The new min value.
+        new_max: The new max value.
+        old_min: The old min value.
+        old_max: The old max value.
 
     Returns:
         The normalized array.
     """
 
-    x = x.astype(np.float64)
-    return a + ( (x - mn) * (b - a) ) / (mx - mn)
+    img = img.astype(np.float64)
+    return new_min + ( (img - old_min) * (new_max - new_min) ) / (old_max - old_min)
 
 
 def gen_circ_mask(
@@ -89,7 +90,7 @@ def bin_thresh(
 
 
 def exec_threshold(
-    masked: npt.NDArray, mask_idx: Sequence, sd_coef: float, rs: RandomState
+    masked: npt.NDArray, mask_idx: Sequence, sd_coef: float, rand_state: RandomState
 ) -> npt.NDArray:
     """Apply threshold to obtain the foreground (cell content) of a plate image.
 
@@ -107,7 +108,7 @@ def exec_threshold(
             that determines foreground threshold strictness. A negative value
             means that intensities to the left of the
             foreground Gaussian's mean will be retained.
-        rs: A NumPy random state object to allow for reproducability.
+        rand_state: A NumPy random state object to allow for reproducability.
 
     Returns:
         Copy of original image with background pixels set to 0.
@@ -115,7 +116,7 @@ def exec_threshold(
     # Select pixels within the mask. Exclude masked-out pixels since they
     # will alter the shape of the background distribution.
     X = masked[mask_idx][:, np.newaxis]
-    gm = GaussianMixture(n_components=2, random_state=rs).fit(X)
+    gm = GaussianMixture(n_components=2, random_state=rand_state).fit(X)
     # Get GMM components
     means = gm.means_.squeeze()
     sds = np.sqrt(gm.covariances_.squeeze())
@@ -239,25 +240,28 @@ def augment_img(
 
 
 def augment_img_mask_pairs(
-    x: npt.NDArray[np.float_], y: npt.NDArray[np.int_], rs: RandomState
+    original_imgs: npt.NDArray[np.float_],
+    original_masks: npt.NDArray[np.int_],
+    rand_state: RandomState
 ) -> Tuple[npt.NDArray[np.float_], npt.NDArray[np.int_]]:
     """Augment a set of image/mask pairs using rotations and horizontal/vertical flips
 
     Args:
         x: Original images.
         y: Original masks.
-        rs: RandomState object to allow for reproducability.
+        rand_state: RandomState object to allow for reproducability.
 
     Returns:
         (Augmented images, matched augmented masks)
     """
-    assert len(x) == len(y), ("x and y must have the same shape, x: "
-                              f"{x.shape} != y: {y.shape}")
+    assert len(original_imgs) == len(original_masks), ("x and y must have the "
+                                                       "same shape, x: "
+                                                       f"{x.shape} != y: {y.shape}")
     m = len(x)
     # Cannot parallelize (random state ensures reproducibility)
-    rots = rs.choice([0, 90, 180, 270], size=m)
-    hflips = rs.choice([True, False], size=m)
-    vflips = rs.choice([True, False], size=m)
+    rots = rand_state.choice([0, 90, 180, 270], size=m)
+    hflips = rand_state.choice([True, False], size=m)
+    vflips = rand_state.choice([True, False], size=m)
 
     def aug_imgs(imgs):
         return np.array(
@@ -273,14 +277,14 @@ def augment_img_mask_pairs(
 
 
 def augment_imgs(
-    x: npt.NDArray[np.float_],  rs: RandomState, rot_options=(0, 90, 180, 270),
+    x: npt.NDArray[np.float_],  rand_state: RandomState, rot_options=(0, 90, 180, 270),
     expand_dims: bool=False
 ) -> npt.NDArray[np.float_]:
     """Augment a set of images using rotations and horizontal/vertical flips.
 
     Args:
         x: Original images.
-        rs: RandomState object to allow for reproducability.
+        rand_state: RandomState object to allow for reproducability.
         rot_options: Random rotation angle choices.
         expand_dims: Whether to add a depth axis to each image after
             augmentation steps.
@@ -289,9 +293,9 @@ def augment_imgs(
         Augmented image set.
     """
     m = len(x)
-    rots = rs.choice(rot_options, size=m)
-    hflips = rs.choice([True, False], size=m)
-    vflips = rs.choice([True, False], size=m)
+    rots = rand_state.choice(rot_options, size=m)
+    hflips = rand_state.choice([True, False], size=m)
+    vflips = rand_state.choice([True, False], size=m)
 
     x = d.compute(
         [d.delayed(augment_img)(x[i], rots[i], hflips[i], vflips[i], expand_dims)
