@@ -293,14 +293,14 @@ def cell_area_verify_config_file(config_path: str, verbose: bool=False) -> Dict[
 
     if not os.path.isfile(config_path):
         raise FileNotFoundError(f"Config file not found: {config_path}")
-    with open(config_path, 'r') as fp:
-        config = json.load(fp)
+    with open(config_path, 'r', encoding="utf8") as config_fp:
+        config = json.load(config_fp)
 
     if verbose:
         print(f"Using config file: {os.linesep}\t{config_path}")
         print(f"{os.linesep}Parameter values:")
-        for k, v in config.items():
-            print(f"{k:<20}{v:>20}")
+        for key, val in config.items():
+            print(f"{key:<20}{val:>20}")
         print(SFM.success)
         verbose_footer()
 
@@ -354,9 +354,9 @@ def zproj_verify_input_dir(input_path: str, extension: str, verbose: bool=False)
                 f"with extension:{os.linesep}\t{extension}{os.linesep}"
                 f"Offending subdirectory:{os.linesep}\t{zsp}"
             )
-        for ip in img_paths:
-            iname = ip.split("/")[-1]
-            pattern = re.search(zstacks._zpos_pattern, ip)
+        for img_path in img_paths:
+            iname = img_path.split("/")[-1]
+            pattern = re.search(zstacks.ZPOS_PATTERN, img_path)
             if pattern is None:
                 raise FileNotFoundError(
                     f"Image file{os.linesep}\t{iname}{os.linesep} "
@@ -368,7 +368,7 @@ def zproj_verify_input_dir(input_path: str, extension: str, verbose: bool=False)
         if verbose:
             zsp_id = zsp.split("/")[-1]
             print(f"{zsp_id:.<40}{n_imgs:.>20}")
-            
+
     if verbose:
         print(SFM.success)
         verbose_footer()
@@ -390,7 +390,7 @@ def zproj_verify_output_dir(output_path: str, verbose: bool=True) -> None:
     if not os.path.isdir(output_path):
         if verbose:
             print(f"Did not find output dir:{os.linesep}\t{output_path}")
-            print(f"Creating...")
+            print("Creating...")
 
         data_prep.make_dir(output_path)
 
@@ -451,7 +451,7 @@ def inv_depth_verify_input_dir(input_path: str, verbose: bool=False) -> Sequence
 
     if verbose:
         print(f"{'Z Stack ID':<60}{'No. Z Positions':>20}")
-    
+
     for zsp in zstack_paths:
         img_paths = [fp.replace("\\", "/") for fp in glob(f"{zsp}/*.{extension}")]
         n_imgs = len(img_paths)
@@ -461,9 +461,9 @@ def inv_depth_verify_input_dir(input_path: str, verbose: bool=False) -> Sequence
                 f"files with extension:{os.linesep}\t{extension}{os.linesep}"
                 f"Offending subdirectory:{os.linesep}\t{zsp}"
             )
-        for ip in img_paths:
-            iname = ip.split("/")[-1]
-            pattern = re.search(zstacks._zpos_pattern, ip)
+        for img_path in img_paths:
+            iname = img_path.split("/")[-1]
+            pattern = re.search(zstacks.ZPOS_PATTERN, img_path)
             if pattern is None:
                 raise FileNotFoundError(
                     f"Image file{os.linesep}\t{iname}{os.linesep}does not contain "
@@ -494,14 +494,14 @@ def inv_depth_verify_output_dir(output_path: str, verbose: bool=True) -> None:
         verbose_header("Verifying Output Directory")
 
     if not os.path.isdir(output_path):
-            if verbose:
-                print(f"Did not find output dir:{os.linesep}\t{output_path}")
-                print("Creating...")
+        if verbose:
+            print(f"Did not find output dir:{os.linesep}\t{output_path}")
+            print("Creating...")
 
-            data_prep.make_dir(output_path)
+        data_prep.make_dir(output_path)
 
-            if verbose:
-                print(f"... Created dir:{os.linesep}\t{output_path}")
+        if verbose:
+            print(f"... Created dir:{os.linesep}\t{output_path}")
     else:
         if verbose:
             print(f"Found dir:{os.linesep}\t{output_path}")
@@ -524,11 +524,13 @@ def inv_depth_verify_config_file(config_path: str, n_models: int,
     Args:
         config_path: Path to config file.
         n_models: The number of saved models.
-        verbose: Using verbose output prints out the config path and parameter values. Defaults to False.
+        verbose: Using verbose output prints out the config path and parameter values.
+                 Defaults to False.
 
     Raises:
         FileNotFoundError: Raised when the config file is not found.
-        AssertionError: Raised when the desired number of ensemble models is greater than the number of saved models.
+        AssertionError: Raised when the desired number of ensemble models is greater
+                        than the number of saved models.
 
     Returns:
         A dictionary of config parameters.
@@ -539,8 +541,8 @@ def inv_depth_verify_config_file(config_path: str, n_models: int,
     if verbose:
         print(f"Using config file: {os.linesep}\t{config_path}")
 
-    with open(config_path, 'r') as fp:
-        config = json.load(fp)
+    with open(config_path, 'r', encoding='utf8') as config_fp:
+        config = json.load(config_fp)
     n_pred_models = config["n_pred_models"]
     if not n_pred_models <= n_models:
         raise AssertionError(
@@ -550,8 +552,8 @@ def inv_depth_verify_config_file(config_path: str, n_models: int,
 
     if verbose:
         print(f"{os.linesep}Parameter values:")
-        for k, v in config.items():
-            print(f"{k:<20}{v:>20}")
+        for key, val in config.items():
+            print(f"{key:<20}{val:>20}")
         print(SFM.success)
         verbose_footer()
 

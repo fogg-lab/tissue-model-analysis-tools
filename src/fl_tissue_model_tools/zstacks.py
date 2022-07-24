@@ -16,11 +16,11 @@ import cv2
 from . import defs
 
 
-_zpos_pattern = "(z|Z)[0-9]+_"
+ZPOS_PATTERN = "(z|Z)[0-9]+_"
 
 
 def _default_get_zpos(z_path: str) -> int:
-    """Use `_zpos_pattern` to retrieve z-position from path string.
+    """Use `ZPOS_PATTERN` to retrieve z-position from path string.
 
     Args:
         z_path: The full path or file name of a z-position image
@@ -30,7 +30,7 @@ def _default_get_zpos(z_path: str) -> int:
 
     """
     # Trim the 'Z' from the beginning of the match
-    return int(re.search(_zpos_pattern, z_path)[0][1:-1])
+    return int(re.search(ZPOS_PATTERN, z_path)[0][1:-1])
 
 
 def _blur_and_lap(image: npt.NDArray, kernel_size: int=5) -> npt.NDArray:
@@ -93,14 +93,13 @@ def zstack_from_dir(
     z_paths = [fn.replace("\\", "/") for fn in glob(f"{z_stack_dir}/*.{file_ext}")]
     if file_ext == "tif":
         flag = cv2.IMREAD_ANYDEPTH
-    # TODO handle more filetypes
     else:
         flag = cv2.IMREAD_GRAYSCALE
-    
-    if get_zpos == None:
+
+    if get_zpos is None:
         get_zpos = _default_get_zpos
-    
-    sorted_z_paths = sorted(z_paths, key = lambda zp: get_zpos(zp), reverse = descending)
+
+    sorted_z_paths = sorted(z_paths, key = get_zpos, reverse = descending)
     return sorted_z_paths, np.array([cv2.imread(img_n, flag) for img_n in sorted_z_paths])
 
 
@@ -124,9 +123,9 @@ def zstack_paths_from_dir(z_stack_dir: str, file_ext: str="tif", descending: boo
 
     """
     z_paths = [fn.replace("\\", "/") for fn in glob(f"{z_stack_dir}/*.{file_ext}")]
-    if get_zpos == None:
+    if get_zpos is None:
         get_zpos = _default_get_zpos
-    sorted_z_paths = sorted(z_paths, key = lambda zp: get_zpos(zp), reverse = descending)
+    sorted_z_paths = sorted(z_paths, key = get_zpos, reverse = descending)
     return sorted_z_paths
 
 

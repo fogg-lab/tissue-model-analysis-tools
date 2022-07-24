@@ -89,6 +89,8 @@ def save_zproj(
 
 
 def main():
+    '''Computes z projections and saves to output directory.'''
+
     args = su.parse_zproj_args()
     verbose = args.verbose
     compute_cell_area = args.area
