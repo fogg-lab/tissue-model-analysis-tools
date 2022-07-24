@@ -112,10 +112,10 @@ def prep_images(img_paths: Sequence[str], dsamp_size: int, extension: str) -> \
         Downsampled, grayscale versions of initial images.
 
     """
-    gs_ds_imgs = d.compute(
-        [d.delayed(load_and_norm)(img_p, extension, dsamp=True,
-        dsize=(dsamp_size, dsamp_size)) for img_p in img_paths]
-    )[0]
+    gs_ds_imgs = d.compute([
+        d.delayed(load_and_norm)(img_p, extension,dsize=(dsamp_size, dsamp_size))
+        for img_p in img_paths
+    ])[0]
     return gs_ds_imgs
 
 
