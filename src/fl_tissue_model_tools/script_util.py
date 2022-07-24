@@ -136,8 +136,8 @@ def parse_zproj_args() -> argparse.Namespace:
         "while -o 1 means (TOP -> BOTTOM) = (Zk -> Z0). If no argument "
         "supplied, defaults to 1=Descending.")
     )
-    
-    parser.add_argument("-a", "--compute_cell_area", action="store_true",
+
+    parser.add_argument("-a", "--area", action="store_true",
         help="Compute cell area after computing Z projection.")
 
     parser.add_argument("-v", "--verbose", action="store_true",
