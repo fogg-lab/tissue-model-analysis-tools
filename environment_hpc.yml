@@ -1,4 +1,4 @@
-name: tf
+name: fogg-lab-tissue-model-analysis-tools
 channels:
   - defaults
   - conda-forge
@@ -321,4 +321,3 @@ dependencies:
     - werkzeug==2.2.0
     - wrapt==1.14.1
     - zipp==3.8.1
-prefix: /nfs/hpc/share/wigginno/.conda/envs/tf
