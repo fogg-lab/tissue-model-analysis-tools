@@ -221,6 +221,10 @@ def cell_area_verify_input_dir(input_path: str, extension: str, verbose: bool=Fa
     if not os.path.isdir(input_path):
         raise FileNotFoundError("Input data directory not found:"
                                 f"{os.linesep}\t{input_path}")
+
+    if "tif" in extension:
+        rename_tiff_to_tif([input_path])
+
     img_paths = [fp.replace("\\", "/") for fp in glob(f"{input_path}/*.{extension}")]
     if len(img_paths) == 0:
         raise FileNotFoundError("Input data directory contains no files with extension:"
@@ -344,6 +348,9 @@ def zproj_verify_input_dir(input_path: str, extension: str, verbose: bool=False)
 
     if verbose:
         print(f"{'Z Stack ID':<40}{'No. Z Positions':>20}")
+    
+    if "tif" in extension:
+        rename_tiff_to_tif(zstack_paths)
 
     for zsp in zstack_paths:
         img_paths = [fp.replace("\\", "/") for fp in glob(f"{zsp}/*.{extension}")]
@@ -448,6 +455,9 @@ def inv_depth_verify_input_dir(input_path: str, verbose: bool=False) -> Sequence
         )
 
     zstack_paths = [fp.replace("\\", "/") for fp in glob(f"{input_path}/*")]
+
+    if "tif" in extension:
+        rename_tiff_to_tif(zstack_paths)
 
     if verbose:
         print(f"{'Z Stack ID':<60}{'No. Z Positions':>20}")
@@ -558,3 +568,15 @@ def inv_depth_verify_config_file(config_path: str, n_models: int,
         verbose_footer()
 
     return config
+
+
+def rename_tiff_to_tif(paths):
+    """Rename .tif files in a list of directories to .tiff
+    
+    Args:
+        paths: List of directories to search for .tif files.
+    """
+    for path in paths:
+        for fp in glob(f"{path}/*.tiff"):
+            new_fp = fp[:-1]
+            os.rename(fp, new_fp)
