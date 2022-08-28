@@ -26,7 +26,7 @@ def main():
 
     ### Verify input source ###
     try:
-        zstack_paths = su.inv_depth_verify_input_dir(in_root, verbose=verbose)
+        su.inv_depth_verify_input_dir(in_root, verbose=verbose)
     except FileNotFoundError as e:
         print(f"{su.SFM.failure} {e}")
         sys.exit()
@@ -113,40 +113,35 @@ def main():
         su.verbose_header("Making predictions")
 
     try:
-        for zstack_dir in zstack_paths:
-            # Load data
-            zstack_id = zstack_dir.split("/")[-1]
-            zpaths = zs.zstack_paths_from_dir(zstack_dir, descending=descending)
+        zstack_dir = in_root
+        # Load data
+        zpaths = zs.zstack_paths_from_dir(zstack_dir, descending=descending)
 
-            if verbose:
-                print(f"Making predictions for Z stack:{os.linesep}\t{zstack_id}"
-                        f"{os.linesep}...")
+        x = data_prep.prep_inv_depth_imgs(zpaths, resnet_inp_shape[:-1])
+        # Convert to tensor before calling predict() to speed up execution
+        x = tf.convert_to_tensor(x, dtype="float")
 
-            x = data_prep.prep_inv_depth_imgs(zpaths, resnet_inp_shape[:-1])
-            # Convert to tensor before calling predict() to speed up execution
-            x = tf.convert_to_tensor(x, dtype="float")
+        # Make predictions
+        # Probability predictions of each model
+        yhatp_m = np.array(
+            d.compute([d.delayed(m.predict)(x).squeeze()
+                        for m in inv_depth_models])[0]
+        ).T
+        # Mean probability predictions (ensemble predictions)
+        yhatp = np.mean(yhatp_m, axis=1, keepdims=True)
+        # Threshold probability predictions
+        yhat = (yhatp > cls_thresh).astype(np.int32)
+        if verbose:
+            print("... Predictions finished.")
 
-            # Make predictions
-            # Probability predictions of each model
-            yhatp_m = np.array(
-                d.compute([d.delayed(m.predict)(x).squeeze()
-                            for m in inv_depth_models])[0]
-            ).T
-            # Mean probability predictions (ensemble predictions)
-            yhatp = np.mean(yhatp_m, axis=1, keepdims=True)
-            # Threshold probability predictions
-            yhat = (yhatp > cls_thresh).astype(np.int32)
-            if verbose:
-                print("... Predictions finished.")
-            
-            # Save outputs
-            if verbose:
-                print("Saving results...")
-            output_file = pd.DataFrame({"img_name": [zp.split("/")[-1]for zp in zpaths],
-                            "inv_prob": yhatp.squeeze(), "inv_label": yhat.squeeze()})
-            output_file.to_csv(f"{out_root}/{zstack_id}.csv", index=False)
-            if verbose:
-                print("... Results saved.")
+        # Save outputs
+        if verbose:
+            print("Saving results...")
+        output_file = pd.DataFrame({"img_name": [zp.split("/")[-1]for zp in zpaths],
+                        "inv_prob": yhatp.squeeze(), "inv_label": yhat.squeeze()})
+        output_file.to_csv(f"{out_root}/invasion_depth_predictions.csv", index=False)
+        if verbose:
+            print("... Results saved.")
 
         if verbose:
             print(su.SFM.success)
