@@ -419,13 +419,10 @@ def zproj_verify_output_dir(output_path: str, verbose: bool=True) -> None:
         verbose_footer()
 
 
-def inv_depth_verify_input_dir(input_path: str, verbose: bool=False) -> Sequence[str]:
+def inv_depth_verify_input_dir(input_path: str, verbose: bool=False) -> None:
     """Verify appropriate contents of input data directory.
 
-    Input directory should contain 1 subdirectory for each Z stack with
-    each of these subdirectories (Z stacks) contining all Z position images
-    for that stack. These images should have a '.extension' suffix. Each
-    Z stack image should have the pattern ...Z[pos]_... in its name,
+    Each Z stack image should have the pattern ...Z[pos]_... in its name,
     where [pos] is a number denoting the Z stack position for that image.
 
     Args:
@@ -439,11 +436,7 @@ def inv_depth_verify_input_dir(input_path: str, verbose: bool=False) -> Sequence
         FileNotFoundError: One or more image files does not follow the
             specified naming convention.
 
-    Returns:
-        List of full paths for Z stack subdirectories.
-
     """
-    # Only supports .tif files, currently
     extension = "tif"
 
     if verbose:
@@ -454,42 +447,37 @@ def inv_depth_verify_input_dir(input_path: str, verbose: bool=False) -> Sequence
             f"Input data directory not found:{os.linesep}\t{input_path}"
         )
 
-    zstack_paths = [fp.replace("\\", "/") for fp in glob(f"{input_path}/*")]
-
     if "tif" in extension:
-        rename_tiff_to_tif(zstack_paths)
+        rename_tiff_to_tif(input_path)
 
     if verbose:
         print(f"{'Z Stack ID':<60}{'No. Z Positions':>20}")
 
-    for zsp in zstack_paths:
-        img_paths = [fp.replace("\\", "/") for fp in glob(f"{zsp}/*.{extension}")]
-        n_imgs = len(img_paths)
-        if n_imgs == 0:
+    img_paths = [fp.replace("\\", "/") for fp in glob(f"{input_path}/*.{extension}")]
+    n_imgs = len(img_paths)
+    if n_imgs == 0:
+        raise FileNotFoundError(
+            "Input data directory holds no files with extension:"
+            f"{os.linesep}\t{extension}{os.linesep}"
+            f"Offending directory:{os.linesep}\t{input_path}"
+        )
+    for img_path in img_paths:
+        iname = img_path.split("/")[-1]
+        pattern = re.search(zstacks.ZPOS_PATTERN, img_path)
+        if pattern is None:
             raise FileNotFoundError(
-                f"Input data directory contains Z stack subdirectory holding no "
-                f"files with extension:{os.linesep}\t{extension}{os.linesep}"
-                f"Offending subdirectory:{os.linesep}\t{zsp}"
-            )
-        for img_path in img_paths:
-            iname = img_path.split("/")[-1]
-            pattern = re.search(zstacks.ZPOS_PATTERN, img_path)
-            if pattern is None:
-                raise FileNotFoundError(
-                    f"Image file{os.linesep}\t{iname}{os.linesep}does not contain "
-                    "the expected pattern to denote Z position. Files must have "
-                    "...Z[pos]_... in their name, where [pos] is a number denoting "
-                    "Z stack position.")
+                f"Image file{os.linesep}\t{iname}{os.linesep}does not contain "
+                "the expected pattern to denote Z position. Files must have "
+                "...Z[pos]_... in their name, where [pos] is a number denoting "
+                "Z stack position.")
 
-        if verbose:
-            zsp_id = zsp.split("/")[-1]
-            print(f"{zsp_id:.<60}{n_imgs:.>20}")
+    if verbose:
+        zsp_id = input_path.split("/")[-1]
+        print(f"{zsp_id:.<60}{n_imgs:.>20}")
 
     if verbose:
         print(SFM.success)
         verbose_footer()
-
-    return zstack_paths
 
 
 def inv_depth_verify_output_dir(output_path: str, verbose: bool=True) -> None:
