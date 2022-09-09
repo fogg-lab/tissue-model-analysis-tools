@@ -247,17 +247,16 @@ def augment_img_mask_pairs(
     """Augment a set of image/mask pairs using rotations and horizontal/vertical flips
 
     Args:
-        x: Original images.
-        y: Original masks.
+        original_imgs: Original images.
+        original_masks: Original masks.
         rand_state: RandomState object to allow for reproducability.
 
     Returns:
         (Augmented images, matched augmented masks)
     """
-    assert len(original_imgs) == len(original_masks), ("x and y must have the "
-                                                       "same shape, x: "
-                                                       f"{x.shape} != y: {y.shape}")
-    m = len(x)
+    assert len(original_imgs) == len(original_masks), (
+        f"x and y must have the same shape, x: {original_imgs.shape} != y: {original_masks.shape}")
+    m = len(original_imgs)
     # Cannot parallelize (random state ensures reproducibility)
     rots = rand_state.choice([0, 90, 180, 270], size=m)
     hflips = rand_state.choice([True, False], size=m)
@@ -272,8 +271,9 @@ def augment_img_mask_pairs(
             ]
         )
 
-    x, y = d.compute((d.delayed(aug_imgs)(x), d.delayed(aug_imgs)(y)))[0]
-    return x, y
+    original_imgs, original_masks = d.compute((d.delayed(aug_imgs)(original_imgs),
+                                               d.delayed(aug_imgs)(original_masks)))[0]
+    return original_imgs, original_masks
 
 
 def augment_imgs(
