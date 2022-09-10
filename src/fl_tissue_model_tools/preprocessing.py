@@ -6,8 +6,11 @@ import numpy.typing as npt
 from numpy.random import RandomState
 import dask as d
 from sklearn.mixture import GaussianMixture
+import random
+from typing import List
 
 from . import defs
+from . import augmentation
 
 
 def min_max_(
@@ -181,84 +184,95 @@ def blur(
     return proc_img.round().astype(np.uint8)
 
 
-def augment_img(
-    img: npt.NDArray[Union[np.float_, np.int_]], rot: int, hflip: bool,
-    vflip: bool, expand_dims: bool=True
+def perform_augmentation(
+    imgs: List[npt.NDArray[Union[np.float_, np.int_]]], rot: int, hflip: bool,
+    vflip: bool, distort: bool=False, expand_dims: bool=True
 ) -> npt.NDArray[Union[np.float_, np.int_]]:
-    """Augment an image using rotations and horizontal/vertical flips
+    """Augment the passed image(s)
     Args:
-        img: Original image.
+        img: Original image(s).
         rot: Rotation angle for image.
         hflip: Whether to horizontally flip image.
         vflip: Whether to vertically flip image.
+        distort: Whether to apply random elastic distortions to image.
         expand_dims: Whether to add a depth axis to the image after
             augmentation steps.
     Returns:
         Augmented image.
     """
-    hw = img.shape[:2]
-    # Horizontal flip
-    if hflip:
-        img = cv2.flip(img, 1)
-    # Vertical flip
-    if vflip:
-        img = cv2.flip(img, 0)
-    # Rotation
-    rot_mat = cv2.getRotationMatrix2D((hw[1] // 2, hw[0] // 2), rot, 1.0)
-    img = cv2.warpAffine(img, rot_mat, hw)
+    for i in range(imgs):
+        hw = imgs[i].shape[:2]
+        # Horizontal flip
+        if hflip:
+            imgs[i] = cv2.flip(imgs[i], 1)
+        # Vertical flip
+        if vflip:
+            imgs[i] = cv2.flip(imgs[i], 0)
+        # Rotation
+        rot_mat = cv2.getRotationMatrix2D((hw[1] // 2, hw[0] // 2), rot, 1.0)
+        imgs[i] = cv2.warpAffine(imgs[i], rot_mat, hw)
 
-    if expand_dims:
-        img = np.expand_dims(img, 2)
-    
-    return img
+        if expand_dims:
+            imgs[i] = np.expand_dims(imgs[i], 2)
+
+    if distort:
+        # TODO: For reproducibility, use a random seed here and in augmentation.py.
+        imgs = augmentation.elastic_distortion(
+            images = imgs,
+            grid_width=random.randint(4, 8),
+            grid_height=random.randint(4, 8),
+            magnitude=random.randint(7,8)
+        )
+
+    return imgs
 
 
 def augment_img_mask_pairs(
-    original_imgs: npt.NDArray[np.float_],
-    original_masks: npt.NDArray[np.int_],
-    rand_state: RandomState
+    x: npt.NDArray[np.float_],
+    y: npt.NDArray[np.int_],
+    rand_state: RandomState,
+    distortion_p: float=0.0,
 ) -> Tuple[npt.NDArray[np.float_], npt.NDArray[np.int_]]:
-    """Augment a set of image/mask pairs using rotations and horizontal/vertical flips
+    """Augment a set of image/mask pairs.
     Args:
-        original_imgs: Original images.
-        original_masks: Original masks.
+        x: Original images.
+        y: Original masks.
         rand_state: RandomState object to allow for reproducability.
+        distortion_p: Probability of applying elastic distortion to an image/mask pair.
     Returns:
         (Augmented images, matched augmented masks)
     """
-    assert len(original_imgs) == len(original_masks), (
-        f"x and y must have the same shape, x: {original_imgs.shape} != y: {original_masks.shape}")
-    m = len(original_imgs)
+    assert len(x) == len(y), (
+        f"x and y must have the same shape, x: {x.shape} != y: {y.shape}")
+    m = len(x)
     # Cannot parallelize (random state ensures reproducibility)
     rots = rand_state.choice([0, 90, 180, 270], size=m)
     hflips = rand_state.choice([True, False], size=m)
     vflips = rand_state.choice([True, False], size=m)
+    distort = rand_state.choice([True, False], size=m, p=[distortion_p, 1-distortion_p])
 
-    def aug_imgs(imgs):
-        return np.array(
-            [
-                augment_img(
-                    imgs[i], rots[i], hflips[i], vflips[i]
-                ) for i in range(m)
-            ]
-        )
+    def aug_imgs(imgs, masks):
+        augmented_imgs = []
+        for i in range(m):
+            augmented_imgs += perform_augmentation([imgs[i], masks[i]], rots[i],
+                                                   hflips[i], vflips[i], distort[i])
+        return np.array(augmented_imgs)
 
-    original_imgs, original_masks = d.compute((d.delayed(aug_imgs)(original_imgs),
-                                               d.delayed(aug_imgs)(original_masks)))[0]
-    return original_imgs, original_masks
+    x, y = d.compute((d.delayed(aug_imgs)(x, y)))[0]
+    return x, y
 
 
 def augment_imgs(
     x: npt.NDArray[np.float_],  rand_state: RandomState, rot_options=(0, 90, 180, 270),
-    expand_dims: bool=False
+    distortion_p: float=0.0, expand_dims: bool=False
 ) -> npt.NDArray[np.float_]:
-    """Augment a set of images using rotations and horizontal/vertical flips.
+    """Augment a set of images.
     Args:
         x: Original images.
         rand_state: RandomState object to allow for reproducability.
         rot_options: Random rotation angle choices.
-        expand_dims: Whether to add a depth axis to each image after
-            augmentation steps.
+        expand_dims: Whether to add a depth axis to each image after augmentation steps.
+        distortion_p: Probability of applying elastic distortion to an image/mask pair.
     Returns:
         Augmented image set.
     """
@@ -266,11 +280,10 @@ def augment_imgs(
     rots = rand_state.choice(rot_options, size=m)
     hflips = rand_state.choice([True, False], size=m)
     vflips = rand_state.choice([True, False], size=m)
+    distort = rand_state.choice([True, False], size=m, p=[distortion_p, 1-distortion_p])
 
-    x = d.compute(
-        [d.delayed(augment_img)(x[i], rots[i], hflips[i], vflips[i], expand_dims)
-            for i in range(m)]
-    )[0]
+    x = d.compute([d.delayed(perform_augmentation)([x[i]], rots[i], hflips[i], vflips[i],
+        distort[i], expand_dims) for i in range(m)])[0]
     return np.array(x)
 
 
