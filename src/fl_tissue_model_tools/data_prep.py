@@ -214,7 +214,7 @@ class InvasionDataGenerator(utils.Sequence):
         X = prep_inv_depth_imgs(img_paths, self.img_shape)
 
         if self.augmentation_function != None:
-            X = self.augmentation_function(X, self.rand_state, expand_dims=False)
+            X = self.augmentation_function(X, self.rand_state, 1.0, expand_dims=False)
         
         # Set y to be (m,1) rather than (m,)
         if self.class_weights != None:
