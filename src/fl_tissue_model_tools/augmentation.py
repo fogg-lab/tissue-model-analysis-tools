@@ -1,6 +1,3 @@
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
 from PIL import Image
 from math import floor
 import random
@@ -24,9 +21,18 @@ def elastic_distortion(images, grid_width, grid_height, magnitude):
     # TODO: For reproducibility, use a random seed.
     """
 
-    for i in range(images):
-        # convert numpy array to PIL image
-        images[i] = Image.fromarray(images[i], mode = "L")
+    extra_dim = [False] * len(images)
+    dtypes = [img.dtype for img in images]
+
+    # Convert numpy arrays to PIL images
+    for i, img in enumerate(images):
+        mode = "L" if img.dtype == np.uint8 or np.max(img) <= 255 else "I"
+        if img.ndim > 2:
+            extra_dim[i] = True
+        if dtypes[i] != np.uint8:
+            dtype = np.uint8 if np.max(img) <= 255 else np.uint16
+            img = img.astype(dtype)
+        images[i] = Image.fromarray(np.squeeze(img), mode = mode)
 
     w, h = images[0].size
 
@@ -68,7 +74,8 @@ def elastic_distortion(images, grid_width, grid_height, magnitude):
     for i in range(vertical_tiles):
         last_column.append((horizontal_tiles-1)+horizontal_tiles*i)
 
-    last_row = range((horizontal_tiles * vertical_tiles) - horizontal_tiles, horizontal_tiles * vertical_tiles)
+    last_row = range(horizontal_tiles * vertical_tiles - horizontal_tiles,
+                     horizontal_tiles * vertical_tiles)
 
     polygons = []
     for x1, y1, x2, y2 in dimensions:
@@ -108,19 +115,21 @@ def elastic_distortion(images, grid_width, grid_height, magnitude):
                         x4, y4]
 
     generated_mesh = []
-    for i in range(len(dimensions)):
-        generated_mesh.append([dimensions[i], polygons[i]])
+    for i, dim in enumerate(dimensions):
+        generated_mesh.append([dim, polygons[i]])
 
-    def do(image):
+    def do_transform(image):
         return image.transform(image.size, Image.MESH, generated_mesh, resample=Image.BICUBIC)
 
     augmented_images = []
 
     for image in images:
-        augmented_images.append(do(image))
+        augmented_images.append(do_transform(image))
 
-    for i in range(len(augmented_images)):
-        # convert PIL image to numpy array
-        augmented_images[i] = np.asarray(augmented_images[i])
+    for i, augmented_img in enumerate(augmented_images):
+        # Convert PIL image back to numpy array
+        augmented_images[i] = np.asarray(augmented_img).astype(dtypes[i])
+        if extra_dim[i]:
+            augmented_images[i] = np.expand_dims(augmented_images[i], axis=2)
 
     return augmented_images
