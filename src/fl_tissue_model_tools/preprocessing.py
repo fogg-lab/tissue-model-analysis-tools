@@ -187,7 +187,7 @@ def blur(
 def perform_augmentation(
     imgs: List[npt.NDArray[Union[np.float_, np.int_]]], rot: int, hflip: bool,
     vflip: bool, distort: bool=False, expand_dims: bool=True
-) -> npt.NDArray[Union[np.float_, np.int_]]:
+) -> List[npt.NDArray[Union[np.float_, np.int_]]]:
     """Augment the passed image(s)
     Args:
         img: Original image(s).
@@ -200,7 +200,8 @@ def perform_augmentation(
     Returns:
         Augmented image.
     """
-    for i in range(imgs):
+
+    for i in range(len(imgs)):
         hw = imgs[i].shape[:2]
         # Horizontal flip
         if hflip:
@@ -253,10 +254,13 @@ def augment_img_mask_pairs(
 
     def aug_imgs(imgs, masks):
         augmented_imgs = []
+        augmented_masks = []
         for i in range(m):
-            augmented_imgs += perform_augmentation([imgs[i], masks[i]], rots[i],
-                                                   hflips[i], vflips[i], distort[i])
-        return np.array(augmented_imgs)
+            img, mask = perform_augmentation([imgs[i], masks[i]], rots[i], hflips[i],
+                                             vflips[i], distort[i])
+            augmented_imgs.append(img)
+            augmented_masks.append(mask)
+        return (np.array(augmented_imgs), np.array(augmented_masks))
 
     x, y = d.compute((d.delayed(aug_imgs)(x, y)))[0]
     return x, y
@@ -283,7 +287,7 @@ def augment_imgs(
     distort = rand_state.choice([True, False], size=m, p=[distortion_p, 1-distortion_p])
 
     x = d.compute([d.delayed(perform_augmentation)([x[i]], rots[i], hflips[i], vflips[i],
-        distort[i], expand_dims) for i in range(m)])[0]
+        distort[i], expand_dims)[0] for i in range(m)])[0]
     return np.array(x)
 
 
