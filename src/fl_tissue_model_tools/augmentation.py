@@ -19,12 +19,16 @@ def elastic_distortion(images, grid_width, grid_height, magnitude, rs):
     """
 
     extra_dim = [False] * len(images)
+    redundant_dims = [False] * len(images)
     dtypes = [img.dtype for img in images]
 
     # Convert numpy arrays to PIL images
     for i, img in enumerate(images):
         mode = "L" if img.dtype == np.uint8 or np.max(img) <= 255 else "I"
-        if img.ndim > 2:
+        if img.ndim == 3 and img.shape[2] > 1:
+            redundant_dims[i] = True
+            img = img[:, :, 0]
+        elif img.ndim == 3:
             extra_dim[i] = True
         if dtypes[i] != np.uint8:
             dtype = np.uint8 if np.max(img) <= 255 else np.uint16
@@ -128,5 +132,7 @@ def elastic_distortion(images, grid_width, grid_height, magnitude, rs):
         augmented_images[i] = np.asarray(augmented_img).astype(dtypes[i])
         if extra_dim[i]:
             augmented_images[i] = np.expand_dims(augmented_images[i], axis=2)
+        elif redundant_dims[i]:
+            augmented_images[i] = np.repeat(augmented_images[i][:, :, np.newaxis], 3, axis=2)
 
     return augmented_images
