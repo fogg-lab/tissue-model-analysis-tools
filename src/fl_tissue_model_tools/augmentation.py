@@ -1,10 +1,9 @@
 from PIL import Image
 from math import floor
-import random
 import numpy as np
 
 
-def elastic_distortion(images, grid_width, grid_height, magnitude):
+def elastic_distortion(images, grid_width, grid_height, magnitude, rs):
     """
     Elastic distortion operation from the Augmentor library
 
@@ -17,8 +16,6 @@ def elastic_distortion(images, grid_width, grid_height, magnitude):
     :param images: The image(s) to be distorted.
     :type images: List containing.
     :return: List of transformed images.
-
-    # TODO: For reproducibility, use a random seed.
     """
 
     extra_dim = [False] * len(images)
@@ -87,8 +84,8 @@ def elastic_distortion(images, grid_width, grid_height, magnitude):
             polygon_indices.append([i, i + 1, i + horizontal_tiles, i + 1 + horizontal_tiles])
 
     for a, b, c, d in polygon_indices:
-        dx = random.randint(-magnitude, magnitude)
-        dy = random.randint(-magnitude, magnitude)
+        dx = rs.randint(-magnitude, magnitude)
+        dy = rs.randint(-magnitude, magnitude)
 
         x1, y1, x2, y2, x3, y3, x4, y4 = polygons[a]
         polygons[a] = [x1, y1,

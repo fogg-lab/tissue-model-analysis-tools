@@ -6,7 +6,6 @@ import numpy.typing as npt
 from numpy.random import RandomState
 import dask as d
 from sklearn.mixture import GaussianMixture
-import random
 from typing import List
 
 from . import defs
@@ -185,8 +184,8 @@ def blur(
 
 
 def perform_augmentation(
-    imgs: List[npt.NDArray[Union[np.float_, np.int_]]], rot: int, hflip: bool,
-    vflip: bool, distort: bool=False, expand_dims: bool=True
+    imgs: List[npt.NDArray[Union[np.float_, np.int_]]], rand_state: RandomState,
+    rot: int, hflip: bool, vflip: bool, distort: bool=False, expand_dims: bool=True
 ) -> List[npt.NDArray[Union[np.float_, np.int_]]]:
     """Augment the passed image(s)
     Args:
@@ -201,28 +200,28 @@ def perform_augmentation(
         Augmented image.
     """
 
-    for i in range(len(imgs)):
-        hw = imgs[i].shape[:2]
+    for i, img in enumerate(imgs):
+        hw = img.shape[:2]
         # Horizontal flip
         if hflip:
-            imgs[i] = cv2.flip(imgs[i], 1)
+            img = cv2.flip(img, 1)
         # Vertical flip
         if vflip:
-            imgs[i] = cv2.flip(imgs[i], 0)
+            img = cv2.flip(img, 0)
         # Rotation
         rot_mat = cv2.getRotationMatrix2D((hw[1] // 2, hw[0] // 2), rot, 1.0)
-        imgs[i] = cv2.warpAffine(imgs[i], rot_mat, hw)
+        imgs[i] = cv2.warpAffine(img, rot_mat, hw)
 
         if expand_dims:
             imgs[i] = np.expand_dims(imgs[i], 2)
 
     if distort:
-        # TODO: For reproducibility, use a random seed here and in augmentation.py.
         imgs = augmentation.elastic_distortion(
             images = imgs,
-            grid_width=random.randint(4, 8),
-            grid_height=random.randint(4, 8),
-            magnitude=random.randint(7,8)
+            grid_width=rand_state.randint(4, 8),
+            grid_height=rand_state.randint(4, 8),
+            magnitude=8,
+            rs=rand_state
         )
 
     return imgs
@@ -256,8 +255,8 @@ def augment_img_mask_pairs(
         augmented_imgs = []
         augmented_masks = []
         for i in range(m):
-            img, mask = perform_augmentation([imgs[i], masks[i]], rots[i], hflips[i],
-                                             vflips[i], distort[i])
+            img, mask = perform_augmentation([imgs[i], masks[i]], rand_state, rots[i],
+                                             hflips[i], vflips[i], distort[i], rand_state)
             augmented_imgs.append(img)
             augmented_masks.append(mask)
         return (np.array(augmented_imgs), np.array(augmented_masks))
@@ -286,8 +285,8 @@ def augment_imgs(
     vflips = rand_state.choice([True, False], size=m)
     distort = rand_state.choice([True, False], size=m, p=[distortion_p, 1-distortion_p])
 
-    x = d.compute([d.delayed(perform_augmentation)([x[i]], rots[i], hflips[i], vflips[i],
-        distort[i], expand_dims)[0] for i in range(m)])[0]
+    x = d.compute([d.delayed(perform_augmentation)([x[i]], rand_state, rots[i], hflips[i],
+                  vflips[i], distort[i], expand_dims)[0] for i in range(m)])[0]
     return np.array(x)
 
 
