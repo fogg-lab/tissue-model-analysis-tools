@@ -274,8 +274,8 @@ def augment_imgs(
         x: Original images.
         rand_state: RandomState object to allow for reproducability.
         rot_options: Random rotation angle choices.
-        expand_dims: Whether to add a depth axis to each image after augmentation steps.
         distortion_p: Probability of applying elastic distortion to an image/mask pair.
+        expand_dims: Whether to add a depth axis to each image after augmentation steps.
     Returns:
         Augmented image set.
     """
