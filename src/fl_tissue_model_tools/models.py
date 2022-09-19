@@ -331,7 +331,7 @@ class ResNet50TLHyperModel(kt.HyperModel):
         self.mcp_mode = mcp_mode
         self.mcp_best_frozen_weights_path = mcp_best_frozen_weights_path
         self.base_model: Model = None
-        
+
         self.adam_beta_1: kt.HyperParameters.Float = None
         self.adam_beta_2: kt.HyperParameters.Float = None
 
