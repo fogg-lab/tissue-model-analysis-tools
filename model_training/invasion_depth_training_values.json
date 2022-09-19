@@ -1,1 +1,1 @@
-{"batch_size": 32, "frozen_epochs": 50, "fine_tune_epochs": 50, "val_split": 0.2, "early_stopping_patience": 25, "early_stopping_min_delta": 0.0001, "rs_seed": "None", "resnet_inp_shape": [128, 128, 3], "class_labels": {"no_invasion": 0, "invasion": 1}, "cls_thresh": 0.5, "n_models": 5}
+{"batch_size": 32, "frozen_epochs": 50, "fine_tune_epochs": 50, "val_split": 0.2, "early_stopping_patience": 25, "early_stopping_min_delta": 0.0001, "rs_seed": "None", "resnet_inp_shape": [256, 256, 3], "class_labels": {"no_invasion": 0, "invasion": 1}, "cls_thresh": 0.5, "n_models": 5}
