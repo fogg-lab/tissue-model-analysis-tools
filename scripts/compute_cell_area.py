@@ -99,8 +99,7 @@ def mask_and_threshold(
     return prep.exec_threshold(masked, pinhole_idx, sd_coef, rand_state)
 
 
-def prep_images(img_paths: Sequence[str], dsamp_size: int, extension: str) -> \
-                List[npt.NDArray]:
+def prep_images(img_paths: Sequence[str], dsamp_size: int, extension: str) -> List[npt.NDArray]:
     """Create grayscale, downsampled versions of original images.
 
     Args:

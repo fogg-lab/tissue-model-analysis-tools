@@ -16,9 +16,6 @@ from . import defs
 from . import preprocessing as prep
 
 
-AugmentationFunction = Callable[[npt.NDArray, RandomState], npt.NDArray]
-
-
 def make_dir(path: str) -> None:
     """Create `path` and all intermediate directories.
 
@@ -135,7 +132,7 @@ class InvasionDataGenerator(utils.Sequence):
         self, class_paths: Sequence[str], class_labels: Dict[str, int],
         batch_size: int, img_shape: Tuple[int, int], random_state: RandomState,
         class_weights: Union[Dict[int, float], bool]=False, shuffle: bool=True,
-        augmentation_function: AugmentationFunction=None
+        augmentation_function: Callable=None
     ):
         """Create sequence class for handling invasion depth images.
 
@@ -213,11 +210,11 @@ class InvasionDataGenerator(utils.Sequence):
         # Generate data
         X = prep_inv_depth_imgs(img_paths, self.img_shape)
 
-        if self.augmentation_function != None:
+        if self.augmentation_function is not None:
             X = self.augmentation_function(X, self.rand_state, expand_dims=False)
-        
+
         # Set y to be (m,1) rather than (m,)
-        if self.class_weights != None:
+        if self.class_weights is not None:
             # Weight classes by relative proportions in the training set
             w = np.array([self.class_weights[y_] for y_ in y])
             # Set y to be (m,1) rather than (m,)
