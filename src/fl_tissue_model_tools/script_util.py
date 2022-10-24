@@ -222,13 +222,22 @@ def cell_area_verify_input_dir(input_path: str, extension: str, verbose: bool=Fa
         raise FileNotFoundError("Input data directory not found:"
                                 f"{os.linesep}\t{input_path}")
 
-    if "tif" in extension:
-        rename_tiff_to_tif([input_path])
+    # Fixes issue with microscope saving images with no extension, these
+    # are interpreted as .tif images
+    if extension == "":
+        img_paths = glob(f"{input_path}/*")
 
-    img_paths = [fp.replace("\\", "/") for fp in glob(f"{input_path}/*.{extension}")]
-    if len(img_paths) == 0:
-        raise FileNotFoundError("Input data directory contains no files with extension:"
-                                f"{os.linesep}\t{extension}")
+        for file in img_paths:
+            if "." in file: img_paths.remove(file)
+
+    else:
+        if "tif" in extension:
+            rename_tiff_to_tif([input_path])
+
+        img_paths = [fp.replace("\\", "/") for fp in glob(f"{input_path}/*.{extension}")]
+        if len(img_paths) == 0:
+            raise FileNotFoundError("Input data directory contains no files with extension:"
+                                    f"{os.linesep}\t{extension}")
 
     if verbose:
         print(f"Found {len(img_paths)} .{extension} files in:{os.linesep}\t{input_path}")
@@ -337,6 +346,7 @@ def zproj_verify_input_dir(input_path: str, extension: str, verbose: bool=False)
         List of full paths for Z stack subdirectories.
 
     """
+
     if verbose:
         verbose_header("Verifying Input Directory")
 
@@ -351,7 +361,6 @@ def zproj_verify_input_dir(input_path: str, extension: str, verbose: bool=False)
     
     if "tif" in extension:
         rename_tiff_to_tif(zstack_paths)
-
     for zsp in zstack_paths:
         img_paths = [fp.replace("\\", "/") for fp in glob(f"{zsp}/*.{extension}")]
         n_imgs = len(img_paths)
@@ -419,7 +428,7 @@ def zproj_verify_output_dir(output_path: str, verbose: bool=True) -> None:
         verbose_footer()
 
 
-def inv_depth_verify_input_dir(input_path: str, verbose: bool=False) -> None:
+def inv_depth_verify_input_dir(input_path: str, verbose: bool=False, extension: str="tif") -> None:
     """Verify appropriate contents of input data directory.
 
     Each Z stack image should have the pattern ...Z[pos]_... in its name,
@@ -437,7 +446,6 @@ def inv_depth_verify_input_dir(input_path: str, verbose: bool=False) -> None:
             specified naming convention.
 
     """
-    extension = "tif"
 
     if verbose:
         verbose_header("Verifying Input Directory")
@@ -452,9 +460,16 @@ def inv_depth_verify_input_dir(input_path: str, verbose: bool=False) -> None:
 
     if verbose:
         print(f"{'Z Stack ID':<60}{'No. Z Positions':>20}")
-
-    img_paths = [fp.replace("\\", "/") for fp in glob(f"{input_path}/*.{extension}")]
-    n_imgs = len(img_paths)
+    # Fixes issue with microscope saving images with no extension, these
+    # are interpreted as .tif images
+    if extension == "":
+        img_paths = glob(f"{input_path}/*")
+        for file in img_paths:
+            if "." in file: img_paths.remove(file)
+        n_imgs = len(img_paths)
+    else:    
+        img_paths = [fp.replace("\\", "/") for fp in glob(f"{input_path}/*.{extension}")]
+        n_imgs = len(img_paths)
     if n_imgs == 0:
         raise FileNotFoundError(
             "Input data directory holds no files with extension:"
