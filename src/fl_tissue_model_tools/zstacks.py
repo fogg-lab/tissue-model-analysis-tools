@@ -122,7 +122,10 @@ def zstack_paths_from_dir(z_stack_dir: str, file_ext: str="tif", descending: boo
         in the z-stack (sorted by z-position)
 
     """
-    z_paths = [fn.replace("\\", "/") for fn in glob(f"{z_stack_dir}/*.{file_ext}")]
+    if file_ext == "":
+        z_paths = [fn.replace("\\", "/") for fn in glob(f"{z_stack_dir}/*")]
+    else:
+        z_paths = [fn.replace("\\", "/") for fn in glob(f"{z_stack_dir}/*.{file_ext}")]
     if get_zpos is None:
         get_zpos = _default_get_zpos
     sorted_z_paths = sorted(z_paths, key = get_zpos, reverse = descending)
