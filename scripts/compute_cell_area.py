@@ -205,9 +205,13 @@ def main():
     extension = args.extension.replace(".", "")
     try:
         img_paths = su.cell_area_verify_input_dir(in_root, extension, verbose=verbose)
-    except FileNotFoundError as error:
-        print(f"{su.SFM.failure} {error}")
-        sys.exit()
+    except FileNotFoundError:
+        # Bug fix for when microscope saves files without extension - interpret them as tif
+        try:
+            img_paths = su.cell_area_verify_input_dir(in_root, "", verbose=verbose)
+        except FileNotFoundError as error:
+            print(f"{su.SFM.failure} {error}")
+            sys.exit()
 
 
     ### Verify output destination ###

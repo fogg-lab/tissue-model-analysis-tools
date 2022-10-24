@@ -26,10 +26,15 @@ def main():
 
     ### Verify input source ###
     try:
-        su.inv_depth_verify_input_dir(in_root, verbose=verbose)
-    except FileNotFoundError as e:
-        print(f"{su.SFM.failure} {e}")
-        sys.exit()
+        su.inv_depth_verify_input_dir(in_root, verbose=verbose, extension="tif")
+        file_extension = "tif"
+    except FileNotFoundError:
+        try:
+            su.inv_depth_verify_input_dir(in_root, verbose=verbose, extension="")
+            file_extension = ""
+        except FileNotFoundError as e:
+            print(f"{su.SFM.failure} {e}")
+            sys.exit()
 
 
     ### Verify output destination ###
@@ -115,7 +120,9 @@ def main():
     try:
         zstack_dir = in_root
         # Load data
-        zpaths = zs.zstack_paths_from_dir(zstack_dir, descending=descending)
+        zpaths = zs.zstack_paths_from_dir(zstack_dir, descending=descending, file_ext=file_extension)
+
+        print(zpaths)
 
         x = data_prep.prep_inv_depth_imgs(zpaths, resnet_inp_shape[:-1])
         # Convert to tensor before calling predict() to speed up execution
