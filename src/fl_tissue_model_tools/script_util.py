@@ -1,6 +1,7 @@
 import argparse
 import os
 import shutil
+import imghdr
 import json
 import re
 from glob import glob
@@ -9,6 +10,7 @@ from typing import Sequence, Any
 
 from typing import Dict
 
+from .helper import get_img_paths
 from . import data_prep, zstacks
 
 
@@ -86,9 +88,6 @@ def parse_cell_area_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
         "default configuration will be used.")
     )
 
-    parser.add_argument("-e", "--extension", type=str, default="tif", help=
-        "File extension of images. If no argument supplied, defaults to tif.")
-
     parser.add_argument("-v", "--verbose", action="store_true", help=
         "Verbose output during script execution.")
 
@@ -120,10 +119,6 @@ def parse_zproj_args() -> argparse.Namespace:
         "already exist.")
     )
 
-    parser.add_argument("-e", "--extension", type=str, default="tif", help=(
-        "File extension of images. If no argument supplied, defaults to tif.")
-    )
-
     parser.add_argument("-m", "--method", type=str, default="fs",
         choices=["min", "max", "med", "avg", "fs"], help=(
         "Z projection method. If no argument supplied, defaults to 'fs' "
@@ -153,6 +148,7 @@ def parse_inv_depth_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
     Args:
         arg_defaults: Default values for the commandline arguments that have
             default values.
+
     Returns:
         Parsed commandline arguments.
 
@@ -163,29 +159,24 @@ def parse_inv_depth_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
 
     parser.add_argument("in_root", type=str, help=(
                         "Full path to root directory of input zstacks. "
-                        "Ex: [...]/my_data/z_stacks/experiment_1_yyyy_mm_dd/. "
-                        "Images must be .tif.")
-    )
+                        "Ex: [...]/my_data/z_stacks/experiment_1_yyyy_mm_dd/. "))
 
     parser.add_argument("out_root", type=str, help=(
                         "Full path to root directory where output will be stored. "
                         "Ex: [...]/my_data/z_projections/experiment_1_yyyy_mm_dd/. "
                         "In this example, experiment_1_yyyy_mm_dd/ will be created "
-                        "if it does not already exist.")
-    )
+                        "if it does not already exist."))
 
     parser.add_argument("-c", "--config", type=str, default=default_config_path, help=(
                         "Full path to invasion depth computation configuration file. "
                         "Ex: C:/my_config/inv_depth_comp_config.json. If no argument "
-                        "supplied, default configuration will be used.")
-    )
+                        "supplied, default configuration will be used."))
 
     parser.add_argument("-o", "--order", type=int, default=1, choices=[0, 1], help=(
                         "Interpretation of Z stack order. 0=Ascending, 1=Descending."
                         "For Z stack of size k: -o 0 means (TOP -> BOTTOM) = (Z0 -> Zk)"
                         "while -o 1 means (TOP -> BOTTOM) = (Zk -> Z0). If no argument"
-                        "supplied, defaults to 1=Descending.")
-    )
+                        "supplied, defaults to 1=Descending."))
 
     parser.add_argument("-v", "--verbose", action="store_true",
                         help="Verbose output during script execution.")
@@ -195,21 +186,16 @@ def parse_inv_depth_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
 
 
 ### File/Directory Validation ###
-def cell_area_verify_input_dir(input_path: str, extension: str, verbose: bool=False) \
-    -> Sequence[str]:
+def cell_area_verify_input_dir(input_path: str, verbose: bool=False) -> Sequence[str]:
     """Verify appropriate contents of input data directory.
-
-    Directory should contain images with '.extension' suffix.
 
     Args:
         input_path: Path to input images.
-        extension: Image file extension (e.g., 'tif').
         verbose: Whether to print verbose output.
 
     Raises:
         FileNotFoundError: Input data directory not found.
-        FileNotFoundError: Input data directory does not contain any files
-            with the appropriate file extension.
+        FileNotFoundError: Input data directory has no images.
 
     Returns:
         The full paths to each relevant image in the directory.
@@ -222,25 +208,11 @@ def cell_area_verify_input_dir(input_path: str, extension: str, verbose: bool=Fa
         raise FileNotFoundError("Input data directory not found:"
                                 f"{os.linesep}\t{input_path}")
 
-    # Fixes issue with microscope saving images with no extension, these
-    # are interpreted as .tif images
-    if extension == "":
-        img_paths = glob(f"{input_path}/*")
-
-        for file in img_paths:
-            if "." in file: img_paths.remove(file)
-
-    else:
-        if "tif" in extension:
-            rename_tiff_to_tif([input_path])
-
-        img_paths = [fp.replace("\\", "/") for fp in glob(f"{input_path}/*.{extension}")]
-        if len(img_paths) == 0:
-            raise FileNotFoundError("Input data directory contains no files with extension:"
-                                    f"{os.linesep}\t{extension}")
+    # Get all images in input directory
+    img_paths = get_img_paths(input_path)
 
     if verbose:
-        print(f"Found {len(img_paths)} .{extension} files in:{os.linesep}\t{input_path}")
+        print(f"Found {len(img_paths)} images in:{os.linesep}\t{input_path}")
         print(SFM.success)
         verbose_footer()
 
@@ -320,27 +292,21 @@ def cell_area_verify_config_file(config_path: str, verbose: bool=False) -> Dict[
     return config
 
 
-def zproj_verify_input_dir(input_path: str, extension: str, verbose: bool=False) \
-    -> Sequence[str]:
+def zproj_verify_input_dir(input_path: str, verbose: bool=False) -> Sequence[str]:
     """Verify appropriate contents of input data directory.
 
     Input directory should contain 1 subdirectory for each Z stack with
     each of these subdirectories (Z stacks) contining all Z position images
-    for that stack. These images should have a '.extension' suffix. Each
-    Z stack image should have the pattern ...Z[pos]_... in its name,
+    for that stack. Each Z stack image should have the pattern ...Z[pos]_... in its name,
     where [pos] is a number denoting the Z stack position for that image.
 
     Args:
         input_path: Path to input Z stacks.
-        extension: Image file extension (e.g., 'tif').
         verbose: Whether to print verbose output.
 
     Raises:
         FileNotFoundError: Input data directory not found.
-        FileNotFoundError: One or more Z stack subdirectories does not
-            contain any images with '.extension' suffix.
-        FileNotFoundError: One or more image files does not follow the
-            specified naming convention.
+        FileNotFoundError: No images found in a subdirectory.
 
     Returns:
         List of full paths for Z stack subdirectories.
@@ -358,18 +324,13 @@ def zproj_verify_input_dir(input_path: str, extension: str, verbose: bool=False)
 
     if verbose:
         print(f"{'Z Stack ID':<40}{'No. Z Positions':>20}")
-    
-    if "tif" in extension:
-        rename_tiff_to_tif(zstack_paths)
+
     for zsp in zstack_paths:
-        img_paths = [fp.replace("\\", "/") for fp in glob(f"{zsp}/*.{extension}")]
+        # Get all images in subdirectory
+        img_paths = get_img_paths(zsp)
         n_imgs = len(img_paths)
         if n_imgs == 0:
-            raise FileNotFoundError(
-                "Input data directory contains Z stack subdirectory holding no files "
-                f"with extension:{os.linesep}\t{extension}{os.linesep}"
-                f"Offending subdirectory:{os.linesep}\t{zsp}"
-            )
+            raise FileNotFoundError(f"No images found in: {os.linesep}\t{zsp}")
         for img_path in img_paths:
             iname = img_path.split("/")[-1]
             pattern = re.search(zstacks.ZPOS_PATTERN, img_path)
@@ -428,7 +389,7 @@ def zproj_verify_output_dir(output_path: str, verbose: bool=True) -> None:
         verbose_footer()
 
 
-def inv_depth_verify_input_dir(input_path: str, verbose: bool=False, extension: str="tif") -> None:
+def inv_depth_verify_input_dir(input_path: str, verbose: bool=False) -> None:
     """Verify appropriate contents of input data directory.
 
     Each Z stack image should have the pattern ...Z[pos]_... in its name,
@@ -440,42 +401,26 @@ def inv_depth_verify_input_dir(input_path: str, verbose: bool=False, extension: 
 
     Raises:
         FileNotFoundError: Input data directory not found.
-        FileNotFoundError: One or more Z stack subdirectories does not
-            contain any images with '.extension' suffix.
-        FileNotFoundError: One or more image files does not follow the
-            specified naming convention.
-
+        FileNotFoundError: No images found in a subdirectory.
+        FileNotFoundError: Image file does not contain the expected pattern.
     """
 
     if verbose:
         verbose_header("Verifying Input Directory")
 
     if not os.path.isdir(input_path):
-        raise FileNotFoundError(
-            f"Input data directory not found:{os.linesep}\t{input_path}"
-        )
-
-    if "tif" in extension:
-        rename_tiff_to_tif(input_path)
+        raise FileNotFoundError(f"Input data directory not found:{os.linesep}\t{input_path}")
 
     if verbose:
         print(f"{'Z Stack ID':<60}{'No. Z Positions':>20}")
-    # Fixes issue with microscope saving images with no extension, these
-    # are interpreted as .tif images
-    if extension == "":
-        img_paths = glob(f"{input_path}/*")
-        for file in img_paths:
-            if "." in file: img_paths.remove(file)
-        n_imgs = len(img_paths)
-    else:    
-        img_paths = [fp.replace("\\", "/") for fp in glob(f"{input_path}/*.{extension}")]
-        n_imgs = len(img_paths)
+
+    # Get all images in input directory
+    img_paths = get_img_paths(input_path)
+
+    n_imgs = len(img_paths)
+
     if n_imgs == 0:
-        raise FileNotFoundError(
-            "Input data directory holds no files with extension:"
-            f"{os.linesep}\t{extension}{os.linesep}"
-            f"Offending directory:{os.linesep}\t{input_path}"
-        )
+        raise FileNotFoundError(f"No images found in: {os.linesep}\t{input_path}")
     for img_path in img_paths:
         iname = img_path.split("/")[-1]
         pattern = re.search(zstacks.ZPOS_PATTERN, img_path)
@@ -571,15 +516,3 @@ def inv_depth_verify_config_file(config_path: str, n_models: int,
         verbose_footer()
 
     return config
-
-
-def rename_tiff_to_tif(paths):
-    """Rename .tif files in a list of directories to .tiff
-    
-    Args:
-        paths: List of directories to search for .tif files.
-    """
-    for path in paths:
-        for fp in glob(f"{path}/*.tiff"):
-            new_fp = fp[:-1]
-            os.rename(fp, new_fp)
