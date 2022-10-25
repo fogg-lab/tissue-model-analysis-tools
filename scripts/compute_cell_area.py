@@ -1,5 +1,6 @@
 import os
 import sys
+from pathlib import Path
 from typing import Sequence, Tuple, List
 import cv2
 import numpy as np
@@ -18,61 +19,41 @@ THRESH_SUBDIR = "thresholded"
 CALC_SUBDIR = "calculations"
 
 
-def load_img(
-    img_path: str, dsamp: bool=True, dsize: int=250, extension: str="tif"
-) -> npt.NDArray:
+def load_img(img_path: str, dsamp: bool=True, dsize: int=250) -> npt.NDArray:
     """Load and downsample image.
 
     Args:
         img_path: Path to image.
         dsamp: Whether to downsample the image.
         dsize: If downsampling image, size to downsample to.
-        extension: File extension for image. Only tif & png
-            currently supported.
 
     Returns:
         Loaded and (optionally) downsampled image.
 
     """
-    if extension == "tif":
-        # cv.IMREAD_ANYDEPTH loads the image as a 16 bit grayscale image
-        img = cv2.imread(img_path, cv2.IMREAD_ANYDEPTH)
-    elif extension == "png":
-        img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+
+    img = cv2.imread(img_path, cv2.IMREAD_ANYDEPTH)
     if dsamp:
         img = cv2.resize(img, dsize, cv2.INTER_AREA)
+
     return img
 
 
-def load_and_norm(
-    img_path: str, extension: str, dsize: int=250
-) -> npt.NDArray:
+def load_and_norm(img_path: str, dsize: int=250) -> npt.NDArray:
     """Load and normalize image to new range.
 
     Args:
         img_path: Path to image.
-        extension: File extension for image.
         dsize: If downsampling image, size to downsample to.
-
-    Raises:
-        OSError: Unsupported file extension supplied.
 
     Returns:
         Normalized image located at img_path.
 
     """
-    new_min = defs.GS_MIN
-    new_max = defs.GS_MAX
-
-    if extension == "png":
-        old_min = new_min
-        old_max = new_max
-    elif extension == "tif":
-        old_min = defs.TIF_MIN
-        old_max = defs.TIF_MAX
-    else:
-        raise OSError(f"Unsupported file type for analysis: {extension}")
+    new_min, new_max = defs.GS_MIN, defs.GS_MAX
+    old_min, old_max = defs.TIF_MIN, defs.TIF_MAX
     img = load_img(img_path, dsamp=True, dsize=dsize)
+
     return prep.min_max_(img, new_min, new_max, old_min, old_max)
 
 
@@ -96,10 +77,12 @@ def mask_and_threshold(
 
     """
     masked = prep.apply_mask(img, circ_mask).astype(float)
-    return prep.exec_threshold(masked, pinhole_idx, sd_coef, rand_state)
+    masked_and_thresholded = prep.exec_threshold(masked, pinhole_idx, sd_coef, rand_state)
+
+    return masked_and_thresholded
 
 
-def prep_images(img_paths: Sequence[str], dsamp_size: int, extension: str) -> List[npt.NDArray]:
+def prep_images(img_paths: Sequence[str], dsamp_size: int) -> List[npt.NDArray]:
     """Create grayscale, downsampled versions of original images.
 
     Args:
@@ -112,7 +95,7 @@ def prep_images(img_paths: Sequence[str], dsamp_size: int, extension: str) -> Li
 
     """
     gs_ds_imgs = d.compute([
-        d.delayed(load_and_norm)(img_p, extension,dsize=(dsamp_size, dsamp_size))
+        d.delayed(load_and_norm)(img_p, dsize=(dsamp_size, dsamp_size))
         for img_p in img_paths
     ])[0]
     return gs_ds_imgs
@@ -196,28 +179,17 @@ def main():
     verbose = args.verbose
 
 
-    ### Tidy up paths ###
-    in_root = args.in_root.replace("\\", "/")
-    out_root = args.out_root.replace("\\", "/")
-
-
     ### Verify input source ###
-    extension = args.extension.replace(".", "")
     try:
-        img_paths = su.cell_area_verify_input_dir(in_root, extension, verbose=verbose)
-    except FileNotFoundError:
-        # Bug fix for when microscope saves files without extension - interpret them as tif
-        try:
-            img_paths = su.cell_area_verify_input_dir(in_root, "", verbose=verbose)
-        except FileNotFoundError as error:
-            print(f"{su.SFM.failure} {error}")
-            sys.exit()
+        img_paths = su.cell_area_verify_input_dir(args.in_root, verbose=verbose)
+    except FileNotFoundError as error:
+        print(f"{su.SFM.failure} {error}")
+        sys.exit()
 
 
     ### Verify output destination ###
     try:
-        su.cell_area_verify_output_dir(out_root, THRESH_SUBDIR, CALC_SUBDIR,
-                                        verbose=verbose)
+        su.cell_area_verify_output_dir(args.out_root, THRESH_SUBDIR, CALC_SUBDIR, verbose=verbose)
     except PermissionError as error:
         print(f"{su.SFM.failure} {error}")
         sys.exit()
@@ -244,7 +216,7 @@ def main():
     rand_state = np.random.RandomState(rs_seed)
     pinhole_cut = int(round(dsamp_size * pinhole_buffer))
     try:
-        gs_ds_imgs = prep_images(img_paths, dsamp_size, extension)
+        gs_ds_imgs = prep_images(img_paths, dsamp_size)
     except OSError as error:
         print(f"{su.SFM.failure}{error}")
         sys.exit()
@@ -252,11 +224,14 @@ def main():
     # variables for image masking
     circ_mask, pinhole_idx, circ_pix_area = circ_mask_setup(gs_ds_imgs[0].shape, pinhole_cut)
     # Threshold images
+    
     gmm_thresh_all = threshold_images(gs_ds_imgs, circ_mask, pinhole_idx, sd_coef, rand_state)
-
+    
 
     ### Compute areas ###
+    
     area_prop = compute_areas(gmm_thresh_all, circ_pix_area)
+    
 
     if verbose:
         print("... Areas computed successfully.")
@@ -266,23 +241,23 @@ def main():
     if verbose:
         print(f"{LINESEP}Saving results...")
 
-    img_ids = [img_n.split("/")[-1] for img_n in img_paths]
+    img_ids = [Path(img_n).stem for img_n in img_paths]
     area_df = pd.DataFrame(
         data = {"image_id": img_ids, "area_pct": area_prop * 100}
     )
     for i, img_id in enumerate(img_ids):
         out_img = gmm_thresh_all[i].astype(np.uint8)
-        out_path = f"{out_root}/{THRESH_SUBDIR}/{img_id}_thresholded.png"
-        cv2.imwrite(
-            out_path,
-            out_img
-        )
+        out_path = os.path.join(args.out_root, THRESH_SUBDIR, f"{img_id}_thresholded.png")
+        cv2.imwrite(out_path, out_img)
 
     if verbose:
-        print(f"... Thresholded images saved to:{os.linesep}\t{out_root}/{THRESH_SUBDIR}")
-    area_df.to_csv(f"{out_root}/{CALC_SUBDIR}/area_results.csv", index=False)
+        print(f"... Thresholded images saved to:{os.linesep}\t{args.out_root}/{THRESH_SUBDIR}")
+
+    area_out_path = os.path.join(args.out_root, CALC_SUBDIR, "cell_area.csv")
+    area_df.to_csv(area_out_path, index=False)
+
     if verbose:
-        print(f"... Area calculations saved to:{os.linesep}\t{out_root}/{CALC_SUBDIR}")
+        print(f"... Area calculations saved to:{os.linesep}\t{area_out_path}")
         print(su.SFM.success)
         print(su.verbose_end)
 
