@@ -5,7 +5,6 @@ https://github.com/cmcguinness/focusstack
 """
 
 import re
-from glob import glob
 from typing import Optional, Sequence, Callable, Tuple
 import numbers
 import dask as d
@@ -14,6 +13,7 @@ import numpy as np
 import cv2
 
 from . import defs
+from .helper import get_img_paths
 
 
 ZPOS_PATTERN = "(z|Z)[0-9]+_"
@@ -51,10 +51,9 @@ def _blur_and_lap(image: npt.NDArray, kernel_size: int=5) -> npt.NDArray:
     return cv2.Laplacian(blurred, cv2.CV_64F, ksize=kernel_size)
 
 
-def zstack_from_dir(
-    z_stack_dir: str, file_ext: str="tif", descending: bool=True,
-    get_zpos: Optional[Callable[[str], int]]=None
-) -> Tuple[Sequence[str], npt.NDArray]:
+def zstack_from_dir(z_stack_dir: str, descending: bool=True,
+                    get_zpos: Optional[Callable[[str], int]]=None
+                   ) -> Tuple[Sequence[str], npt.NDArray]:
     """Return sorted (by z-position) z-stack image paths and z-stack.
 
     IMPORTANT: To use the default `get_zpos` function, each z-position image
@@ -75,7 +74,6 @@ def zstack_from_dir(
 
     Args:
         z_stack_dir: Directory where z-stack images are located.
-        file_ext: File extension of z-stack images.
         descending: Whether z-position index is numbered from top to bottom
             or bottom to top. For example, descending means z-position 3 is
             located _above_ z-position 2.
@@ -90,26 +88,24 @@ def zstack_from_dir(
 
     """
 
-    z_paths = [fn.replace("\\", "/") for fn in glob(f"{z_stack_dir}/*.{file_ext}")]
-    if file_ext == "tif":
-        flag = cv2.IMREAD_ANYDEPTH
-    else:
-        flag = cv2.IMREAD_GRAYSCALE
+    # Get images in z-stack directory
+    z_paths = get_img_paths(z_stack_dir)
 
     if get_zpos is None:
         get_zpos = _default_get_zpos
 
-    sorted_z_paths = sorted(z_paths, key = get_zpos, reverse = descending)
-    return sorted_z_paths, np.array([cv2.imread(img_n, flag) for img_n in sorted_z_paths])
+    # Sort z-stack images by z-position
+    z_paths = sorted(z_paths, key = get_zpos, reverse = descending)
+    
+    return z_paths, np.array([cv2.imread(img, cv2.IMREAD_ANYDEPTH) for img in z_paths])
 
 
-def zstack_paths_from_dir(z_stack_dir: str, file_ext: str="tif", descending: bool=True,
+def zstack_paths_from_dir(z_stack_dir: str, descending: bool=True,
                         get_zpos: Optional[Callable[[str], int]]=None) -> Sequence[str]:
     """Get sorted z-stack image paths.
 
     Args:
         z_stack_dir: Directory where z-stack images are located.
-        file_ext: File extension of z-stack images.
         descending: Whether z-position index is numbered from top to bottom
             or bottom to top. For example, descending means z-position 3 is
             located _above_ z-position 2.
@@ -122,10 +118,7 @@ def zstack_paths_from_dir(z_stack_dir: str, file_ext: str="tif", descending: boo
         in the z-stack (sorted by z-position)
 
     """
-    if file_ext == "":
-        z_paths = [fn.replace("\\", "/") for fn in glob(f"{z_stack_dir}/*")]
-    else:
-        z_paths = [fn.replace("\\", "/") for fn in glob(f"{z_stack_dir}/*.{file_ext}")]
+    z_paths = get_img_paths(z_stack_dir)
     if get_zpos is None:
         get_zpos = _default_get_zpos
     sorted_z_paths = sorted(z_paths, key = get_zpos, reverse = descending)
