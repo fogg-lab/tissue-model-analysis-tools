@@ -101,16 +101,11 @@ def exec_threshold(
         Copy of original image with background pixels set to 0.
     """
 
-    thread_id = np.random.randint(0, 1000000)
-
     # Select pixels within the mask. Exclude masked-out pixels since they
     # will alter the shape of the background distribution.
     X = masked[mask_idx][:, np.newaxis]
-    print(f"{thread_id} at 1")
     gm = GaussianMixture(n_components=2, random_state=rand_state)
-    print(f"{thread_id} at 2")
     gm = gm.fit(X)
-    
 
     # Get GMM components
     means = gm.means_.squeeze()
