@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+from pathlib import Path
 import tensorflow.keras.backend as K
 import tensorflow as tf
 import numpy as np
@@ -19,27 +20,17 @@ def main():
     verbose = args.verbose
 
 
-    ### Tidy up paths ###
-    in_root = args.in_root.replace("\\", "/")
-    out_root = args.out_root.replace("\\", "/")
-
-
     ### Verify input source ###
     try:
-        su.inv_depth_verify_input_dir(in_root, verbose=verbose, extension="tif")
-        file_extension = "tif"
-    except FileNotFoundError:
-        try:
-            su.inv_depth_verify_input_dir(in_root, verbose=verbose, extension="")
-            file_extension = ""
-        except FileNotFoundError as e:
-            print(f"{su.SFM.failure} {e}")
-            sys.exit()
+        su.inv_depth_verify_input_dir(args.in_root, verbose=verbose)
+    except FileNotFoundError as e:
+        print(f"{su.SFM.failure} {e}")
+        sys.exit()
 
 
     ### Verify output destination ###
     try:
-        su.inv_depth_verify_output_dir(out_root, verbose=verbose)
+        su.inv_depth_verify_output_dir(args.out_root, verbose=verbose)
     except PermissionError as e:
         print(f"{su.SFM.failure} {e}")
         sys.exit()
@@ -58,6 +49,7 @@ def main():
        training_values = json.load(fp)
     if training_values["rs_seed"] == "None":
         training_values["rs_seed"] = None
+
 
     ### Set model variables ###
     cls_thresh = training_values["cls_thresh"]
@@ -94,6 +86,7 @@ def main():
             base_last_layer=last_resnet_layer, base_model_trainable=False)
             for _ in range(n_pred_models)
     ]
+
     for i, m in enumerate(inv_depth_models):
         if verbose:
             print(f"Loading classifier {i}...")
@@ -108,7 +101,7 @@ def main():
             print(f"... Classifier {i} loaded.")
 
     if verbose:
-        print(f"All classifiers loaded.")
+        print("All classifiers loaded.")
         print(su.SFM.success)
         su.verbose_footer()
 
@@ -118,9 +111,9 @@ def main():
         su.verbose_header("Making predictions")
 
     try:
-        zstack_dir = in_root
+        zstack_dir = args.in_root
         # Load data
-        zpaths = zs.zstack_paths_from_dir(zstack_dir, descending=descending, file_ext=file_extension)
+        zpaths = zs.zstack_paths_from_dir(zstack_dir, descending=descending)
 
         print(zpaths)
 
@@ -144,15 +137,16 @@ def main():
         # Save outputs
         if verbose:
             print("Saving results...")
-        output_file = pd.DataFrame({"img_name": [zp.split("/")[-1]for zp in zpaths],
+        output_file = pd.DataFrame({"img_name": [Path(zp).name for zp in zpaths],
                         "inv_prob": yhatp.squeeze(), "inv_label": yhat.squeeze()})
-        output_file.to_csv(f"{out_root}/invasion_depth_predictions.csv", index=False)
+        output_file.to_csv(f"{args.out_root}/invasion_depth_predictions.csv", index=False)
         if verbose:
             print("... Results saved.")
 
         if verbose:
             print(su.SFM.success)
             su.verbose_footer()
+
     except Exception as e:
         print(f"{su.SFM.failure} {e}")
         sys.exit()
