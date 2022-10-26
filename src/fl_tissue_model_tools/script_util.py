@@ -6,6 +6,7 @@ import json
 import re
 from glob import glob
 from dataclasses import dataclass
+from turtle import clear
 from typing import Sequence, Any
 
 from typing import Dict
@@ -239,7 +240,7 @@ def cell_area_verify_output_dir(output_path: str, thresh_subdir: str, calc_subdi
         if verbose:
             print(f"Did not find output dir:{os.linesep}\t{output_path}")
             print("Creating...")
-        data_prep.make_dir(output_path)
+        data_prep.make_dir(output_path, clear_directory=False)
         if verbose:
             print(f"... Created dir:{os.linesep}\t{output_path}")
 
@@ -248,8 +249,8 @@ def cell_area_verify_output_dir(output_path: str, thresh_subdir: str, calc_subdi
         print(f"\t{output_path}/{thresh_subdir}")
         print(f"\t{output_path}/{calc_subdir}")
 
-    data_prep.make_dir(f"{output_path}/{thresh_subdir}")
-    data_prep.make_dir(f"{output_path}/{calc_subdir}")
+    data_prep.make_dir(f"{output_path}/{thresh_subdir}", clear_directory=False)
+    data_prep.make_dir(f"{output_path}/{calc_subdir}", clear_directory=False)
 
     if verbose:
         print("... Created dirs:")
@@ -369,7 +370,7 @@ def zproj_verify_output_dir(output_path: str, verbose: bool=True) -> None:
             print(f"Did not find output dir:{os.linesep}\t{output_path}")
             print("Creating...")
 
-        data_prep.make_dir(output_path)
+        data_prep.make_dir(output_path, clear_directory=False)
 
         if verbose:
             print(f"... Created dir:{os.linesep}\t{output_path}")
@@ -379,7 +380,7 @@ def zproj_verify_output_dir(output_path: str, verbose: bool=True) -> None:
             print(f"Found dir:{os.linesep}\t{output_path}")
             print("Clearing...")
 
-        data_prep.make_dir(output_path)
+        data_prep.make_dir(output_path, clear_directory=False)
 
         if verbose:
             print(f"... Cleared dir:{os.linesep}\t{output_path}")
@@ -456,7 +457,7 @@ def inv_depth_verify_output_dir(output_path: str, verbose: bool=True) -> None:
             print(f"Did not find output dir:{os.linesep}\t{output_path}")
             print("Creating...")
 
-        data_prep.make_dir(output_path)
+        data_prep.make_dir(output_path, clear_directory=False)
 
         if verbose:
             print(f"... Created dir:{os.linesep}\t{output_path}")
@@ -465,7 +466,7 @@ def inv_depth_verify_output_dir(output_path: str, verbose: bool=True) -> None:
             print(f"Found dir:{os.linesep}\t{output_path}")
             print("Clearing...")
 
-        data_prep.make_dir(output_path)
+        data_prep.make_dir(output_path, clear_directory=False)
 
         if verbose:
             print(f"... Cleared dir:{os.linesep}\t{output_path}")
