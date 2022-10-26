@@ -114,9 +114,6 @@ def main():
         zstack_dir = args.in_root
         # Load data
         zpaths = zs.zstack_paths_from_dir(zstack_dir, descending=descending)
-
-        print(zpaths)
-
         x = data_prep.prep_inv_depth_imgs(zpaths, resnet_inp_shape[:-1])
         # Convert to tensor before calling predict() to speed up execution
         x = tf.convert_to_tensor(x, dtype="float")
