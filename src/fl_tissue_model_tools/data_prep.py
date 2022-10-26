@@ -16,7 +16,7 @@ from . import defs
 from . import preprocessing as prep
 
 
-def make_dir(path: str) -> None:
+def make_dir(path: str, clear_directory=True) -> None:
     """Create `path` and all intermediate directories.
 
     If the provided path is `a/b/c`, all subdirectories or
@@ -29,9 +29,10 @@ def make_dir(path: str) -> None:
         None
 
     """
-    if os.path.exists(path):
+    if os.path.exists(path) and clear_directory:
         shutil.rmtree(path)
-    os.makedirs(path)
+    elif not os.path.exists(path):
+        os.makedirs(path)
 
 
 def save_class_imgs(
