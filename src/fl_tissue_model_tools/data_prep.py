@@ -31,7 +31,7 @@ def make_dir(path: str, clear_directory=True) -> None:
     """
     if os.path.exists(path) and clear_directory:
         shutil.rmtree(path)
-    elif not os.path.exists(path):
+    if not os.path.exists(path):
         os.makedirs(path)
 
 
