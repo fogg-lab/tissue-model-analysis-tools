@@ -62,7 +62,6 @@ def save_zproj(zproj: npt.NDArray, out_root: str, zid: str, zproj_type: str, ext
     new_min = defs.TIF_MIN
     new_max = defs.TIF_MAX
 
-    print(f"{ext = }")
     zproj_out_path = os.path.join(out_root, f"{zid}_{zproj_type}{ext}")
     zproj_out_img = prep.min_max_(zproj, new_min, new_max, old_min, old_max).astype(cast_type)
     cv2.imwrite(zproj_out_path, zproj_out_img)

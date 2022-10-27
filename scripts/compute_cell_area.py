@@ -221,21 +221,19 @@ def main():
         print(f"{su.SFM.failure}{error}")
         sys.exit()
 
-    # variables for image masking
+    # Variables for image masking
     circ_mask, pinhole_idx, circ_pix_area = circ_mask_setup(gs_ds_imgs[0].shape, pinhole_cut)
+
     # Threshold images
-    
     gmm_thresh_all = threshold_images(gs_ds_imgs, circ_mask, pinhole_idx, sd_coef, rand_state)
-    
+
 
     ### Compute areas ###
-    
+
     area_prop = compute_areas(gmm_thresh_all, circ_pix_area)
-    
 
     if verbose:
         print("... Areas computed successfully.")
-
 
     ### Save results ###
     if verbose:
