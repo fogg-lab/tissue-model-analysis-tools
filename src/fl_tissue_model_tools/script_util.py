@@ -1,10 +1,9 @@
 import argparse
 import os
-from pathlib import Path
 import shutil
+import imghdr
 import json
 import re
-import imghdr
 from glob import glob
 from dataclasses import dataclass
 from turtle import clear
@@ -250,8 +249,8 @@ def cell_area_verify_output_dir(output_path: str, thresh_subdir: str, calc_subdi
         print(f"\t{output_path}/{thresh_subdir}")
         print(f"\t{output_path}/{calc_subdir}")
 
-    data_prep.make_dir(f"{output_path}/{thresh_subdir}")
-    data_prep.make_dir(f"{output_path}/{calc_subdir}")
+    data_prep.make_dir(f"{output_path}/{thresh_subdir}", clear_directory=False)
+    data_prep.make_dir(f"{output_path}/{calc_subdir}", clear_directory=False)
 
     if verbose:
         print("... Created dirs:")
@@ -297,11 +296,10 @@ def cell_area_verify_config_file(config_path: str, verbose: bool=False) -> Dict[
 def zproj_verify_input_dir(input_path: str, verbose: bool=False) -> Sequence[str]:
     """Verify appropriate contents of input data directory.
 
-    Input directory should contain either:  
-     - One subdirectory per Z stack (required if there is more than 1 zstack).
-     - No subdirectorie, with all images in the zstack placed in the root of the input directory.
-    Each Zstack should contain all Z position images for that stack.
-    Each image should have the pattern ...Z[pos]_... in its name (e.g. ...Z12_...).
+    Input directory should contain 1 subdirectory for each Z stack with
+    each of these subdirectories (Z stacks) contining all Z position images
+    for that stack. Each Z stack image should have the pattern ...Z[pos]_... in its name,
+    where [pos] is a number denoting the Z stack position for that image.
 
     Args:
         input_path: Path to input Z stacks.
@@ -323,10 +321,7 @@ def zproj_verify_input_dir(input_path: str, verbose: bool=False) -> Sequence[str
         raise FileNotFoundError(
             f"Input data directory not found:{os.linesep}\t{input_path}"
         )
-    zstack_paths = [fp for fp in glob(f"{input_path}/*") if os.path.isdir(fp)]
-
-    if len(zstack_paths) == 0:
-        zstack_paths = [input_path]
+    zstack_paths = [fp.replace("\\", "/") for fp in glob(f"{input_path}/*")]
 
     if verbose:
         print(f"{'Z Stack ID':<40}{'No. Z Positions':>20}")
@@ -338,7 +333,7 @@ def zproj_verify_input_dir(input_path: str, verbose: bool=False) -> Sequence[str
         if n_imgs == 0:
             raise FileNotFoundError(f"No images found in: {os.linesep}\t{zsp}")
         for img_path in img_paths:
-            iname = Path(img_path).name
+            iname = img_path.split("/")[-1]
             pattern = re.search(zstacks.ZPOS_PATTERN, img_path)
             if pattern is None:
                 raise FileNotFoundError(
@@ -349,7 +344,7 @@ def zproj_verify_input_dir(input_path: str, verbose: bool=False) -> Sequence[str
                 )
 
         if verbose:
-            zsp_id = Path(zsp).name
+            zsp_id = zsp.split("/")[-1]
             print(f"{zsp_id:.<40}{n_imgs:.>20}")
 
     if verbose:
@@ -385,10 +380,7 @@ def zproj_verify_output_dir(output_path: str, verbose: bool=True) -> None:
             print(f"Found dir:{os.linesep}\t{output_path}")
             print("Clearing...")
 
-        # Remove previous zproj images in output directory
-        for prev_output_fp in [Path(output_path) / f for f in os.listdir(output_path)]:
-            if os.path.isfile(prev_output_fp) and imghdr.what(prev_output_fp) is not None:
-                os.remove(prev_output_fp)
+        data_prep.make_dir(output_path, clear_directory=False)
 
         if verbose:
             print(f"... Cleared dir:{os.linesep}\t{output_path}")
@@ -431,7 +423,7 @@ def inv_depth_verify_input_dir(input_path: str, verbose: bool=False) -> None:
     if n_imgs == 0:
         raise FileNotFoundError(f"No images found in: {os.linesep}\t{input_path}")
     for img_path in img_paths:
-        iname = Path(img_path).name
+        iname = img_path.split("/")[-1]
         pattern = re.search(zstacks.ZPOS_PATTERN, img_path)
         if pattern is None:
             raise FileNotFoundError(
@@ -441,7 +433,7 @@ def inv_depth_verify_input_dir(input_path: str, verbose: bool=False) -> None:
                 "Z stack position.")
 
     if verbose:
-        zsp_id = Path(input_path).name
+        zsp_id = input_path.split("/")[-1]
         print(f"{zsp_id:.<60}{n_imgs:.>20}")
 
     if verbose:
@@ -474,10 +466,7 @@ def inv_depth_verify_output_dir(output_path: str, verbose: bool=True) -> None:
             print(f"Found dir:{os.linesep}\t{output_path}")
             print("Clearing...")
 
-        # Remove previous zproj output files
-        for prev_output_filepath in [Path(output_path) / f for f in os.listdir(output_path)]:
-            if os.path.isfile(prev_output_filepath) and prev_output_filepath.suffix == ".csv":
-                os.remove(prev_output_filepath)
+        data_prep.make_dir(output_path, clear_directory=False)
 
         if verbose:
             print(f"... Cleared dir:{os.linesep}\t{output_path}")
