@@ -16,7 +16,7 @@ from . import defs
 from . import preprocessing as prep
 
 
-def make_dir(path: str, clear_directory=True) -> None:
+def make_dir(path: str) -> None:
     """Create `path` and all intermediate directories.
 
     If the provided path is `a/b/c`, all subdirectories or
