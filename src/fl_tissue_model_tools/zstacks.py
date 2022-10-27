@@ -96,7 +96,7 @@ def zstack_from_dir(z_stack_dir: str, descending: bool=True,
 
     # Sort z-stack images by z-position
     z_paths = sorted(z_paths, key = get_zpos, reverse = descending)
-
+    
     return z_paths, np.array([cv2.imread(img, cv2.IMREAD_ANYDEPTH) for img in z_paths])
 
 
