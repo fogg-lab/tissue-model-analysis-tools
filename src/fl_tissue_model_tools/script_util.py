@@ -2,12 +2,11 @@ import argparse
 import os
 from pathlib import Path
 import shutil
+import imghdr
 import json
 import re
-import imghdr
 from glob import glob
 from dataclasses import dataclass
-from turtle import clear
 from typing import Sequence, Any
 
 from typing import Dict
@@ -241,7 +240,7 @@ def cell_area_verify_output_dir(output_path: str, thresh_subdir: str, calc_subdi
         if verbose:
             print(f"Did not find output dir:{os.linesep}\t{output_path}")
             print("Creating...")
-        data_prep.make_dir(output_path, clear_directory=False)
+        data_prep.make_dir(output_path)
         if verbose:
             print(f"... Created dir:{os.linesep}\t{output_path}")
 
@@ -375,7 +374,7 @@ def zproj_verify_output_dir(output_path: str, verbose: bool=True) -> None:
             print(f"Did not find output dir:{os.linesep}\t{output_path}")
             print("Creating...")
 
-        data_prep.make_dir(output_path, clear_directory=False)
+        data_prep.make_dir(output_path)
 
         if verbose:
             print(f"... Created dir:{os.linesep}\t{output_path}")
@@ -465,7 +464,7 @@ def inv_depth_verify_output_dir(output_path: str, verbose: bool=True) -> None:
             print(f"Did not find output dir:{os.linesep}\t{output_path}")
             print("Creating...")
 
-        data_prep.make_dir(output_path, clear_directory=False)
+        data_prep.make_dir(output_path)
 
         if verbose:
             print(f"... Created dir:{os.linesep}\t{output_path}")
