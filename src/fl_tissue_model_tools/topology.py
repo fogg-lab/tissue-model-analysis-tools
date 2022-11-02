@@ -6,7 +6,7 @@ import numpy.typing as npt
 import gudhi as gd
 import networkx as nx
 
-from .graph_recon_DM import graphRecon
+from pydmtgraph.dmtgraph import DMTGraph
 
 
 def __compute_morse_skeleton_and_barcode_one_component(
@@ -42,7 +42,8 @@ def __compute_morse_skeleton_and_barcode_one_component(
     #
     # NOTICE: This function will return a warning about opening an empty file
     #         if the Morse skeleton is empty. Don't be alarmed. This is safe.
-    verts, edges = graphRecon.cmp_dm_img_grid2D(im, threshold, graph_recon_path)
+    dmtG = DMTGraph(im)
+    verts, edges = dmtG.computeGraph(threshold)
 
 
     # check if the morse skeleton is empty
@@ -314,8 +315,8 @@ def compute_morse_skeleton_and_barcode(im: npt.ArrayLike, mask: npt.ArrayLike,
         #
         # NOTICE: This function will return a warning about opening an empty file
         #         if the Morse skeleton is empty. Don't be alarmed. This is safe.
-        verts, edges = graphRecon.cmp_dm_img_grid2D(
-            component[x_min:x_min+w, y_min:y_min+h], threshold, graph_recon_path)
+        dmtG = DMTGraph(component[x_min:x_min+w, y_min:y_min+h])
+        verts, edges = dmtG.computeGraph(threshold)
 
         # If the graph is not empty, we compute and plot the barcode of the Morse skeleton.
         # The filtration adds the vertices and edges in decreasing order of
