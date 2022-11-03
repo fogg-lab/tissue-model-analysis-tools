@@ -28,13 +28,13 @@ def __compute_morse_skeleton_and_barcode_one_component(
                 the graph will be
 
         Returns:
-            verts_total (V x 2 numpy array of floats):
+            verts_total (V x 2 numpy array of ints):
                 Array where ith row stores 2d coordinate of ith vertex in
                 Morse skeleton
-            edges_total (E x 3 numpy array of floats):
+            edges_total (E x 2 numpy array of ints):
                 array where kth row [i, j, _] storing the indices i and j of
                 the kth edge's endpoints in `verts_total`
-            bc_total (n x 2 numpy array of bars):
+            bc_total (n x 2 numpy array of float):
                 array where each row is a bar in the barcode of the filtration
                 on the Morse skeleton
     """
@@ -141,12 +141,12 @@ def compute_morse_skeleton_and_barcode_parallel(im: npt.ArrayLike,
 
 
         Returns:
-            verts_total (V x 2 numpy array of floats): Array where ith row stores the 2d
+            verts_total (V x 2 numpy array of ints): Array where ith row stores the 2d
                                                        coordinate of ith vertex in Morse skeleton
-            edges_total (E x 2 numpy array of floats): Array where kth row [i, j]
+            edges_total (E x 2 numpy array of ins): Array where kth row [i, j]
                                                        storing the indices i and j of the kth
                                                        edge's endpoints in `verts_total`
-            bc_total (n x 2 numpy array of bars): array where each row is a bar in the barcode
+            bc_total (n x 2 numpy array of floats): array where each row is a bar in the barcode
                                                   of the filtration on the Morse skeleton
 
     """
@@ -253,12 +253,12 @@ def compute_morse_skeleton_and_barcode(im: npt.ArrayLike, mask: npt.ArrayLike,
 
 
         Returns:
-            verts_total (V x 2 numpy array of floats): Array where ith row stores
+            verts_total (V x 2 numpy array of ints): Array where ith row stores
                                                        2d coordinate of ith vertex in Morse skeleton
-            edges_total (E x 3 numpy array of floats): array where kth row [i, j, _]
+            edges_total (E x 2 numpy array of ints): array where kth row [i, j]
                                                        storing the indices i and j of the kth edge's
                                                        endpoints in `verts_total`
-            bc_total (n x 2 numpy array of bars): array where each row is a bar in the barcode
+            bc_total (n x 2 numpy array of floats): array where each row is a bar in the barcode
                                                    of the filtration on the Morse skeleton
 
     """
@@ -346,11 +346,11 @@ def compute_morse_skeleton_and_barcode(im: npt.ArrayLike, mask: npt.ArrayLike,
 
 
             # center of the graph
-            # centers = nx.algorithms.distance_measures.center(G)
-            # center = centers[0]
+            centers = nx.algorithms.distance_measures.center(G)
+            center = centers[0]
             # I am using a random vertex instead of the actual center,
             # as centers can take a while to compute
-            center = np.random.randint(len(verts))
+            # center = np.random.randint(len(verts))
             # distances of each point to the center
             distances = nx.algorithms.shortest_paths.weighted.single_source_dijkstra_path_length(
                 G, center)
@@ -387,7 +387,7 @@ def compute_morse_skeleton_and_barcode(im: npt.ArrayLike, mask: npt.ArrayLike,
             # (we also ignore the last column of edges as this contains a mysterious variable
             # used by the graph_recon package.)
             num_prev_verts = verts_total.shape[0]
-            edges[:,:2] += num_prev_verts
+            edges += num_prev_verts
             verts_total = np.concatenate((verts_total, verts), axis=0)
             edges_total = np.concatenate((edges_total, edges), axis=0)
 
