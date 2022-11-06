@@ -46,13 +46,12 @@ root/path/for/storing/figures   # top-level directory of figure and visualizatio
 See `dev_paths_example.txt` for an example file.
 
 ### Topological Analysis
-To utilize the `fl_tissue_model_tools.topology` module, the `graph_recon_DM` dependency must be set up. To do so, follow the installation instructions in `fl_tissue_model_tools/graph_recon_DM/README.md`.
+To utilize the `fl_tissue_model_tools.topology` module, the `pydmtgraph` dependency must be set up. To do so,
 
-#### For Windows users
-It is easiest to install `g++` via `MYSYS2`, following this [guide](https://www.msys2.org/). Verify installation of `g++` by restarting terminal after installation and executing
-```
-g++ --version
-```
+1. If not already installed, install Boost. This can be installed in Conda with the command `conda install -c conda-forge boost`.
+2. Navigate to the `src/pydmtgraph` directory
+3. Run `git submodule update --init`
+4. Follow the installation instructions in `src/pydmtgraph/README.md`.
 
 ## Capabilities
 
