@@ -72,7 +72,6 @@ def __compute_morse_skeleton_and_barcode_one_component(
             edge_length = np.linalg.norm(verts[v0]-verts[v1])
             G.add_edge(v0, v1, weight=edge_length)
 
-
         # draw the graph with networkx
         #
         # create a dictionary with vertex positions
@@ -82,38 +81,43 @@ def __compute_morse_skeleton_and_barcode_one_component(
         # nx.draw(G, pos=positions, width=0.1, node_size=5)
         # plt.draw()
 
-        # center of the graph
-        centers = nx.algorithms.distance_measures.center(G)
-        center = centers[0]
-        # Use a random vertex instead of the actual center,
-        #  as centers can take a while to compute
-        # center = np.random.randint(len(verts))
-        # Distances of each vertex to the center
-        distances = nx.algorithms.shortest_paths.weighted.single_source_dijkstra_path_length(
-            G, center)
+        # compute a barcode for each connected components of the graph
+        bc_total = np.zeros((0,2))
+        graph_components = [ G.subgraph(c).copy() for c in nx.connected_components(G) ]
+        for g in graph_components:
+            # center of the graph
+            centers = nx.algorithms.distance_measures.center(g)
+            center = centers[0]
+            # Use a random vertex instead of the actual center,
+            #  as centers can take a while to compute
+            # center = np.random.randint(len(verts))
+            # Distances of each vertex to the center
+            distances = nx.algorithms.shortest_paths.weighted.single_source_dijkstra_path_length(
+                g, center)
 
-        # Now, we use the distances to compute the barcode of the Morse skeleton
-        #
-        # Build a Gudhi complex to compute the filtration
-        # `K` is just another representation of the Morse skeleton
-        K = gd.SimplexTree()
+            # Now, we use the distances to compute the barcode of the Morse skeleton
+            #
+            # Build a Gudhi complex to compute the filtration
+            # `K` is just another representation of the Morse skeleton
+            K = gd.SimplexTree()
 
-        # Add the vertices to the complex with their filtration values
-        # `distances` is a dict with entries of the form {vertex_idx : distance to `center`}
-        for key in distances:
-            K.insert([key], filtration=-distances[key])
+            # Add the vertices to the complex with their filtration values
+            # `distances` is a dict with entries of the form {vertex_idx : distance to `center`}
+            for key in distances:
+                K.insert([key], filtration=-distances[key])
 
-        # Add the edges to the complex.
-        # The filtation value of an edge is the max filtation value of its vertices.
-        for v0, v1 in edges:
-            K.insert([v0, v1], filtration = max(K.filtration([v0]), K.filtration([v1])))
+            # Add the edges to the complex.
+            # The filtation value of an edge is the max filtation value of its vertices.
+            for v0, v1 in g.edges():
+                K.insert([v0, v1], filtration = max(K.filtration([v0]), K.filtration([v1])))
 
-        # compute the barcode of the Morse skeleton
-        K.compute_persistence()
-        # retrieve the 0-dimensional barcode
-        bc = K.persistence_intervals_in_dimension(0)
+            # compute the barcode of the Morse skeleton
+            K.compute_persistence()
+            # retrieve the 0-dimensional barcode
+            bc = K.persistence_intervals_in_dimension(0)
+            bc_total = np.concatenate((bc_total, bc), axis=0)
 
-        return verts, edges, bc
+        return verts, edges, bc_total
 
 def compute_morse_skeleton_and_barcode_parallel(im: npt.ArrayLike,
                                                 mask: npt.ArrayLike,
@@ -344,40 +348,39 @@ def compute_morse_skeleton_and_barcode(im: npt.ArrayLike, mask: npt.ArrayLike,
             # nx.draw(G, pos=positions, width=0.1, node_size=5)
             # plt.draw()
 
+            graph_components = [ G.subgraph(c).copy() for c in nx.connected_components(G) ]
+            for g in graph_components:
+                # center of the graph
+                centers = nx.algorithms.distance_measures.center(g)
+                center = centers[0]
+                # Use a random vertex instead of the actual center,
+                #  as centers can take a while to compute
+                # center = np.random.randint(len(verts))
+                # Distances of each vertex to the center
+                distances = nx.algorithms.shortest_paths.weighted.single_source_dijkstra_path_length(
+                    g, center)
 
-            # center of the graph
-            centers = nx.algorithms.distance_measures.center(G)
-            center = centers[0]
-            # I am using a random vertex instead of the actual center,
-            # as centers can take a while to compute
-            # center = np.random.randint(len(verts))
-            # distances of each point to the center
-            distances = nx.algorithms.shortest_paths.weighted.single_source_dijkstra_path_length(
-                G, center)
+                # Now, we use the distances to compute the barcode of the Morse skeleton
+                #
+                # Build a Gudhi complex to compute the filtration
+                # `K` is just another representation of the Morse skeleton
+                K = gd.SimplexTree()
 
-            # Now, we use the {distances} to compute the barcode of the Morse skeleton
-            #
-            # build a Gudhi complex to compute the filtration
-            # K is just another representation of the Morse skeleton
-            K = gd.SimplexTree()
+                # Add the vertices to the complex with their filtration values
+                # `distances` is a dict with entries of the form {vertex_idx : distance to `center`}
+                for key in distances:
+                    K.insert([key], filtration=-distances[key])
 
-            # add the vertices to the complex with their filtration values
-            # v is the index of the vertex
-            # dist is the distance of the vertex from the center
-            for key in distances:
-                K.insert([key], filtration=-distances[key])
+                # Add the edges to the complex.
+                # The filtation value of an edge is the max filtation value of its vertices.
+                for v0, v1 in g.edges():
+                    K.insert([v0, v1], filtration = max(K.filtration([v0]), K.filtration([v1])))
 
-            # add the edge to the complex
-            # the filtation value of an edge is the max filtation value of its vertices
-            for v0, v1 in edges:
-                K.insert([v0, v1], filtration = max(K.filtration([v0]), K.filtration([v1])))
-
-            # compute the barcode of the Morse skeleton
-            K.compute_persistence()
-            # retrieve the 0-dimensional barcode
-            bc = K.persistence_intervals_in_dimension(0)
-            # add barcode to total barcode
-            bc_total = np.concatenate((bc_total, bc), axis=0)
+                # compute the barcode of the Morse skeleton
+                K.compute_persistence()
+                # retrieve the 0-dimensional barcode
+                bc = K.persistence_intervals_in_dimension(0)
+                bc_total = np.concatenate((bc_total, bc), axis=0)
 
             # concatenate vertices and edges with vertices and edges of other connected components
             #
