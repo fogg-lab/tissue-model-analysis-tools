@@ -28,7 +28,9 @@ def min_max_(
     """
 
     img = img.astype(np.float64)
-    return new_min + ( (img - old_min) * (new_max - new_min) ) / (old_max - old_min)
+    img_norm = new_min + ( (img - old_min) * (new_max - new_min) ) / (old_max - old_min)
+
+    return img_norm
 
 
 def gen_circ_mask(
