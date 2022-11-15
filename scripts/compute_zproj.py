@@ -1,7 +1,6 @@
 import os
 import sys
 from pathlib import Path
-import dask as d
 import numpy as np
 import numpy.typing as npt
 import cv2
@@ -35,8 +34,8 @@ def get_zstack(zs_path: str, descending: bool) -> npt.NDArray:
         Z stack as array of images.
     """
 
-    new_min, new_max = defs.GS_MIN, defs.GS_MAX
-    old_min, old_max = defs.TIF_MIN, defs.TIF_MAX
+    new_min, new_max = 0, defs.GS_MAX
+    old_min, old_max = 0, defs.TIF_MAX
 
     zstack = zs.zstack_from_dir(zs_path, descending)[1]
     zstack = prep.min_max_(zstack, new_min, new_max, old_min, old_max)
@@ -55,11 +54,11 @@ def save_zproj(zproj: npt.NDArray, out_root: str, zid: str, zproj_type: str, ext
     Raises:
         OSError: Unsupported file extension supplied.
     """
-    old_min = defs.GS_MIN
+    old_min = 0
     old_max = defs.GS_MAX
 
     cast_type = np.uint16
-    new_min = defs.TIF_MIN
+    new_min = 0
     new_max = defs.TIF_MAX
 
     zproj_out_path = os.path.join(out_root, f"{zid}_{zproj_type}{ext}")
@@ -95,32 +94,19 @@ def main():
     if verbose:
         su.verbose_header("Constructing Z projections")
 
-    zp_method = args.method
-    proj_method = proj_methods[zp_method]
+    proj_method = proj_methods[args.method]
     descending = bool(args.order)
-    z_ids = [zsp.split("/")[-1] for zsp in zstack_paths]
     if verbose:
-        print("Loading Z stacks...")
+        print("Loading and computing Z stacks...")
     try:
-        zprojs = {}
-        for i, zsp in enumerate(zstack_paths):
-            zstack = get_zstack(zsp, extension, descending)
-            zproj = proj_method(zstack)
-            z_id = z_ids[i]
-            zprojs[z_id] = zproj
-
+        # zprojs: A dictionary of Z projections, keyed by Z stack ID.
+        zprojs = {Path(zsp).name: proj_method(get_zstack(zsp, descending)) for zsp in zstack_paths}
     except OSError as error:
         print(f"{su.SFM.failure}{error}")
         sys.exit()
 
     if verbose:
-        print("... Z stacks loaded.")
-
-    proj_method = proj_methods[zp_method]
-
-    if verbose:
         print("... Projections computed.")
-
 
     ### Save Z projections ###
 
@@ -132,7 +118,7 @@ def main():
     if verbose:
         print(f"{os.linesep}Saving projections...")
     for z_id, zproj in zprojs.items():
-        save_zproj(zproj, args.out_root, z_id, zp_method, out_ext)
+        save_zproj(zproj, args.out_root, z_id, args.method, out_ext)
 
     if verbose:
         print("... Projections saved.")
