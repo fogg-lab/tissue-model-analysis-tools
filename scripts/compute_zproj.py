@@ -11,6 +11,7 @@ from fl_tissue_model_tools import defs
 from fl_tissue_model_tools import preprocessing as prep
 from fl_tissue_model_tools import script_util as su
 from fl_tissue_model_tools import zstacks as zs
+from fl_tissue_model_tools import helper
 
 
 proj_methods = {
@@ -34,12 +35,15 @@ def get_zstack(zs_path: str, descending: bool) -> npt.NDArray:
         Z stack as array of images.
     """
 
-    new_min, new_max = 0, defs.GS_MAX
-    old_min, old_max = 0, defs.TIF_MAX
+    z_paths = sorted(helper.get_img_paths(zs_path), key=zs.default_get_zpos, reverse=descending)
+    z_stack = []
 
-    zstack = zs.zstack_from_dir(zs_path, descending)[1]
-    zstack = prep.min_max_(zstack, new_min, new_max, old_min, old_max)
-    return zstack
+    for z_path in z_paths:
+        z_img = cv2.imread(z_path, cv2.IMREAD_ANYDEPTH)
+        z_img_norm = prep.min_max_(z_img, 0, defs.GS_MAX, 0, defs.TIF_MAX)
+        z_stack.append(z_img_norm.round().astype(np.uint8))
+
+    return np.array(z_stack)
 
 
 def save_zproj(zproj: npt.NDArray, out_root: str, zid: str, zproj_type: str, ext: str) -> None:
