@@ -96,16 +96,19 @@ def main():
         su.verbose_header("Constructing Z projections")
 
     zp_method = args.method
+    proj_method = proj_methods[zp_method]
     descending = bool(args.order)
-    z_ids = [Path(zsp).name for zsp in zstack_paths]
+    z_ids = [zsp.split("/")[-1] for zsp in zstack_paths]
     if verbose:
         print("Loading Z stacks...")
     try:
-        zstacks = d.compute(
-            d.delayed(
-                {z_ids[i]: get_zstack(zsp, descending) for i, zsp in enumerate(zstack_paths)}
-            )
-        )[0]
+        zprojs = {}
+        for i, zsp in enumerate(zstack_paths):
+            zstack = get_zstack(zsp, extension, descending)
+            zproj = proj_method(zstack)
+            z_id = z_ids[i]
+            zprojs[z_id] = zproj
+
     except OSError as error:
         print(f"{su.SFM.failure}{error}")
         sys.exit()
@@ -114,15 +117,6 @@ def main():
         print("... Z stacks loaded.")
 
     proj_method = proj_methods[zp_method]
-
-    if verbose:
-        print(f"{os.linesep}Computing projections...")
-
-    zprojs = d.compute(
-        d.delayed(
-            {z_id: proj_method(zstacks[z_id]) for z_id in z_ids}
-        )
-    )[0]
 
     if verbose:
         print("... Projections computed.")
