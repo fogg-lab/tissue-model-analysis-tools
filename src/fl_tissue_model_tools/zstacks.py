@@ -19,7 +19,7 @@ from .helper import get_img_paths
 ZPOS_PATTERN = "(z|Z)[0-9]+_"
 
 
-def _default_get_zpos(z_path: str) -> int:
+def default_get_zpos(z_path: str) -> int:
     """Use `ZPOS_PATTERN` to retrieve z-position from path string.
 
     Args:
@@ -92,7 +92,7 @@ def zstack_from_dir(z_stack_dir: str, descending: bool=True,
     z_paths = get_img_paths(z_stack_dir)
 
     if get_zpos is None:
-        get_zpos = _default_get_zpos
+        get_zpos = default_get_zpos
 
     # Sort z-stack images by z-position
     z_paths = sorted(z_paths, key = get_zpos, reverse = descending)
@@ -120,7 +120,7 @@ def zstack_paths_from_dir(z_stack_dir: str, descending: bool=True,
     """
     z_paths = get_img_paths(z_stack_dir)
     if get_zpos is None:
-        get_zpos = _default_get_zpos
+        get_zpos = default_get_zpos
     sorted_z_paths = sorted(z_paths, key = get_zpos, reverse = descending)
     return sorted_z_paths
 
@@ -150,22 +150,22 @@ def proj_focus_stacking(
     # We do not perform the alignment step which is typically included,
     # since each image in the stack is assumed to be an in-focus cross-section.
 
-    # Compute Laplacian for each slice in stack. This will give sharpness
-    # measurement for each pixel in each slice.
-    laps = np.array(
-        d.compute([
-            d.delayed(_blur_and_lap)(pos, kernel_size) for pos in stack
-        ])[0]
-    )
+    # Compute Laplacian for each slice in stack to measure the sharpness of each pixel.
+    # Assign each output pixel with the value in the stack with the largest magnitude sharpness.
+
+    maxima = np.zeros(stack[0].shape, dtype=np.float64)
+    masks = []
+
+    for pos in stack:
+        abs_laplacian = np.absolute(_blur_and_lap(pos, kernel_size))
+        maxima = np.max(np.array([maxima, abs_laplacian]), axis=axis)
+        masks.append((abs_laplacian == maxima).astype(np.uint8))
+
     output = np.zeros_like(stack[0])
 
-    # For each pixel in output, assign to it the value in the stack with the
-    # largest magnitude sharpness measurement at that position.
-    abs_laps = np.absolute(laps)
-    maxima = np.max(abs_laps, axis=axis)
-    mask = (abs_laps == maxima).astype(np.uint8)
-    for i in range(len(stack)):
-        output = cv2.bitwise_not(stack[i], output, mask=mask[i])
+    for i, z_img in enumerate(stack):
+        output = cv2.bitwise_not(z_img, output, mask=masks[i])
+
     return defs.GS_MAX - output
 
 

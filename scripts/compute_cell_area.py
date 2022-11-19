@@ -50,8 +50,8 @@ def load_and_norm(img_path: str, dsize: int=250) -> npt.NDArray:
         Normalized image located at img_path.
 
     """
-    new_min, new_max = defs.GS_MIN, defs.GS_MAX
-    old_min, old_max = defs.TIF_MIN, defs.TIF_MAX
+    new_min, new_max = 0, defs.GS_MAX
+    old_min, old_max = 0, defs.TIF_MAX
     img = load_img(img_path, dsamp=True, dsize=dsize)
 
     return prep.min_max_(img, new_min, new_max, old_min, old_max)
