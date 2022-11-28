@@ -1,0 +1,3 @@
+[submodule "src/pydmtgraph"]
+	path = src/pydmtgraph
+	url = https://github.com/blackmit/pydmtgraph
