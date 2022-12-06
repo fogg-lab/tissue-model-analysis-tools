@@ -8,6 +8,21 @@ import networkx as nx
 
 from pydmtgraph.dmtgraph import DMTGraph
 
+def __shortest_path_tree(
+    G: nx.Graph, distances: dict
+):
+    """ Return the shortest path tree of a networkx graph.
+
+        Args:
+            G (networkx graph):
+            distances (dictionary): dictionary of distances to the root
+    """
+
+    C = nx.Graph()
+    for v0, v1 in G.edges():
+        C.add_edge(v0, v1, weight=max(distances[v0], distances[v1]))
+    return nx.minimum_spanning_tree(C)
+
 
 def __compute_morse_skeleton_and_barcode_one_component(
     im: npt.ArrayLike, threshold1: float, threshold2: float
@@ -32,7 +47,7 @@ def __compute_morse_skeleton_and_barcode_one_component(
                 Array where ith row stores 2d coordinate of ith vertex in
                 Morse skeleton
             edges_total (E x 2 numpy array of ints):
-                array where kth row [i, j, _] storing the indices i and j of
+                array where kth row [i, j] storing the indices i and j of
                 the kth edge's endpoints in `verts_total`
             bc_total (n x 2 numpy array of float):
                 array where each row is a bar in the barcode of the filtration
@@ -83,6 +98,7 @@ def __compute_morse_skeleton_and_barcode_one_component(
 
         # compute a barcode for each connected components of the graph
         bc_total = np.zeros((0,2))
+        edges_total = np.zeros((0,2), dtype='int')
         graph_components = [ G.subgraph(c).copy() for c in nx.connected_components(G) ]
         for g in graph_components:
             # center of the graph
@@ -94,6 +110,12 @@ def __compute_morse_skeleton_and_barcode_one_component(
             # Distances of each vertex to the center
             distances = nx.algorithms.shortest_paths.weighted.single_source_dijkstra_path_length(
                 g, center)
+
+            # compute the shortest path tree of the graph component
+            spt = __shortest_path_tree(g, distances)
+            # add edges in shortest path tree to total list of edges
+            spt_edges = np.array(spt.edges)
+            edges_total = np.concatenate((edges_total, spt_edges), axis=0)
 
             # Now, we use the distances to compute the barcode of the Morse skeleton
             #
@@ -108,7 +130,7 @@ def __compute_morse_skeleton_and_barcode_one_component(
 
             # Add the edges to the complex.
             # The filtation value of an edge is the max filtation value of its vertices.
-            for v0, v1 in g.edges():
+            for v0, v1 in spt.edges():
                 K.insert([v0, v1], filtration = max(K.filtration([v0]), K.filtration([v1])))
 
             # compute the barcode of the Morse skeleton
@@ -117,7 +139,7 @@ def __compute_morse_skeleton_and_barcode_one_component(
             bc = K.persistence_intervals_in_dimension(0)
             bc_total = np.concatenate((bc_total, bc), axis=0)
 
-        return verts, edges, bc_total
+        return verts, edges_total, bc_total
 
 def compute_morse_skeleton_and_barcode_parallel(im: npt.ArrayLike,
                                                 mask: npt.ArrayLike,
@@ -360,6 +382,12 @@ def compute_morse_skeleton_and_barcode(im: npt.ArrayLike, mask: npt.ArrayLike,
                 distances = nx.algorithms.shortest_paths.weighted.single_source_dijkstra_path_length(
                     g, center)
 
+                # compute the shortest path tree of the graph component
+                spt = __shortest_path_tree(g, distances)
+                # add edges in shortest path tree to total list of edges
+                spt_edges = np.array(spt.edges)
+                edges_total = np.concatenate((edges_total, spt_edges), axis=0)
+
                 # Now, we use the distances to compute the barcode of the Morse skeleton
                 #
                 # Build a Gudhi complex to compute the filtration
@@ -373,7 +401,7 @@ def compute_morse_skeleton_and_barcode(im: npt.ArrayLike, mask: npt.ArrayLike,
 
                 # Add the edges to the complex.
                 # The filtation value of an edge is the max filtation value of its vertices.
-                for v0, v1 in g.edges():
+                for v0, v1 in spt.edges():
                     K.insert([v0, v1], filtration = max(K.filtration([v0]), K.filtration([v1])))
 
                 # compute the barcode of the Morse skeleton
@@ -392,6 +420,6 @@ def compute_morse_skeleton_and_barcode(im: npt.ArrayLike, mask: npt.ArrayLike,
             num_prev_verts = verts_total.shape[0]
             edges += num_prev_verts
             verts_total = np.concatenate((verts_total, verts), axis=0)
-            edges_total = np.concatenate((edges_total, edges), axis=0)
+            # edges_total = np.concatenate((edges_total, edges), axis=0)
 
     return verts_total, edges_total, bc_total
