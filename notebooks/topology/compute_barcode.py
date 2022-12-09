@@ -37,6 +37,9 @@ def compute_peristence_barcode_from_skeleton(
     # Distances of each vertex to the center
     distances = nx.algorithms.shortest_paths.weighted.single_source_dijkstra_path_length(
         G, center)
+    
+    spt = __shortest_path_tree(G, distances)
+    spt_edges = np.array(spt.edges)
 
     # Now, we use the distances to compute the barcode of the Morse skeleton
     #
@@ -51,7 +54,7 @@ def compute_peristence_barcode_from_skeleton(
 
     # Add the edges to the complex.
     # The filtation value of an edge is the max filtation value of its vertices.
-    for v0, v1, in edges:
+    for v0, v1, in spt_edges:
         K.insert([v0, v1], filtration = max(K.filtration([v0]), K.filtration([v1])))
 
     # compute the barcode of the Morse skeleton
@@ -60,3 +63,17 @@ def compute_peristence_barcode_from_skeleton(
     bc = K.persistence_intervals_in_dimension(0)
 
     return bc
+
+def __shortest_path_tree(
+    G: nx.Graph, distances: dict
+):
+    """ Return the shortest path tree of a networkx graph.
+        Args:
+            G (networkx graph):
+            distances (dictionary): dictionary of distances to the root
+    """
+
+    C = nx.Graph()
+    for v0, v1 in G.edges():
+        C.add_edge(v0, v1, weight=max(distances[v0], distances[v1]))
+    return nx.minimum_spanning_tree(C)
