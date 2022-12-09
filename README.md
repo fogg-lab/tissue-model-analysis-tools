@@ -130,6 +130,11 @@ Root directory
 |    |    ...
 ```
 
+**To compute Z-projections and their cell area, add the --area flag:**  
+```
+python compute_zproj.py -v --area [input_root_path] [output_root_path]
+```
+
 **Advanced usage:**
 
 * Select custom Z projection method from:
