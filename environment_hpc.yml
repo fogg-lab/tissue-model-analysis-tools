@@ -1,0 +1,19 @@
+name: tissue-model-analysis-tools
+channels:
+  - anaconda
+  - conda-forge
+dependencies:
+  - python=3.10
+  - boost
+  - cudatoolkit=11.2
+  - cudnn=8.1.0
+  - dask
+  - gudhi
+  - matplotlib
+  - networkx
+  - opencv
+  - scikit-learn
+  - setuptools
+  - pip:
+    - keras-tuner
+    - tensorflow
