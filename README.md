@@ -8,7 +8,7 @@
 ## Setup
 
 ### Clone repository
-git clone --recurse-submodules https://github.com/fogg-lab/tissue-model-analysis-tools.git
+`git clone --recurse-submodules https://github.com/fogg-lab/tissue-model-analysis-tools.git`
 
 ### Use with `conda`
 Build a `conda` environment using the appropriate `environment_[OS].yml` file (located in the root project directory). For information on how to manage `conda` environments, see [environment management reference](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html).
