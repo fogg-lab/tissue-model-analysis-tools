@@ -1,4 +1,4 @@
-name: tissue-model-analysis-analysis
+name: tissue-model-analysis
 channels:
   - anaconda
   - conda-forge
