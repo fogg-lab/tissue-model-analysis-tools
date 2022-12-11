@@ -9,6 +9,7 @@ dependencies:
   - cudnn=8.1.0
   - dask
   - gudhi
+  - jupyterlab
   - matplotlib
   - networkx
   - opencv
