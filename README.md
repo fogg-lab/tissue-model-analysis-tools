@@ -13,7 +13,22 @@ git clone --recurse-submodules https://github.com/fogg-lab/tissue-model-analysis
 ```
 
 ### Use with `conda`
-Build a `conda` environment using the appropriate `environment_[OS].yml` file (located in the root project directory). For information on how to manage `conda` environments, see [environment management reference](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html).
+Build a `conda` environment using the `environment.yml` file (located in the root project directory). On Linux machines with a CUDA-capable GPU, you can use `environment_gpu.yml` instead (for GPU-accelerated training).  
+
+For more information on how to manage `conda` environments, see [environment management reference](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html).
+
+#### Create conda environment (from environment.yml)
+```
+conda install -n base conda-libmamba-solver
+conda env create -f environment.yml --solver=libmamba
+```
+
+#### Create conda environment (from environment_gpu.yml)
+```
+conda install -n base conda-libmamba-solver
+conda env create -f environment_gpu.yml --solver=libmamba
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CONDA_PREFIX/lib/
+```
 
 #### Install `fl_tissue_model_tools` Package
 
