@@ -21,6 +21,7 @@ For more information on how to manage `conda` environments, see [environment man
 ```
 conda create --no-default-packages -n tissue-model-analysis conda-libmamba-solver
 conda env update -f environment.yml --prune
+conda activate tissue-model-analysis
 ```
 
 #### Create conda environment (from environment_gpu.yml)
