@@ -19,14 +19,15 @@ For more information on how to manage `conda` environments, see [environment man
 
 #### Create conda environment (from environment.yml)
 ```
-conda install -n base conda-libmamba-solver
-conda env create -f environment.yml --solver=libmamba
+conda create --no-default-packages -n tissue-model-analysis conda-libmamba-solver
+conda env update -f environment.yml --prune
 ```
 
 #### Create conda environment (from environment_gpu.yml)
 ```
-conda install -n base conda-libmamba-solver
-conda env create -f environment_gpu.yml --solver=libmamba
+conda create --no-default-packages -n tissue-model-analysis conda-libmamba-solver
+conda env update -f environment_gpu.yml --prune --solver=libmamba
+conda activate tissue-model-analysis
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CONDA_PREFIX/lib/
 ```
 
