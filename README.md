@@ -17,19 +17,12 @@ Build a `conda` environment using the `environment.yml` file (located in the roo
 
 For more information on how to manage `conda` environments, see [environment management reference](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html).
 
-#### Create conda environment (from environment.yml)
-```
+#### Create conda environment
+```bash
 conda create --no-default-packages -n tissue-model-analysis conda-libmamba-solver
+# to set up on Linux machine with a CUDA-capable GPU, use environment_gpu.yml instead
 conda env update -f environment.yml --prune
 conda activate tissue-model-analysis
-```
-
-#### Create conda environment (from environment_gpu.yml)
-```
-conda create --no-default-packages -n tissue-model-analysis conda-libmamba-solver
-conda env update -f environment_gpu.yml --prune --solver=libmamba
-conda activate tissue-model-analysis
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CONDA_PREFIX/lib/
 ```
 
 #### Install `fl_tissue_model_tools` Package
