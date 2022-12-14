@@ -9,7 +9,7 @@
 
 ### Clone repository
 ```
-git clone --recurse-submodules https://github.com/fogg-lab/tissue-model-analysis-tools.git
+git clone --recurse-submodules git@github.com:fogg-lab/tissue-model-analysis-tools.git
 ```
 
 ### Use with `conda`
