@@ -11,10 +11,8 @@ dependencies:
   - matplotlib
   - networkx
   - opencv
-  - pip
   - python=3.10
   - scikit-learn
   - setuptools
-  - pip:
-    - keras-tuner
-    - tensorflow
+  - tensorflow
+  - keras-tuner
