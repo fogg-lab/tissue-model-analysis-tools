@@ -17,21 +17,26 @@ def __random_color(i : int):
 
     return cvtColor(np.array([[[step*i, 220, 255]]], np.uint8), COLOR_HSV2BGR)[0][0] / 255
 
-def plot_colored_barcode(ax, barcode_and_colors):
+def plot_colored_barcode(barcode_and_colors, ax):
     """
     """
+    # sort bars by birth time
     barcode_and_colors.sort(reverse=True)
+    # prepare args for bar plot
     heights = [i for i in range(len(barcode_and_colors))]
     births = [bar[0] for bar in barcode_and_colors]
     widths = [bar[1] - bar[0] for bar in barcode_and_colors]
     colors = [bar[2] for bar in barcode_and_colors]
     ax.barh(heights, widths, left=births, color=colors)
+    ax.set_yticks([])
+    ax.set_xlabel("Barcode")
     return
 
-def plot_colored_tree(ax, lines):
+def plot_colored_tree(lines, ax):
     """
     """
     ax.add_collection(lines)
+    ax.set_axis_off()
     return
 
 def compute_colored_tree_and_barcode(vertices, edges):
