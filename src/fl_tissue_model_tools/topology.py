@@ -8,6 +8,151 @@ import networkx as nx
 
 from pydmtgraph.dmtgraph import DMTGraph
 
+def __random_color(i : int):
+    """ Convert an int to a random color """
+    from cv2 import cvtColor, COLOR_HSV2BGR
+
+    phi = 0.618033988749895
+    step = 180*phi
+
+    return cvtColor(np.array([[[step*i, 220, 255]]], np.uint8), COLOR_HSV2BGR)[0][0] / 255
+
+def plot_colored_barcode(ax, barcode_and_colors):
+    """
+    """
+    barcode_and_colors.sort(reverse=True)
+    heights = [i for i in range(len(barcode_and_colors))]
+    births = [bar[0] for bar in barcode_and_colors]
+    widths = [bar[1] - bar[0] for bar in barcode_and_colors]
+    colors = [bar[2] for bar in barcode_and_colors]
+    ax.barh(heights, widths, left=births, color=colors)
+    return
+
+def plot_colored_tree(ax, lines):
+    """
+    """
+    ax.add_collection(lines)
+    return
+
+def compute_colored_tree_and_barcode(vertices, edges):
+    """
+    """
+    from matplotlib.collections import LineCollection
+
+    G = __convert_to_networkx_graph(vertices, edges)
+
+    if not nx.is_forest(G):
+        raise ValueError("Input graph must be a forest")
+
+    edge_length = lambda u, v : np.linalg.norm(vertices[u]-vertices[v])
+
+    # list of lines and barcodes for all graph component
+    lines_total = []
+    lines_colors_total = []
+    barcode_and_colors_total = []
+    graph_components = [ G.subgraph(c).copy() for c in nx.connected_components(G) ]
+    for g in graph_components:
+        # we treat the center of the graph as the root
+        centers = nx.algorithms.distance_measures.center(g)
+        center = centers[0]
+        # create a list where each vertex points to its parent in the tree.
+        # we set parents with a bfs starting at the center.
+        # we also use the bfs to compute distance to center
+        parent = { v : None for v in g.nodes }
+        parent[center] = center
+        dist_to_center = { }
+        dist_to_center[center] = 0
+        unvisited_vertices = [ center ]
+        while len(unvisited_vertices) > 0:
+            v = unvisited_vertices.pop(0)
+            for n in G.neighbors(v):
+                # if the parent of a node has not been assigned,
+                # it has not been visited
+                if parent[n] is None:
+                    parent[n] = v
+                    dist_to_center[n] = dist_to_center[v] + edge_length(n,v)
+                    unvisited_vertices.append(n)
+        # check that the parents were set properly
+        assert all([parent[v] is not None for v in g.nodes])
+        # Each vertex in the tree belongs to a unique branch
+        # corresponding to a leaf. Specifically, a vertex is
+        # apart of the longest branch from a leaf to the center
+        # of all its descendant leaves.
+        #
+        # Label each vertex with its leaf.
+        # We do this by labelling all vertices on the path
+        # between the leaf and the center,
+        # unless the vertex has already been labelled with a further leaf.
+        leaves = [ v for v in g.nodes if g.degree[v] == 1 ]
+        max_dist_to_leaf = { v : -np.inf for v in g.nodes }
+        leaf_label = { }
+        for leaf in leaves:
+            current_vertex = leaf
+            current_parent = parent[current_vertex]
+            max_dist_to_leaf[leaf] = current_distance = 0
+            leaf_label[leaf] = leaf
+            while current_parent != current_vertex:
+                current_distance += edge_length(current_parent, current_vertex)
+                if current_distance < max_dist_to_leaf[current_parent]:
+                    # we've reached a vertex that is part of another branch,
+                    # so we quit our traversal
+                    break
+                current_vertex = current_parent
+                current_parent = parent[current_vertex]
+                max_dist_to_leaf[current_vertex] = current_distance
+                leaf_label[current_vertex] = leaf
+        # now that we have labelled each vertex with its branch,
+        # we create an edge collection where each branch is a different color.
+        lines = []
+        lines_colors = []
+        barcode_and_colors = []
+        for i, leaf in enumerate(leaves):
+            current_vertex = leaf
+            current_color = __random_color(i)
+            current_label = leaf
+            current_parent = parent[leaf]
+            current_distance = 0
+            # follow the path from the leaf to the center
+            # until we encounter another branch.
+            while current_label == leaf and current_vertex != current_parent:
+                current_distance += edge_length(current_parent, current_vertex)
+
+                v1 = vertices[current_vertex]
+                v2 = vertices[current_parent]
+                c1 = (v1[1], v1[0])
+                c2 = (v2[1], v2[0])
+                lines.append([c1, c2])
+                lines_colors.append(current_color)
+
+                current_vertex = current_parent
+                current_parent = parent[current_vertex]
+                current_label = leaf_label[current_vertex]
+
+            birth = -dist_to_center[leaf]
+            death = birth + current_distance
+            barcode_and_colors.append((birth, death, current_color))
+
+        lines_total.extend(lines)
+        lines_colors_total.extend(lines_colors)
+        barcode_and_colors_total.extend(barcode_and_colors)
+
+    lines_collection = LineCollection(lines_total, colors=lines_colors_total, linewidth = 2)
+    return lines_collection, barcode_and_colors_total
+
+
+def __convert_to_networkx_graph(vertices, edges):
+    """ Convert a dmtgraph to a Networkx graph """
+    G = nx.Graph()
+    for v0, v1 in edges:
+        # Add each edge to the graph with weight = Euclidean distance between endpoints
+        # Each row in `edges` is an array [i, j],
+        #   where i and j are ints representing the index of the endpoints.
+        # Each row in `verts` is an array [x, y],
+        #   where x and y are the 2d-coordinates of the vertex.
+        edge_length = np.linalg.norm(vertices[v0]-vertices[v1])
+        G.add_edge(v0, v1, weight=edge_length)
+    return G
+
 def __shortest_path_tree(
     G: nx.Graph, distances: dict
 ):
@@ -68,78 +213,70 @@ def __compute_morse_skeleton_and_barcode_one_component(
         bc = np.zeros((0,2))
 
         return verts, edges, bc
-    else:
-        # If the Morse skeleton is not empty,
-        # we compute the barcode of the Morse skeleton.
 
-        # Create a networkx graph of Morse skeleton
-        # We use the networkx graph to compute the distance of each vertex from
-        #   the "center" of the graph
-        # The center is a graph-theoretic notion defined here:
-        #   https://en.wikipedia.org/wiki/Graph_center
-        G = nx.Graph()
-        for v0, v1 in edges:
-            # Add each edge to the graph with weight = Euclidean distance between endpoints
-            # Each row in `edges` is an array [i, j],
-            #   where i and j are ints representing the index of the endpoints.
-            # Each row in `verts` is an array [x, y],
-            #   where x and y are the 2d-coordinates of the vertex.
-            edge_length = np.linalg.norm(verts[v0]-verts[v1])
-            G.add_edge(v0, v1, weight=edge_length)
+    # If the Morse skeleton is not empty,
+    # we compute the barcode of the Morse skeleton.
 
-        # draw the graph with networkx
+    # Create a networkx graph of Morse skeleton
+    # We use the networkx graph to compute the distance of each vertex from
+    #   the "center" of the graph
+    # The center is a graph-theoretic notion defined here:
+    #   https://en.wikipedia.org/wiki/Graph_center
+    G = __convert_to_networkx_graph(verts, edges)
+
+    # draw the graph with networkx
+    #
+    # create a dictionary with vertex positions
+    # elements of vertex are in image coordinates, so we negate y-coordinate
+    # positions = {v : [x, -y] for v, [x, y] in enumerate(verts)}
+    # plot graph with vertex positions
+    # nx.draw(G, pos=positions, width=0.1, node_size=5)
+    # plt.draw()
+
+    # compute a barcode for each connected components of the graph
+    bc_total = np.zeros((0,2))
+    edges_total = np.zeros((0,2), dtype='int')
+    graph_components = [ G.subgraph(c).copy() for c in nx.connected_components(G) ]
+    for g in graph_components:
+        # center of the graph
+        centers = nx.algorithms.distance_measures.center(g)
+        center = centers[0]
+        # Use a random vertex instead of the actual center,
+        #  as centers can take a while to compute
+        # center = np.random.randint(len(verts))
+        # Distances of each vertex to the center
+        distances = nx.algorithms.shortest_paths.weighted.single_source_dijkstra_path_length(
+            g, center)
+
+        # compute the shortest path tree of the graph component
+        spt = __shortest_path_tree(g, distances)
+        # add edges in shortest path tree to total list of edges
+        spt_edges = np.array(spt.edges)
+        edges_total = np.concatenate((edges_total, spt_edges), axis=0)
+
+        # Now, we use the distances to compute the barcode of the Morse skeleton
         #
-        # create a dictionary with vertex positions
-        # elements of vertex are in image coordinates, so we negate y-coordinate
-        # positions = {v : [x, -y] for v, [x, y] in enumerate(verts)}
-        # plot graph with vertex positions
-        # nx.draw(G, pos=positions, width=0.1, node_size=5)
-        # plt.draw()
+        # Build a Gudhi complex to compute the filtration
+        # `K` is just another representation of the Morse skeleton
+        K = gd.SimplexTree()
 
-        # compute a barcode for each connected components of the graph
-        bc_total = np.zeros((0,2))
-        edges_total = np.zeros((0,2), dtype='int')
-        graph_components = [ G.subgraph(c).copy() for c in nx.connected_components(G) ]
-        for g in graph_components:
-            # center of the graph
-            centers = nx.algorithms.distance_measures.center(g)
-            center = centers[0]
-            # Use a random vertex instead of the actual center,
-            #  as centers can take a while to compute
-            # center = np.random.randint(len(verts))
-            # Distances of each vertex to the center
-            distances = nx.algorithms.shortest_paths.weighted.single_source_dijkstra_path_length(
-                g, center)
+        # Add the vertices to the complex with their filtration values
+        # `distances` is a dict with entries of the form {vertex_idx : distance to `center`}
+        for key in distances:
+            K.insert([key], filtration=-distances[key])
 
-            # compute the shortest path tree of the graph component
-            spt = __shortest_path_tree(g, distances)
-            # add edges in shortest path tree to total list of edges
-            spt_edges = np.array(spt.edges)
-            edges_total = np.concatenate((edges_total, spt_edges), axis=0)
+        # Add the edges to the complex.
+        # The filtation value of an edge is the max filtation value of its vertices.
+        for v0, v1 in spt.edges():
+            K.insert([v0, v1], filtration = max(K.filtration([v0]), K.filtration([v1])))
 
-            # Now, we use the distances to compute the barcode of the Morse skeleton
-            #
-            # Build a Gudhi complex to compute the filtration
-            # `K` is just another representation of the Morse skeleton
-            K = gd.SimplexTree()
+        # compute the barcode of the Morse skeleton
+        K.compute_persistence()
+        # retrieve the 0-dimensional barcode
+        bc = K.persistence_intervals_in_dimension(0)
+        bc_total = np.concatenate((bc_total, bc), axis=0)
 
-            # Add the vertices to the complex with their filtration values
-            # `distances` is a dict with entries of the form {vertex_idx : distance to `center`}
-            for key in distances:
-                K.insert([key], filtration=-distances[key])
-
-            # Add the edges to the complex.
-            # The filtation value of an edge is the max filtation value of its vertices.
-            for v0, v1 in spt.edges():
-                K.insert([v0, v1], filtration = max(K.filtration([v0]), K.filtration([v1])))
-
-            # compute the barcode of the Morse skeleton
-            K.compute_persistence()
-            # retrieve the 0-dimensional barcode
-            bc = K.persistence_intervals_in_dimension(0)
-            bc_total = np.concatenate((bc_total, bc), axis=0)
-
-        return verts, edges_total, bc_total
+    return verts, edges_total, bc_total
 
 def compute_morse_skeleton_and_barcode_parallel(im: npt.ArrayLike,
                                                 mask: npt.ArrayLike,
