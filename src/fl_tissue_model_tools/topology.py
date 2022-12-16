@@ -17,55 +17,108 @@ def __random_color(i : int):
 
     return cvtColor(np.array([[[step*i, 220, 255]]], np.uint8), COLOR_HSV2BGR)[0][0] / 255
 
-def plot_colored_barcode(barcode_and_colors, ax):
+def plot_colored_barcode(barcode_and_colors, ax=None, **kwargs):
+    """ Plot a colored barcode computed by `compute_colored_tree_and_barcode`
+
+        Args:
+            barcode_and_colors (list): list of bars and colors in the format returned
+                by `compute_colored_tree_and_barcode`. Each item in the list is
+                a tuple of a persistence pair and a color.
+            ax (matplotlib.axes.Axes): axis on which to plot barcode. defaults to None.
+                If no axis is provided, the tree is just plotted on the current axis of plt.
+            kwargs (dict): Additional keyword arguments.
+                These are forwarded to the ax.barh call.
     """
-    """
-    # sort bars by birth time
+    # if no axis is provided, fetch the current axis
+    import matplotlib.pyplot as plt
+    ax_provided = ax is not None
+    ax = ax if ax_provided else plt.gca()
+    # sort bars in ascending order by birth time
     barcode_and_colors.sort(reverse=True)
     # prepare args for bar plot
     heights = [i for i in range(len(barcode_and_colors))]
-    births = [bar[0] for bar in barcode_and_colors]
-    widths = [bar[1] - bar[0] for bar in barcode_and_colors]
-    colors = [bar[2] for bar in barcode_and_colors]
-    ax.barh(heights, widths, left=births, color=colors)
+    births = [bar[0] for bar, color in barcode_and_colors]
+    widths = [bar[1] - bar[0] for bar, color in barcode_and_colors]
+    colors = [color for bar, color in barcode_and_colors]
+    # plot the barcode
+    ax.barh(heights, widths, left=births, color=colors, **kwargs)
     ax.set_yticks([])
     ax.set_xlabel("Barcode")
+    if not ax_provided:
+        plt.show()
     return
 
-def plot_colored_tree(lines, ax):
+def plot_colored_tree(edges_and_colors, ax=None, **kwargs):
+    """ Plot a colored tree computed by `compute_colored_tree_and_barcode`
+
+        Args:
+            edges_and_colors (list): List of edges and colors.
+                Each item in the list is a tuple of a line and an rgb color.
+                Each line in a tuple with the 2d endpoints of an edge in the tree
+            ax (matplotlib.axes.Axes): axis on which to plot barcode. defaults to None.
+                If no axis is provided, the tree is just plotted on the current axis of plt.
+            kwargs (dict): Additional keyword arguments.
+                These are forwarded to the LineCollection constructor.
+                For example, kwargs could contain linewidth.
     """
-    """
-    ax.add_collection(lines)
+    from matplotlib.collections import LineCollection
+    import matplotlib.pyplot as plt
+    # if no axis is provided, fetch the current axis
+    ax_provided = ax is not None
+    ax = ax if ax_provided else plt.gca()
+    # prepare the edges to be plotted
+    edges = [line for line, color in edges_and_colors]
+    colors = [color for line, color in edges_and_colors]
+    edges_collection = LineCollection(edges, colors=colors, **kwargs)
+    # plot the tree
+    ax.add_collection(edges_collection)
     ax.set_axis_off()
+    if not ax_provided:
+        plt.show()
     return
 
 def compute_colored_tree_and_barcode(vertices, edges):
-    """
-    """
-    from matplotlib.collections import LineCollection
+    """ Compute a tree and barcode colored according to branches.
 
+    Args:
+        vertices (V x 2 numpy array of ints):
+            Array where ith row stores 2d coordinate of ith vertex of a graph
+        edges (E x 2 numpy array of ints):
+            array where kth row [i, j] storing the indices i and j of
+            the kth edge's endpoints in `vertices`
+
+    Returns:
+        edges_and_colors (list): List of edges and colors.
+            Each item in the list is a tuple of a line and an rgb color.
+            Each line in a tuple with the 2d endpoints of an edge in the tree
+        barcode_and_colors (list): list of bars and colors.
+            Each item in the list is a tuple of a persistence pair and an rgb color.
+
+    Raises:
+        ValueError: The input graph must be a forest
+    """
     G = __convert_to_networkx_graph(vertices, edges)
 
     if not nx.is_forest(G):
         raise ValueError("Input graph must be a forest")
 
+    # function for computing the length of the edge {u,v}
     edge_length = lambda u, v : np.linalg.norm(vertices[u]-vertices[v])
-
-    # list of lines and barcodes for all graph component
-    lines_total = []
-    lines_colors_total = []
-    barcode_and_colors_total = []
+    # list of edges and barcodes to be returned
+    edges_and_colors = []
+    barcode_and_colors = []
+    # compute the path between each vertex and the root of its connected component
+    dist_to_center = { }
+    parent = { v : None for v in G.nodes }
     graph_components = [ G.subgraph(c).copy() for c in nx.connected_components(G) ]
     for g in graph_components:
         # we treat the center of the graph as the root
         centers = nx.algorithms.distance_measures.center(g)
         center = centers[0]
-        # create a list where each vertex points to its parent in the tree.
+        # create a dict where each vertex points to its parent in the tree.
         # we set parents with a bfs starting at the center.
         # we also use the bfs to compute distance to center
-        parent = { v : None for v in g.nodes }
         parent[center] = center
-        dist_to_center = { }
         dist_to_center[center] = 0
         unvisited_vertices = [ center ]
         while len(unvisited_vertices) > 0:
@@ -77,72 +130,75 @@ def compute_colored_tree_and_barcode(vertices, edges):
                     parent[n] = v
                     dist_to_center[n] = dist_to_center[v] + edge_length(n,v)
                     unvisited_vertices.append(n)
-        # check that the parents were set properly
-        assert all([parent[v] is not None for v in g.nodes])
-        # Each vertex in the tree belongs to a unique branch
-        # corresponding to a leaf. Specifically, a vertex is
-        # apart of the longest branch from a leaf to the center
-        # of all its descendant leaves.
-        #
-        # Label each vertex with its leaf.
-        # We do this by labelling all vertices on the path
-        # between the leaf and the center,
-        # unless the vertex has already been labelled with a further leaf.
-        leaves = [ v for v in g.nodes if g.degree[v] == 1 ]
-        max_dist_to_leaf = { v : -np.inf for v in g.nodes }
-        leaf_label = { }
-        for leaf in leaves:
-            current_vertex = leaf
+    # check that the parents were set properly
+    assert all([parent[v] is not None for v in G.nodes])
+    # Each vertex in the tree belongs to a unique branch
+    # corresponding to a leaf. Specifically, a vertex is
+    # in the longest branch from a leaf to the center
+    # of all its descendant leaves.
+    #
+    # Label each vertex with its branch.
+    # We do this by labelling all vertices on the path
+    # between the leaf and the center,
+    # unless we encounter vertex has already been labelled
+    # with a more distant leaf, which means all other vertices on
+    # the path are apart of this branch.
+    leaves = [ v for v in G.nodes if G.degree[v] == 1 ]
+    max_dist_to_leaf = { v : -np.inf for v in G.nodes }
+    branch_label = { }
+    for leaf in leaves:
+        current_vertex = leaf
+        current_parent = parent[current_vertex]
+        max_dist_to_leaf[leaf] = current_distance = 0
+        branch_label[leaf] = leaf
+        # This while loop follows the unique path from
+        # a leaf to the root.
+        while current_parent != current_vertex:
+            current_distance += edge_length(current_parent, current_vertex)
+            if current_distance < max_dist_to_leaf[current_parent]:
+                # We've reached a vertex that has a descendant leaf that is
+                # further away, so it is part of another branch.
+                # Thus, we quit our traversal.
+                break
+            current_vertex = current_parent
             current_parent = parent[current_vertex]
-            max_dist_to_leaf[leaf] = current_distance = 0
-            leaf_label[leaf] = leaf
-            while current_parent != current_vertex:
-                current_distance += edge_length(current_parent, current_vertex)
-                if current_distance < max_dist_to_leaf[current_parent]:
-                    # we've reached a vertex that is part of another branch,
-                    # so we quit our traversal
-                    break
-                current_vertex = current_parent
-                current_parent = parent[current_vertex]
-                max_dist_to_leaf[current_vertex] = current_distance
-                leaf_label[current_vertex] = leaf
-        # now that we have labelled each vertex with its branch,
-        # we create an edge collection where each branch is a different color.
-        lines = []
-        lines_colors = []
-        barcode_and_colors = []
-        for i, leaf in enumerate(leaves):
-            current_vertex = leaf
-            current_color = __random_color(i)
-            current_label = leaf
-            current_parent = parent[leaf]
-            current_distance = 0
-            # follow the path from the leaf to the center
-            # until we encounter another branch.
-            while current_label == leaf and current_vertex != current_parent:
-                current_distance += edge_length(current_parent, current_vertex)
+            max_dist_to_leaf[current_vertex] = current_distance
+            branch_label[current_vertex] = leaf
+    # now that we have labelled each vertex with its branch,
+    # we fill our list of edges and colors
+    # where each branch is a different color.
+    for i, leaf in enumerate(leaves):
+        current_vertex = leaf
+        current_label = leaf
+        current_color = __random_color(i)
+        current_parent = parent[leaf]
+        current_distance = 0
+        # Follow the path from the leaf
+        # until we encounter another branch or reach the root.
+        # Add each edge along the way with the color of the branch.
+        while current_label == leaf and current_vertex != current_parent:
+            # update distance from `leaf`.
+            # this is used after the loop finishes to compute the barcode
+            current_distance += edge_length(current_parent, current_vertex)
+            # v1 and v2 are the coordinates of the vertex
+            v1 = vertices[current_vertex]
+            v2 = vertices[current_parent]
+            # reverse v1 and v2 as mpl uses image coordinates
+            c1 = (v1[1], v1[0])
+            c2 = (v2[1], v2[0])
+            edges_and_colors.append(([c1, c2], current_color))
+            # update pointers for next iteration of loop
+            current_vertex = current_parent
+            current_parent = parent[current_vertex]
+            current_label = branch_label[current_vertex]
+        # add the branch of the current leaf to the barcode
+        # its birth is the (negative) distance of the leaf to the center
+        # the death is the distance where we encounter a longer branch
+        birth = -dist_to_center[leaf]
+        death = birth + current_distance
+        barcode_and_colors.append(((birth, death), current_color))
 
-                v1 = vertices[current_vertex]
-                v2 = vertices[current_parent]
-                c1 = (v1[1], v1[0])
-                c2 = (v2[1], v2[0])
-                lines.append([c1, c2])
-                lines_colors.append(current_color)
-
-                current_vertex = current_parent
-                current_parent = parent[current_vertex]
-                current_label = leaf_label[current_vertex]
-
-            birth = -dist_to_center[leaf]
-            death = birth + current_distance
-            barcode_and_colors.append((birth, death, current_color))
-
-        lines_total.extend(lines)
-        lines_colors_total.extend(lines_colors)
-        barcode_and_colors_total.extend(barcode_and_colors)
-
-    lines_collection = LineCollection(lines_total, colors=lines_colors_total, linewidth = 2)
-    return lines_collection, barcode_and_colors_total
+    return edges_and_colors, barcode_and_colors
 
 
 def __convert_to_networkx_graph(vertices, edges):
@@ -161,11 +217,11 @@ def __convert_to_networkx_graph(vertices, edges):
 def __shortest_path_tree(
     G: nx.Graph, distances: dict
 ):
-    """ Return the shortest path tree of a networkx graph.
+    """ Return the shortest path tree of a networkx graph with respect to some root.
 
         Args:
-            G (networkx graph):
-            distances (dictionary): dictionary of distances to the root
+            G (networkx.Graph):
+            distances (dict): dictionary of distances to the root
     """
 
     C = nx.Graph()
