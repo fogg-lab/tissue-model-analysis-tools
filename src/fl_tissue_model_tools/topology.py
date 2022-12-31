@@ -1,9 +1,5 @@
-import cv2 as cv
-import dask as d
 import numpy as np
 import numpy.typing as npt
-from matplotlib import pyplot as plt
-import random
 import gudhi as gd
 import networkx as nx
 
@@ -265,14 +261,8 @@ def compute_morse_skeleton_and_barcode(im: npt.NDArray[np.double],
 
     # Compute the Morse skeleton
     # Slice a bounding box of the connected component to speed up computation
-    #fname = f'/home/bean/lab/tissue-model-analysis-tools/notebooks/topology/output/{random.randint(1,100000)}.png'
-    #cv.imwrite(fname, (np.round(im*256)).astype(np.uint8))
-    #print(f'{np.min(im)=}')
-    #print(f'{np.max(im)=}')
     dmtG = DMTGraph(im)
     verts, edges = dmtG.computeGraph(threshold1, threshold2)
-    #print(f'{len(verts)=}')
-    #print(f'{len(edges)=}')
 
     # If the graph is not empty, we compute and plot the barcode of the Morse skeleton.
     # The filtration adds the vertices and edges in decreasing order of distance from the center.
