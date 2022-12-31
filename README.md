@@ -19,10 +19,10 @@ For more information on how to manage `conda` environments, see [environment man
 
 #### Create conda environment
 ```bash
-conda create --no-default-packages -n tissue-model-analysis conda-libmamba-solver
-# to set up on Linux machine with a CUDA-capable GPU, use environment_gpu.yml instead
-conda env update -f environment.yml --prune --solver=libmamba
+conda create --no-default-packages -n tissue-model-analysis mamba
 conda activate tissue-model-analysis
+# to set up on Linux machine with a CUDA-capable GPU, use environment_gpu.yml instead
+mamba env update -f environment.yml
 ```
 
 #### Install `fl_tissue_model_tools` Package
