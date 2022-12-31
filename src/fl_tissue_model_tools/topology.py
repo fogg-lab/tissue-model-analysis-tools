@@ -2,7 +2,8 @@ import cv2 as cv
 import dask as d
 import numpy as np
 import numpy.typing as npt
-
+from matplotlib import pyplot as plt
+import random
 import gudhi as gd
 import networkx as nx
 
@@ -264,8 +265,14 @@ def compute_morse_skeleton_and_barcode(im: npt.NDArray[np.double],
 
     # Compute the Morse skeleton
     # Slice a bounding box of the connected component to speed up computation
+    #fname = f'/home/bean/lab/tissue-model-analysis-tools/notebooks/topology/output/{random.randint(1,100000)}.png'
+    #cv.imwrite(fname, (np.round(im*256)).astype(np.uint8))
+    #print(f'{np.min(im)=}')
+    #print(f'{np.max(im)=}')
     dmtG = DMTGraph(im)
     verts, edges = dmtG.computeGraph(threshold1, threshold2)
+    #print(f'{len(verts)=}')
+    #print(f'{len(edges)=}')
 
     # If the graph is not empty, we compute and plot the barcode of the Morse skeleton.
     # The filtration adds the vertices and edges in decreasing order of distance from the center.
@@ -285,16 +292,13 @@ def compute_morse_skeleton_and_barcode(im: npt.NDArray[np.double],
             G.add_edge(v0, v1, weight=edge_length)
 
         graph_components = [ G.subgraph(c).copy() for c in nx.connected_components(G) ]
-        print(f"number of graph components: {len(graph_components)}")
         for g in graph_components:
             # Choose an arbitrary vertex as the center and compute the distance of each vertex
             center = np.random.choice([n for n in g])
-            print(f"computing distances...")
             distances = nx.algorithms.shortest_paths.weighted.single_source_dijkstra_path_length(
                 g, center)
 
             # compute the shortest path tree of the graph component
-            print(f"computing spt...")
             spt = __shortest_path_tree(g, distances)
 
             # Now, we use the distances to compute the barcode of the Morse skeleton
@@ -305,18 +309,15 @@ def compute_morse_skeleton_and_barcode(im: npt.NDArray[np.double],
 
             # Add the vertices to the complex with their filtration values
             # `distances` is a dict with entries of the form {vertex_idx : distance to `center`}
-            print(f"adding vertices to the comnplex...")
             for key in distances:
                 K.insert([key], filtration=-distances[key])
 
             # Add the edges to the complex.
             # The filtation value of an edge is the max filtation value of its vertices.
-            print(f"adding edges to the comnplex...")
             for v0, v1 in spt.edges():
                 K.insert([v0, v1], filtration = max(K.filtration([v0]), K.filtration([v1])))
 
             # compute the barcode of the Morse skeleton
-            print(f"computing persistence...")
             K.compute_persistence()
 
             # retrieve the 0-dimensional barcode
