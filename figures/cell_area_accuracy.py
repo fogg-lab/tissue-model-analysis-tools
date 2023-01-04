@@ -11,6 +11,10 @@ df = pd.DataFrame({
 	'y': [9.76, 15.73, 10.70],
 })
 
+# Ground truth data was gathered from this spreadsheet https://docs.google.com/spreadsheets/d/1rHN75Il85e2PEaLOqa3C6ebiWOjuJ94jXKitOCEJV2Y/edit#gid=1365849218
+# using wells A1, A2, and B1 at time 0. The same images (located here: https://drive.google.com/drive/folders/1uNsYXaxvbFGzQHeNHPzpPj1ROZRLf5Sz)
+# were run through the program for the experimental data.
+
 x = df['x'] # experimental data
 y = df['y'] # ground truth data
 
