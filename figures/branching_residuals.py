@@ -34,7 +34,7 @@ model = sm.OLS(y, x).fit()
 influence = model.get_influence()
 standardized_residuals = influence.resid_studentized_internal
 plt.scatter(df.x, standardized_residuals)
-plt.xlabel('Predicted Values for Average Branch Length')
+plt.xlabel('Predicted Values for Average Branch Length (μm)')
 plt.ylabel('Standardized Residuals')
 plt.axhline(y=0, color='black', linestyle='--', linewidth=1)
 plt.show()
