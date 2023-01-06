@@ -6,6 +6,7 @@ import statsmodels.api as sm
 import pandas as pd
 
 fig = plt.figure(figsize=(10,6))
+plt.rcParams.update({'font.size': 22})
 
 def get_random_vals(lower_bound, upper_bound, num_vals):
     hand_measured_points = []
@@ -32,7 +33,6 @@ model = sm.OLS(y, x).fit()
 
 influence = model.get_influence()
 standardized_residuals = influence.resid_studentized_internal
-plt.title('Model Accuracy Residual Plot')
 plt.scatter(df.x, standardized_residuals)
 plt.xlabel('Predicted Values for Average Branch Length')
 plt.ylabel('Standardized Residuals')
