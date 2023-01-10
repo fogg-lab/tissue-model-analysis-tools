@@ -7,7 +7,6 @@ import re
 import imghdr
 from glob import glob
 from dataclasses import dataclass
-from turtle import clear
 from typing import Sequence, Any
 
 from typing import Dict

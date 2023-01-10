@@ -2,6 +2,8 @@ import numpy as np
 import numpy.typing as npt
 import gudhi as gd
 import networkx as nx
+from matplotlib.collections import LineCollection
+import matplotlib.pyplot as plt
 
 from pydmtgraph.dmtgraph import DMTGraph
 
@@ -44,8 +46,6 @@ def plot_colored_barcode(barcode_and_colors, ax=None, **kwargs):
     ax.set_xlabel("Barcode")
     if not ax_provided:
         plt.show()
-    return
-
 
 def plot_colored_tree(edges_and_colors, ax=None, **kwargs):
     """ Plot a colored tree computed by `compute_colored_tree_and_barcode`
@@ -60,8 +60,6 @@ def plot_colored_tree(edges_and_colors, ax=None, **kwargs):
                 These are forwarded to the LineCollection constructor.
                 For example, kwargs could contain linewidth.
     """
-    from matplotlib.collections import LineCollection
-    import matplotlib.pyplot as plt
     # if no axis is provided, fetch the current axis
     ax_provided = ax is not None
     ax = ax if ax_provided else plt.gca()
@@ -74,8 +72,6 @@ def plot_colored_tree(edges_and_colors, ax=None, **kwargs):
     ax.set_axis_off()
     if not ax_provided:
         plt.show()
-    return
-
 
 def compute_colored_tree_and_barcode(vertices, edges):
     """ Compute a tree and barcode colored according to branches.
@@ -204,14 +200,14 @@ def compute_colored_tree_and_barcode(vertices, edges):
 def __convert_to_networkx_graph(vertices, edges):
     """ Convert a dmtgraph to a Networkx graph """
     G = nx.Graph()
-    for v0, v1 in edges:
+    for vertex0, vertex1 in edges:
         # Add each edge to the graph with weight = Euclidean distance between endpoints
         # Each row in `edges` is an array [i, j],
         #   where i and j are ints representing the index of the endpoints.
         # Each row in `verts` is an array [x, y],
         #   where x and y are the 2d-coordinates of the vertex.
-        edge_length = np.linalg.norm(vertices[v0]-vertices[v1])
-        G.add_edge(v0, v1, weight=edge_length)
+        edge_length = np.linalg.norm(vertices[vertex0]-vertices[vertex1])
+        G.add_edge(vertex0, vertex1, weight=edge_length)
     return G
 
 
@@ -226,8 +222,8 @@ def __shortest_path_tree(
     """
 
     C = nx.Graph()
-    for v0, v1 in G.edges():
-        C.add_edge(v0, v1, weight=max(distances[v0], distances[v1]))
+    for vertex0, vertex1 in G.edges():
+        C.add_edge(vertex0, vertex1, weight=max(distances[vertex0], distances[vertex1]))
     return nx.minimum_spanning_tree(C)
 
 
