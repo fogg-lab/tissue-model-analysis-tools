@@ -1,5 +1,5 @@
-from PIL import Image
 from math import floor
+from PIL import Image
 import numpy as np
 
 
@@ -35,16 +35,16 @@ def elastic_distortion(images, grid_width, grid_height, magnitude, rs):
             img = img.astype(dtype)
         images[i] = Image.fromarray(np.squeeze(img), mode = mode)
 
-    w, h = images[0].size
+    width, height = images[0].size
 
     horizontal_tiles = grid_width
     vertical_tiles = grid_height
 
-    width_of_square = int(floor(w / float(horizontal_tiles)))
-    height_of_square = int(floor(h / float(vertical_tiles)))
+    width_of_square = int(floor(width / float(horizontal_tiles)))
+    height_of_square = int(floor(height / float(vertical_tiles)))
 
-    width_of_last_square = w - (width_of_square * (horizontal_tiles - 1))
-    height_of_last_square = h - (height_of_square * (vertical_tiles - 1))
+    width_of_last_square = width - (width_of_square * (horizontal_tiles - 1))
+    height_of_last_square = height - (height_of_square * (vertical_tiles - 1))
 
     dimensions = []
 
