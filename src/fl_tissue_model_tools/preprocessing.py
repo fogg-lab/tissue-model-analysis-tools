@@ -105,9 +105,9 @@ def exec_threshold(
 
     # Select pixels within the mask. Exclude masked-out pixels since they
     # will alter the shape of the background distribution.
-    X = masked[mask_idx][:, np.newaxis]
+    pixels = masked[mask_idx][:, np.newaxis]
     gm = GaussianMixture(n_components=2, random_state=rand_state)
-    gm = gm.fit(X)
+    gm = gm.fit(pixels)
 
     # Get GMM components
     means = gm.means_.squeeze()
@@ -209,7 +209,7 @@ def perform_augmentation(
     """
 
     for i, img in enumerate(imgs):
-        hw = img.shape[:2]
+        horizontal_width = img.shape[:2]
         # Horizontal flip
         if hflip:
             img = cv2.flip(img, 1)
@@ -217,8 +217,8 @@ def perform_augmentation(
         if vflip:
             img = cv2.flip(img, 0)
         # Rotation
-        rot_mat = cv2.getRotationMatrix2D((hw[1] // 2, hw[0] // 2), rot, 1.0)
-        imgs[i] = cv2.warpAffine(img, rot_mat, hw)
+        rotation_matrix = cv2.getRotationMatrix2D((horizontal_width[1] // 2, horizontal_width[0] // 2), rot, 1.0)
+        imgs[i] = cv2.warpAffine(img, rotation_matrix, horizontal_width)
 
         if expand_dims:
             imgs[i] = np.expand_dims(imgs[i], 2)
@@ -236,50 +236,50 @@ def perform_augmentation(
 
 
 def augment_img_mask_pairs(
-    x: npt.NDArray[np.float_],
-    y: npt.NDArray[np.int_],
+    images: npt.NDArray[np.float_],
+    masks: npt.NDArray[np.int_],
     rand_state: RandomState,
     distortion_p: float=0.0,
 ) -> Tuple[npt.NDArray[np.float_], npt.NDArray[np.int_]]:
     """Augment a set of image/mask pairs.
     Args:
-        x: Original images.
-        y: Original masks.
+        images: Original images.
+        masks: Original masks.
         rand_state: RandomState object to allow for reproducability.
         distortion_p: Probability of applying elastic distortion to an image/mask pair.
     Returns:
         (Augmented images, matched augmented masks)
     """
-    assert len(x) == len(y), (
-        f"x and y must have the same shape, x: {x.shape} != y: {y.shape}")
-    m = len(x)
+    assert len(images) == len(y), (
+        f"images and masks must have the same shape, images: {images.shape} != masks: {masks.shape}")
+    num_imgs = len(images)
     # Cannot parallelize (random state ensures reproducibility)
-    rots = rand_state.choice([0, 90, 180, 270], size=m)
-    hflips = rand_state.choice([True, False], size=m)
-    vflips = rand_state.choice([True, False], size=m)
-    distort = rand_state.choice([True, False], size=m, p=[distortion_p, 1-distortion_p])
+    rots = rand_state.choice([0, 90, 180, 270], size=num_imgs)
+    hflips = rand_state.choice([True, False], size=num_imgs)
+    vflips = rand_state.choice([True, False], size=num_imgs)
+    distort = rand_state.choice([True, False], size=num_imgs, p=[distortion_p, 1-distortion_p])
 
     def aug_imgs(imgs, masks):
         augmented_imgs = []
         augmented_masks = []
-        for i in range(m):
+        for i in range(num_imgs):
             img, mask = perform_augmentation([imgs[i], masks[i]], rand_state, rots[i],
                                              hflips[i], vflips[i], distort[i], rand_state)
             augmented_imgs.append(img)
             augmented_masks.append(mask)
         return (np.array(augmented_imgs), np.array(augmented_masks))
 
-    x, y = d.compute((d.delayed(aug_imgs)(x, y)))[0]
-    return x, y
+    images, masks = d.compute((d.delayed(aug_imgs)(images, masks)))[0]
+    return images, masks
 
 
 def augment_imgs(
-    x: npt.NDArray[np.float_],  rand_state: RandomState, rot_options=(0, 90, 180, 270),
+    images: npt.NDArray[np.float_],  rand_state: RandomState, rot_options=(0, 90, 180, 270),
     distortion_p: float=0.0, expand_dims: bool=False
 ) -> npt.NDArray[np.float_]:
     """Augment a set of images.
     Args:
-        x: Original images.
+        images: Original images.
         rand_state: RandomState object to allow for reproducability.
         rot_options: Random rotation angle choices.
         distortion_p: Probability of applying elastic distortion to an image/mask pair.
@@ -287,15 +287,15 @@ def augment_imgs(
     Returns:
         Augmented image set.
     """
-    m = len(x)
-    rots = rand_state.choice(rot_options, size=m)
-    hflips = rand_state.choice([True, False], size=m)
-    vflips = rand_state.choice([True, False], size=m)
-    distort = rand_state.choice([True, False], size=m, p=[distortion_p, 1-distortion_p])
+    num_images = len(images)
+    rots = rand_state.choice(rot_options, size=num_images)
+    hflips = rand_state.choice([True, False], size=num_images)
+    vflips = rand_state.choice([True, False], size=num_images)
+    distort = rand_state.choice([True, False], size=num_images, p=[distortion_p, 1-distortion_p])
 
-    x = d.compute([d.delayed(perform_augmentation)([x[i]], rand_state, rots[i], hflips[i],
-                  vflips[i], distort[i], expand_dims)[0] for i in range(m)])[0]
-    return np.array(x)
+    images = d.compute([d.delayed(perform_augmentation)([images[i]], rand_state, rots[i], hflips[i],
+                  vflips[i], distort[i], expand_dims)[0] for i in range(num_images)])[0]
+    return np.array(images)
 
 
 def map2bin(
