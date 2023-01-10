@@ -171,7 +171,7 @@ class InvasionDataGenerator(utils.Sequence):
         self.indices = np.arange(len(self.img_paths), dtype=np.uint)
         if isinstance(class_weights, Dict):
             self.class_weights = deepcopy(class_weights)
-        elif class_weights == True:
+        elif class_weights:
             self.class_weights = prep.balanced_class_weights_from_counts(self.class_counts)
         else:
             self.class_weights = None
@@ -206,23 +206,23 @@ class InvasionDataGenerator(utils.Sequence):
         batch_indices = self.indices[batch_idx_start: batch_idx_end]
 
         img_paths = [self.img_paths[i] for i in batch_indices]
-        y = np.array([self.img_labels[i] for i in batch_indices])
+        img_labels = np.array([self.img_labels[i] for i in batch_indices])
 
         # Generate data
-        X = prep_inv_depth_imgs(img_paths, self.img_shape)
+        preprocessed_imgs = prep_inv_depth_imgs(img_paths, self.img_shape)
 
         if self.augmentation_function is not None:
-            X = self.augmentation_function(X, self.rand_state, expand_dims=False)
+            preprocessed_imgs = self.augmentation_function(preprocessed_imgs, self.rand_state, expand_dims=False)
 
-        # Set y to be (m,1) rather than (m,)
+        # Set img_labels to be (m,1) rather than (m,)
         if self.class_weights is not None:
             # Weight classes by relative proportions in the training set
-            w = np.array([self.class_weights[y_] for y_ in y])
+            weights = np.array([self.class_weights[y_] for y_ in img_labels])
             # Set y to be (m,1) rather than (m,)
-            return X, y[:, np.newaxis], w
+            return preprocessed_imgs, img_labels[:, np.newaxis], weights
 
         # Set y to be (m,1) rather than (m,)
-        return X, y[:, np.newaxis]
+        return preprocessed_imgs, img_labels[:, np.newaxis]
 
     def _get_class_counts_and_create_master_image_and_label_lists(self):
         """Get class counts and create full lists of image paths and labels.
@@ -230,11 +230,11 @@ class InvasionDataGenerator(utils.Sequence):
         The ith image path will correspond to the ith image label.
         """
         self.class_counts = {c: len(pn) for c, pn in self.class_paths.items()}
-        for k, v in self.class_paths.items():
+        for key, path in self.class_paths.items():
             # Paths to each image
-            self.img_paths.extend(v)
+            self.img_paths.extend(path)
             # Associate labels with each image path
-            self.img_labels.extend(list(np.repeat(k, len(v))))
+            self.img_labels.extend(list(np.repeat(key, len(path))))
 
     def shuffle_indices(self) -> None:
         """Shuffle indices used to select image paths for loading into batch."""
