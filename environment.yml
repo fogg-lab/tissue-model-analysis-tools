@@ -18,3 +18,5 @@ dependencies:
   - tensorflow
   - keras-tuner
   - pytorch
+  - torchvision
+  - pillow
