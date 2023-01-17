@@ -7,7 +7,6 @@ https://github.com/cmcguinness/focusstack
 import re
 from typing import Optional, Sequence, Callable, Tuple
 import numbers
-import dask as d
 import numpy.typing as npt
 import numpy as np
 import cv2

@@ -2,7 +2,7 @@ import numpy as np
 import numpy.typing as npt
 
 
-def compute_area_prop(img: npt.NDArray, ref_area: int, min_val: float=0) -> float:
+def compute_area_prop(img: npt.NDArray, ref_area: int) -> float:
     """Computes the proportion of pixels that are thresholded in circular area.
 
     Args:
