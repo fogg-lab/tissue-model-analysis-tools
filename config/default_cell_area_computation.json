@@ -1,1 +1,1 @@
-{"dsamp_size": 250, "sd_coef": 0, "pinhole_buffer": 0.04, "rs_seed": 123}
+{"dsamp_size": 250, "sd_coef": 0, "detect_well_edge": false, "pinhole_buffer": 0.04, "rs_seed": 123, "batch_size": 4}
