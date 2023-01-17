@@ -43,6 +43,6 @@ def get_dev_directories(dev_paths_file: str) -> DevDirs:
             in `dev_paths_file`.
 
     """
-    with open(dev_paths_file) as fp:
-        dirs = [l.strip() for l in fp.readlines()]
+    with open(dev_paths_file) as file:
+        dirs = [l.strip() for l in file.readlines()]
     return DevDirs(data_dir=dirs[0], analysis_dir=dirs[1], figures_dir=dirs[2])

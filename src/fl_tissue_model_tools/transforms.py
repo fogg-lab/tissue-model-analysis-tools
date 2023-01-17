@@ -1,7 +1,8 @@
-from PIL import Image
+import warnings
 from math import floor
+from PIL import Image
 import numpy as np
-
+from skimage import measure, morphology
 
 def elastic_distortion(images, grid_width, grid_height, magnitude, rs):
     """
@@ -35,16 +36,16 @@ def elastic_distortion(images, grid_width, grid_height, magnitude, rs):
             img = img.astype(dtype)
         images[i] = Image.fromarray(np.squeeze(img), mode = mode)
 
-    w, h = images[0].size
+    width, height = images[0].size
 
     horizontal_tiles = grid_width
     vertical_tiles = grid_height
 
-    width_of_square = int(floor(w / float(horizontal_tiles)))
-    height_of_square = int(floor(h / float(vertical_tiles)))
+    width_of_square = int(floor(width / float(horizontal_tiles)))
+    height_of_square = int(floor(height / float(vertical_tiles)))
 
-    width_of_last_square = w - (width_of_square * (horizontal_tiles - 1))
-    height_of_last_square = h - (height_of_square * (vertical_tiles - 1))
+    width_of_last_square = width - (width_of_square * (horizontal_tiles - 1))
+    height_of_last_square = height - (height_of_square * (vertical_tiles - 1))
 
     dimensions = []
 
@@ -136,3 +137,35 @@ def elastic_distortion(images, grid_width, grid_height, magnitude, rs):
             augmented_images[i] = np.repeat(augmented_images[i][:, :, np.newaxis], 3, axis=2)
 
     return augmented_images
+
+def remove_small_islands(mask, min_area0=100, min_area1=100, connectivity0=1, connectivity1=1):
+    '''Remove small islands from a binary mask.
+
+    Args:
+        mask (np.ndarray): binary mask of values 0 and 1
+        min_area0 (int): minimum area of islands with value 0 to change to 1
+        min_area1 (int): minimum area of islands with value 1 to change to 0
+        connectivity0 (int): pixel connectivity to include in islands with value 0
+        connectivity1 (int): pixel connectivity to include in islands with value 1
+
+    '''
+    if np.min(mask) != 0 or np.max(mask) > 1:
+        raise ValueError('this function expects a binary mask of values 0 and 1')
+
+    mask = mask.copy()
+    inverse_mask = 1 - mask
+    labeled_regions_inverse = measure.label(inverse_mask, connectivity=connectivity0)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        labeled_inverse_regions = morphology.remove_small_objects(labeled_regions_inverse, min_size=min_area0)
+
+    mask[labeled_inverse_regions == 0] = 1
+    labeled_regions = measure.label(mask, connectivity=connectivity1)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        labeled_regions = morphology.remove_small_objects(labeled_regions, min_size=min_area1)
+
+    mask[labeled_regions == 0] = 0
+    return mask
