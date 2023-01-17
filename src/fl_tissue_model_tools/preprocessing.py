@@ -1,15 +1,17 @@
 from typing import Union, Sequence, Any
 from typing import Tuple, Dict
+from typing import List
+import random
 import cv2
 import numpy as np
 import numpy.typing as npt
 from numpy.random import RandomState
 import dask as d
 from sklearn.mixture import GaussianMixture
-from typing import List
+from skimage import exposure, filters
 
 from . import defs
-from . import augmentation
+from . import transforms
 
 
 def min_max_(
@@ -50,6 +52,80 @@ def gen_circ_mask(
     """
     circ_mask = np.zeros(shape, dtype="uint8")
     return cv2.circle(circ_mask, center, rad, mask_val, cv2.FILLED)
+
+
+def gen_circ_mask_auto(
+    img: npt.NDArray, pinhole_buffer=0.04, mask_val: np.uint8 = 1
+) -> npt.NDArray[np.uint8]:
+    """Generate a 2D circular well mask automatically from an image."""
+    img = np.copy(img)
+    if img.dtype == float and (img.min() < -1 or img.max() > 1):
+        mult_factor = 255 if img.max() <= 255 else 1
+        img *= mult_factor
+        img = np.round(img).astype(np.uint16)
+    img = exposure.equalize_adapthist(img)
+    img = np.round(img*255).astype(np.uint8)
+    img = cv2.bilateralFilter(img, 20, 30, 30)
+    im_thresh = np.zeros_like(img)
+    thresh_val = round(img.max() * 0.05)
+    im_thresh[img>thresh_val] = 1
+    min_area = round(img.shape[0] * img.shape[1] * 0.0004)
+    im_thresh = transforms.remove_small_islands(im_thresh, min_area0=min_area, min_area1=min_area)
+    kernel=np.ones((3, 3), np.uint8)
+    im_thresh = cv2.dilate(im_thresh,kernel, iterations=1)
+    im_thresh = cv2.erode(im_thresh,kernel, iterations=1)
+    edgefilter = filters.roberts(im_thresh)
+    edge_rows, edge_cols = np.where(edgefilter>0)
+    edge_xy = [*zip(edge_cols.tolist(), edge_rows.tolist())]
+    circles = []
+    radius_reduction_factor = 0.825
+    inner_diameter_proportion_est = 1 - pinhole_buffer * 2
+    outer_diameter_proportion_est = inner_diameter_proportion_est / radius_reduction_factor
+    outer_radius_prop_est = outer_diameter_proportion_est / 2
+    target_radius_proportion_range = outer_radius_prop_est - .05, outer_radius_prop_est + .05
+    radius_min = img.shape[0] * target_radius_proportion_range[0]
+    radius_max = img.shape[0] * target_radius_proportion_range[1]
+    center_x_min, center_x_max = img.shape[1] * 0.43, img.shape[1] * 0.57
+    center_y_min, center_y_max = center_x_min, center_x_max
+    for _ in range(150):
+        circle_points_3 = random.sample(edge_xy, k=3)
+        try:
+            circle = get_circle(circle_points_3)
+        except ZeroDivisionError:
+            continue
+        # Make sure radius and center are in range
+        if not (radius_min < circle['radius'] < radius_max):
+            continue
+        if not (center_x_min < circle['center_x'] < center_x_max):
+            continue
+        if not (center_y_min < circle['center_y'] < center_y_max):
+            continue
+        circles.append(circle)
+    if len(circles) == 0:
+        circle = {
+            'radius': img.shape[0] * radius_proportion_est,
+            'center_x': img.shape[1] * 0.5,
+            'center_y': img.shape[0] * 0.5
+        }
+        circles.append(circle)
+    mask_radius = np.median([circ['radius'] for circ in circles])
+    mask_radius = round(mask_radius*radius_reduction_factor)
+    mask_center_x = np.median([circ['center_x'] for circ in circles])
+    mask_center_y = np.median([circ['center_y'] for circ in circles])
+    mask_center = round(mask_center_x), round(mask_center_y)
+
+    return gen_circ_mask(mask_center, mask_radius, edgefilter.shape, mask_val)
+
+def get_circle(points_3: Sequence[Tuple[float, float]]):
+    """Get circle parameters from 3 points: [(x,y),(x,y),(x,y)]"""
+    x, y, z = [xcoord+ycoord*1j for (xcoord,ycoord) in points_3]
+    w = (z-x) / (y-x)
+    c = (x-y)*(w-abs(w)**2)/2j/w.imag-x
+    return {
+        'radius': abs(c+x),
+        'center_x': c.real * -1,
+        'center_y': c.imag * -1
+    }
 
 
 def apply_mask(img: npt.NDArray, mask: npt.NDArray) -> npt.NDArray:
@@ -224,7 +300,7 @@ def perform_augmentation(
             imgs[i] = np.expand_dims(imgs[i], 2)
 
     if distort:
-        imgs = augmentation.elastic_distortion(
+        imgs = transforms.elastic_distortion(
             images = imgs,
             grid_width=rand_state.randint(4, 8),
             grid_height=rand_state.randint(4, 8),
@@ -250,7 +326,7 @@ def augment_img_mask_pairs(
     Returns:
         (Augmented images, matched augmented masks)
     """
-    assert len(images) == len(y), (
+    assert len(images) == len(masks), (
         f"images and masks must have the same shape, images: {images.shape} != masks: {masks.shape}")
     num_imgs = len(images)
     # Cannot parallelize (random state ensures reproducibility)

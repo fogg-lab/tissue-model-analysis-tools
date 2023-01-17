@@ -58,9 +58,8 @@ def load_and_norm(img_path: str, dsize: int=250) -> npt.NDArray:
 
 
 def mask_and_threshold(
-    img: npt.NDArray, circ_mask: npt.NDArray,
-    pinhole_idx: Tuple[npt.NDArray, npt.NDArray], sd_coef: float,
-    rand_state: np.random.RandomState
+    img: npt.NDArray, circ_mask: npt.NDArray, pinhole_idx: Tuple[npt.NDArray, npt.NDArray],
+    sd_coef: float, rand_state: np.random.RandomState,
 ) -> npt.NDArray:
     """Apply circular mask to image and perform foreground thresholding on the
     masked image.
@@ -123,17 +122,25 @@ def circ_mask_setup(img_shape: Tuple[int, int], pinhole_cut: int) -> \
     return circ_mask, pinhole_idx, circ_pix_area
 
 
+def circ_mask_setup_auto(img: npt.NDArray, pinhole_buffer=0.04):
+    """Generate circular mask for image based on detected well boundary."""
+    circ_mask = prep.gen_circ_mask_auto(img, pinhole_buffer, mask_val=defs.GS_MAX)
+    pinhole_idx = np.where(circ_mask > 0)
+    circ_pix_area = len(pinhole_idx[0])
+    return circ_mask, pinhole_idx, circ_pix_area
+
+
 def threshold_images(
-    imgs: List[npt.NDArray], circ_mask: npt.NDArray,
-    pinhole_idx: Tuple[npt.NDArray, npt.NDArray], sd_coef: float,
+    imgs: List[npt.NDArray], circ_masks: List[npt.NDArray],
+    pinhole_idx: List[Tuple[npt.NDArray, npt.NDArray]], sd_coef: float,
     rand_state: np.random.RandomState
 ) -> List[npt.NDArray]:
     """Apply mask & threshold to all images.
 
     Args:
         imgs: Original images.
-        circ_mask: Circular mask.
-        pinhole_idx: Indices within circular mask.
+        circ_mask: Circular masks.
+        pinhole_idx: Indices within each circular mask.
         sd_coef: Threshold pixels with less than sd_coef * foreground_mean.
         rand_state: RandomState object to allow for reproducability.
 
@@ -142,14 +149,14 @@ def threshold_images(
 
     """
     gmm_thresh_all = d.compute(
-        [d.delayed(mask_and_threshold)(img, circ_mask, pinhole_idx, sd_coef, rand_state)
-            for img in imgs]
+        [d.delayed(mask_and_threshold)(img, circ_masks[i], pinhole_idx[i], sd_coef, rand_state)
+            for i, img in enumerate(imgs)]
     )[0]
     return gmm_thresh_all
 
 
 def compute_areas(
-    imgs: List[npt.NDArray], circ_pix_area: int
+    imgs: List[npt.NDArray], circ_pix_area: List[int]
 ) -> npt.NDArray[np.float_]:
     """Compute non-zero pixel area of thresholded images.
 
@@ -162,7 +169,7 @@ def compute_areas(
 
     """
     area_prop = d.compute(
-        [d.delayed(an.compute_area_prop)(img, circ_pix_area) for img in imgs]
+        [d.delayed(an.compute_area_prop)(img, circ_pix_area[i]) for i, img in enumerate(imgs)]
     )[0]
     area_prop = np.array(area_prop)
     return area_prop
@@ -181,7 +188,7 @@ def main():
 
     ### Verify input source ###
     try:
-        img_paths = su.cell_area_verify_input_dir(args.in_root, verbose=verbose)
+        all_img_paths = su.cell_area_verify_input_dir(args.in_root, verbose=verbose)
     except FileNotFoundError as error:
         print(f"{su.SFM.failure} {error}")
         sys.exit()
@@ -212,25 +219,44 @@ def main():
     dsamp_size = config["dsamp_size"]
     sd_coef = config["sd_coef"]
     rs_seed = None if (config["rs_seed"] == "None") else config["rs_seed"]
+    detect_well_edge = config["detect_well_edge"]
+    batch_size = config["batch_size"]
     pinhole_buffer = config["pinhole_buffer"]
-    rand_state = np.random.RandomState(rs_seed)
     pinhole_cut = int(round(dsamp_size * pinhole_buffer))
-    try:
-        gs_ds_imgs = prep_images(img_paths, dsamp_size)
-    except OSError as error:
-        print(f"{su.SFM.failure}{error}")
-        sys.exit()
 
-    # Variables for image masking
-    circ_mask, pinhole_idx, circ_pix_area = circ_mask_setup(gs_ds_imgs[0].shape, pinhole_cut)
+    area_prop = []
+    gmm_thresh_all = []
+    rand_state = np.random.RandomState(rs_seed)
 
-    # Threshold images
-    gmm_thresh_all = threshold_images(gs_ds_imgs, circ_mask, pinhole_idx, sd_coef, rand_state)
+    def chunks(lst, n):
+        """Yield successive n-sized chunks from lst."""
+        for i in range(0, len(lst), n):
+            yield lst[i:i + n]
 
+    for img_paths in chunks(all_img_paths, batch_size):
+        try:
+            gs_ds_imgs = prep_images(img_paths, dsamp_size)
+        except OSError as error:
+            print(f"{su.SFM.failure}{error}")
+            sys.exit()
 
-    ### Compute areas ###
+        # Variables for image masking
+        if detect_well_edge:
+            circ_masks_with_info = [circ_mask_setup_auto(img, pinhole_buffer) for img in gs_ds_imgs]
+            circ_masks, pinhole_idx, circ_pix_areas = zip(*circ_masks_with_info)
+        else:
+            circ_mask, pinhole_idx, circ_pix_area = circ_mask_setup(gs_ds_imgs[0].shape, pinhole_cut)
+            circ_masks = [circ_mask] * len(gs_ds_imgs)
+            pinhole_idx = [pinhole_idx] * len(gs_ds_imgs)
+            circ_pix_areas = [circ_pix_area] * len(gs_ds_imgs)
 
-    area_prop = compute_areas(gmm_thresh_all, circ_pix_area)
+        # Threshold images
+        gmm_thresh = threshold_images(gs_ds_imgs, circ_masks, pinhole_idx, sd_coef, rand_state)
+        gmm_thresh_all.extend(gmm_thresh)
+        ### Compute areas ###
+        area_prop.extend(compute_areas(gmm_thresh, circ_pix_areas))
+
+    area_prop = np.array(area_prop)
 
     if verbose:
         print("... Areas computed successfully.")
@@ -239,7 +265,7 @@ def main():
     if verbose:
         print(f"{LINESEP}Saving results...")
 
-    img_ids = [Path(img_n).stem for img_n in img_paths]
+    img_ids = [Path(img_n).stem for img_n in all_img_paths]
     area_df = pd.DataFrame(
         data = {"image_id": img_ids, "area_pct": area_prop * 100}
     )
