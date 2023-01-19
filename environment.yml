@@ -1,8 +1,8 @@
 name: tissue-model-analysis
 channels:
-  - anaconda
   - conda-forge
   - pytorch
+  - defaults
 dependencies:
   - boost
   - cxx-compiler
