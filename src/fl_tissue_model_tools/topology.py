@@ -109,8 +109,7 @@ def compute_colored_tree_and_barcode(vertices, edges):
     graph_components = [ G.subgraph(c).copy() for c in nx.connected_components(G) ]
     for g in graph_components:
         # we treat the center of the graph as the root
-        centers = nx.algorithms.distance_measures.center(g)
-        center = centers[0]
+        center = np.random.choice([n for n in g])
         # create a dict where each vertex points to its parent in the tree.
         # we set parents with a bfs starting at the center.
         # we also use the bfs to compute distance to center
