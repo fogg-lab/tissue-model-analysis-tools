@@ -75,6 +75,16 @@ def plot_colored_tree(edges_and_colors, ax=None, **kwargs):
 
 
 def nx_graph_from_binary_skeleton(skeleton: npt.NDArray) -> nx.Graph:
+    """
+    Create a weighted, undirected networkx graph from a binary skeleton image.
+    The graph will have a 'physical_pos' attribute that maps node ids to their
+    physical coordinates in the skeleton image.
+
+    Args:
+        skeleton (npt.NDArray): binary skeleton image
+    Returns:
+        nx.Graph: weighted, undirected graph
+    """
     skeleton = skeleton.astype(bool)
     g = nx.Graph()
 
@@ -87,8 +97,6 @@ def nx_graph_from_binary_skeleton(skeleton: npt.NDArray) -> nx.Graph:
     nodes = np.zeros_like(skeleton, dtype=bool)
     node_pos = np.empty((0, 2), dtype=int)
 
-    edges_added = set()
-
     def shift_2d(arr: npt.NDArray, pad_vals: npt.NDArray) -> npt.NDArray:
         # add zero-padding to sides then crop the opposite sides from the padding
         padded = np.pad(arr, pad_vals)
@@ -100,8 +108,7 @@ def nx_graph_from_binary_skeleton(skeleton: npt.NDArray) -> nx.Graph:
     for (shift_rows, shift_cols) in [(1, 0), (0, 1), (1, 1), (1, -1)]:
         ## find skeleton nodes connected by an edge for the current shift direction
 
-        # shift the skeleton 1 pixel down, right, down-right, or down-left
-        # use pad and crop method
+        # pad and crop to shift skeleton 1 pixel down, right, down-right, or down-left
         pad_top, pad_bottom = (shift_rows == 1), 0
         pad_left, pad_right = (shift_cols == 1), (shift_cols == -1)
         pad_vals = np.array([[pad_top, pad_bottom], [pad_left, pad_right]])
@@ -120,7 +127,6 @@ def nx_graph_from_binary_skeleton(skeleton: npt.NDArray) -> nx.Graph:
         new_nodes = (src_nodes + dest_nodes) * np.logical_not(nodes)
         nodes += new_nodes
         new_nodes_pos = np.argwhere(new_nodes)
-
         # record previous node count and add new nodes coordinates to node_pos
         prev_node_count = node_pos.shape[0]
         node_pos = np.vstack((node_pos, new_nodes_pos))
@@ -128,7 +134,6 @@ def nx_graph_from_binary_skeleton(skeleton: npt.NDArray) -> nx.Graph:
         # assign numerical ids to new nodes
         new_node_ids = np.arange(prev_node_count, node_pos.shape[0])
         node_labels[new_nodes_pos[:, 0], new_nodes_pos[:, 1]] = new_node_ids
-
         # get node ids for all current src and dest nodes
         src_node_ids = node_labels[(node_labels > -1) & src_nodes]
         dest_node_ids = node_labels[(node_labels > -1) & dest_nodes]
