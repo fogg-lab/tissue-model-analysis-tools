@@ -139,8 +139,6 @@ def nx_graph_from_binary_skeleton(skeleton: npt.NDArray) -> nx.Graph:
         new_weighted_edges = zip(src_node_ids, dest_node_ids, weights)
         weighted_edges.extend(new_weighted_edges)
 
-        new_edges_added = [tuple(sorted((src, dest))) for src, dest in zip(src_node_ids, dest_node_ids)]    
-
     # add weighted edges to graph
     g.add_weighted_edges_from(weighted_edges)
 
