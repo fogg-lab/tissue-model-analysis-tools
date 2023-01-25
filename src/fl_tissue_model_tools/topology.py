@@ -73,6 +73,94 @@ def plot_colored_tree(edges_and_colors, ax=None, **kwargs):
     if not ax_provided:
         plt.show()
 
+
+def nx_graph_from_binary_skeleton(skeleton: npt.NDArray) -> nx.Graph:
+    skeleton = skeleton.astype(bool)
+    g = nx.Graph()
+
+    if not np.any(skeleton):
+        g.graph['physical_pos'] = np.empty((0, 2), dtype=int)
+        return g
+
+    node_labels = np.full(skeleton.shape, -1)
+    weighted_edges = []
+    nodes = np.zeros_like(skeleton, dtype=bool)
+    node_pos = np.empty((0, 2), dtype=int)
+
+    edges_added = set()
+
+    def shift_2d(arr: npt.NDArray, pad_vals: npt.NDArray) -> npt.NDArray:
+        # add zero-padding to sides then crop the opposite sides from the padding
+        padded = np.pad(arr, pad_vals)
+        pad_bottom, pad_right = pad_vals[0,1], pad_vals[1,1]
+        h, w = arr.shape
+        shifted = padded[pad_bottom:(h + pad_bottom), pad_right:(w + pad_right)]
+        return shifted.astype(arr.dtype)
+
+    for (shift_rows, shift_cols) in [(1, 0), (0, 1), (1, 1), (1, -1)]:
+        ## find skeleton nodes connected by an edge for the current shift direction
+
+        # shift the skeleton 1 pixel down, right, down-right, or down-left
+        # use pad and crop method
+        pad_top, pad_bottom = (shift_rows == 1), 0
+        pad_left, pad_right = (shift_cols == 1), (shift_cols == -1)
+        pad_vals = np.array([[pad_top, pad_bottom], [pad_left, pad_right]])
+        shifted_skel = shift_2d(skeleton, pad_vals)
+
+        # dest nodes: intersection of the shifted skeleton and the original skeleton
+        dest_nodes = skeleton * shifted_skel
+        if not np.any(dest_nodes):
+            continue
+
+        # src nodes: dest nodes shifted back to their original position
+        pad_vals = np.flip(pad_vals, axis=1)
+        src_nodes = shift_2d(dest_nodes, pad_vals)
+
+        # find new nodes not already added (they will need to be assigned an id)
+        new_nodes = (src_nodes + dest_nodes) * np.logical_not(nodes)
+        nodes += new_nodes
+        new_nodes_pos = np.argwhere(new_nodes)
+
+        # record previous node count and add new nodes coordinates to node_pos
+        prev_node_count = node_pos.shape[0]
+        node_pos = np.vstack((node_pos, new_nodes_pos))
+
+        # assign numerical ids to new nodes
+        new_node_ids = np.arange(prev_node_count, node_pos.shape[0])
+        node_labels[new_nodes_pos[:, 0], new_nodes_pos[:, 1]] = new_node_ids
+
+        # get node ids for all current src and dest nodes
+        src_node_ids = node_labels[(node_labels > -1) & src_nodes]
+        dest_node_ids = node_labels[(node_labels > -1) & dest_nodes]
+
+        # create list of weighted edges: [(node_id_1, node_id_2, weight), ...]
+        weight = np.linalg.norm((shift_rows, shift_cols))
+        weights = np.full(src_node_ids.shape, weight)
+        new_weighted_edges = zip(src_node_ids, dest_node_ids, weights)
+        weighted_edges.extend(new_weighted_edges)
+
+        new_edges_added = [tuple(sorted((src, dest))) for src, dest in zip(src_node_ids, dest_node_ids)]    
+
+    # add weighted edges to graph
+    g.add_weighted_edges_from(weighted_edges)
+
+    # add edges of weight 0 to graph (isolated nodes)
+    isolated_nodes = skeleton * np.logical_not(nodes)
+    if np.any(isolated_nodes):
+        isolated_nodes_pos = np.argwhere(isolated_nodes)
+        prev_node_count = node_pos.shape[0]
+        node_pos = np.vstack((node_pos, isolated_nodes_pos))
+        isolated_node_ids = np.arange(prev_node_count, node_pos.shape[0])
+        node_labels[isolated_nodes_pos[:, 0], isolated_nodes_pos[:, 1]] = isolated_node_ids
+        isolated_edges = zip(isolated_node_ids, isolated_node_ids)
+        g.add_edges_from(isolated_edges, weight=0)
+
+    # add physical node positions to graph
+    g.graph['physical_pos'] = node_pos
+
+    return g
+
+
 def compute_colored_tree_and_barcode(vertices, edges):
     """ Compute a tree and barcode colored according to branches.
 
