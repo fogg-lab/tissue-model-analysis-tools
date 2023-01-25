@@ -88,23 +88,31 @@ def nx_graph_from_binary_skeleton(skeleton: npt.NDArray) -> nx.Graph:
     skeleton = skeleton.astype(bool)
     g = nx.Graph()
 
-    if not np.any(skeleton):
-        g.graph['physical_pos'] = np.empty((0, 2), dtype=int)
+    # get physical positions of nodes and add them to the graph
+    node_pos = np.argwhere(skeleton)
+    g.graph['physical_pos'] = node_pos
+
+    # if skeleton is empty, return empty graph
+    if len(node_pos) == 0:
         return g
 
+    # get node labels
     node_labels = np.full(skeleton.shape, -1)
+    node_labels[node_pos[:, 0], node_pos[:, 1]] = np.arange(node_pos.shape[0])
+    edge_connected_nodes = np.zeros(skeleton.shape, dtype=bool)
     weighted_edges = []
-    nodes = np.zeros_like(skeleton, dtype=bool)
-    node_pos = np.empty((0, 2), dtype=int)
 
+    # function to shift the skeleton (pad sides, crop opposite sides from the padding)
     def shift_2d(arr: npt.NDArray, pad_vals: npt.NDArray) -> npt.NDArray:
-        # add zero-padding to sides then crop the opposite sides from the padding
         padded = np.pad(arr, pad_vals)
         pad_bottom, pad_right = pad_vals[0,1], pad_vals[1,1]
         h, w = arr.shape
         shifted = padded[pad_bottom:(h + pad_bottom), pad_right:(w + pad_right)]
         return shifted
 
+    # shift skeleton in each possible edge direction to find connected nodes
+    # intersection of shifted skeleton and original skeleton gives dest nodes
+    # dest nodes shifted back to original position gives src nodes
     for (shift_rows, shift_cols) in [(1, 0), (0, 1), (1, 1), (1, -1)]:
         ## find skeleton nodes connected by an edge for the current shift direction
 
@@ -123,18 +131,10 @@ def nx_graph_from_binary_skeleton(skeleton: npt.NDArray) -> nx.Graph:
         pad_vals = np.flip(pad_vals, axis=1)
         src_nodes = shift_2d(dest_nodes, pad_vals)
 
-        # find new nodes not already added (they will need to be assigned an id)
-        new_nodes = (src_nodes + dest_nodes) * np.logical_not(nodes)
-        nodes += new_nodes
-        new_nodes_pos = np.argwhere(new_nodes)
-        # record previous node count and add new nodes coordinates to node_pos
-        prev_node_count = node_pos.shape[0]
-        node_pos = np.vstack((node_pos, new_nodes_pos))
+        # add src and dest nodes to edge_connected_nodes
+        edge_connected_nodes += src_nodes + dest_nodes
 
-        # assign numerical ids to new nodes
-        new_node_ids = np.arange(prev_node_count, node_pos.shape[0])
-        node_labels[new_nodes_pos[:, 0], new_nodes_pos[:, 1]] = new_node_ids
-        # get node ids for all current src and dest nodes
+        # get node ids
         src_node_ids = node_labels[(node_labels > -1) & src_nodes]
         dest_node_ids = node_labels[(node_labels > -1) & dest_nodes]
 
@@ -147,19 +147,11 @@ def nx_graph_from_binary_skeleton(skeleton: npt.NDArray) -> nx.Graph:
     # add weighted edges to graph
     g.add_weighted_edges_from(weighted_edges)
 
-    # add edges of weight 0 to graph (isolated nodes)
-    isolated_nodes = skeleton * np.logical_not(nodes)
+    # add disconnected nodes to graph
+    isolated_nodes = skeleton * np.logical_not(edge_connected_nodes)
     if np.any(isolated_nodes):
-        isolated_nodes_pos = np.argwhere(isolated_nodes)
-        prev_node_count = node_pos.shape[0]
-        node_pos = np.vstack((node_pos, isolated_nodes_pos))
-        isolated_node_ids = np.arange(prev_node_count, node_pos.shape[0])
-        node_labels[isolated_nodes_pos[:, 0], isolated_nodes_pos[:, 1]] = isolated_node_ids
-        isolated_edges = zip(isolated_node_ids, isolated_node_ids)
-        g.add_edges_from(isolated_edges, weight=0)
-
-    # add physical node positions to graph
-    g.graph['physical_pos'] = node_pos
+        isolated_node_ids = node_labels[(node_labels > -1) & isolated_nodes].tolist()
+        g.add_nodes_from(isolated_node_ids)
 
     return g
 
