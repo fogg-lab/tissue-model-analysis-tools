@@ -156,6 +156,46 @@ def nx_graph_from_binary_skeleton(skeleton: npt.NDArray) -> nx.Graph:
     return g
 
 
+def get_filtered_mask_and_graph(mask: npt.NDArray) -> Tuple[npt.NDArray, nx.Graph]:
+    """
+    Remove components from the segmentation mask that do not contain branches.
+    Args:
+        mask (npt.NDArray): Segmentation mask to filter
+    Returns:
+        Tuple[npt.NDArray, nx.Graph]: Filtered mask and nx graph
+    """
+
+    mask = np.copy(mask)
+
+    seg_skel=morphology.skeletonize(mask)
+    G = nx_graph_from_binary_skeleton(seg_skel)
+
+    fork_nodes = {n for n in G.nodes() if G.degree[n] > 2}
+    components = [*nx.connected_components(G)]
+
+    remove_nodes_1_per_cc = []
+    remove_nodes_all = set()
+
+    for cc in components:
+        if not cc.intersection(fork_nodes):
+            cc_node_sample = next(iter(cc))
+            remove_nodes_1_per_cc.append(cc_node_sample)
+            remove_nodes_all.update(cc)
+
+    labeled_components = measure.label(mask, connectivity=2)
+    removed_components = set()
+
+    for node in remove_nodes_1_per_cc:
+        node_coords=G.graph['physical_pos'][node]
+        node_cc_label = labeled_components[node_coords[0]][node_coords[1]]
+        mask[labeled_components==node_cc_label] = 0
+        removed_components.add(node_cc_label)
+
+    G.remove_nodes_from(remove_nodes_all)
+
+    return mask, G
+
+
 def compute_colored_tree_and_barcode(vertices, edges):
     """ Compute a tree and barcode colored according to branches.
 
