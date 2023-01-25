@@ -94,7 +94,8 @@ def nx_graph_from_binary_skeleton(skeleton: npt.NDArray) -> nx.Graph:
         padded = np.pad(arr, pad_vals)
         pad_bottom, pad_right = pad_vals[0,1], pad_vals[1,1]
         h, w = arr.shape
-        return padded[pad_bottom:(h + pad_bottom), pad_right:(w + pad_right)]
+        shifted = padded[pad_bottom:(h + pad_bottom), pad_right:(w + pad_right)]
+        return shifted
 
     for (shift_rows, shift_cols) in [(1, 0), (0, 1), (1, 1), (1, -1)]:
         ## find skeleton nodes connected by an edge for the current shift direction
