@@ -1,5 +1,6 @@
 import numpy as np
 import numpy.typing as npt
+import networkx as nx
 
 def num_branches(barcode: npt.ArrayLike) -> int:
     return len(barcode)
@@ -31,3 +32,12 @@ def pixels_to_microns(pixels: float, im_width: int, well_width: float) -> float:
     Convert pixels to microns in specified resolution.
     """
     return (well_width / im_width) * pixels
+
+def filter_graph(G, minimum_length):
+	filtered_graph = nx.Graph()
+
+	for node1, node2, weight in G.edges():
+		if weight > minimum_length:
+			filtered_graph.add_edge(node1, node2, weight=weight)
+
+	return filtered_graph
