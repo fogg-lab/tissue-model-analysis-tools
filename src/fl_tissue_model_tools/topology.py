@@ -312,4 +312,4 @@ def compute_morse_skeleton_and_barcode(im: npt.NDArray[np.double],
             verts_total = np.concatenate((verts_total, verts), axis=0)
             edges_total = np.concatenate((edges_total, np.array(spt.edges)), axis=0)
 
-    return verts_total, edges_total, bc_total
+    return verts_total, edges_total, bc_total, G
