@@ -372,7 +372,7 @@ def compute_nx_graph(im: npt.NDArray[np.double],
     # Slice a bounding box of the connected component to speed up computation
     dmtG = DMTGraph(im)
     verts, edges = dmtG.computeGraph(threshold1, threshold2)
-
+    G = nx.Graph()
     # If the graph is not empty, we compute and plot the barcode of the Morse skeleton.
     # The filtration adds the vertices and edges in decreasing order of distance from the center.
     if(len(edges) > 0):
@@ -380,7 +380,6 @@ def compute_nx_graph(im: npt.NDArray[np.double],
         # we use {G} to compute the distance of each vertex from the "center" of the graph
         # The center is a graph-theoretic notion defined here:
         #   https://en.wikipedia.org/wiki/Graph_center
-        G = nx.Graph()
         for v0, v1 in edges:
             # add each graph to the graph with weight = Euclidean distance between endpoints
             # each edge in edges is an array [i, j, _],
