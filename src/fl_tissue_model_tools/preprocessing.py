@@ -8,7 +8,8 @@ import numpy.typing as npt
 from numpy.random import RandomState
 import dask as d
 from sklearn.mixture import GaussianMixture
-from skimage import exposure, filters
+from skimage import exposure, filters, morphology
+from scipy.spatial import KDTree
 
 from . import defs
 from . import transforms
@@ -33,6 +34,37 @@ def min_max_(
     img_norm = new_min + ( (img - old_min) * (new_max - new_min) ) / (old_max - old_min)
 
     return img_norm
+
+
+def combine_im_with_mask_dist_transform(
+    img: npt.NDArray, mask: npt.NDArray, blend_exponent: float = 1
+) -> npt.NDArray[np.float]:
+    """Highlight centerlines of mask components in image using distance transform.
+    Args:
+        img: The image.
+        mask: The binary mask.
+        blend_exponent: The exponent applied to transformed mask before blending with the image.
+                        For example, a value of 1.5 will highlight centerlines more prominently,
+                        while a value of 0.5 will retain more detail of the original image.
+    Returns:
+        The image blended with the transformed mask.
+    """
+    img = np.copy(img)
+    mask = np.copy(mask)
+    mask = (mask / np.max(mask)).astype(np.uint8)
+    dist_to_border = cv2.distanceTransform(mask, cv2.DIST_L2, 5)
+    skeleton = morphology.skeletonize(mask).astype(np.uint8)
+    skel_coords = np.argwhere(skeleton)
+    skeleton = KDTree(skel_coords)
+    mask_coords = np.argwhere(mask)
+    mask_distances_to_skeleton, _ = skeleton.query(mask_coords)
+    dist_to_skeleton = np.zeros(mask.shape)
+    dist_to_skeleton[mask_coords[:, 0], mask_coords[:, 1]] = mask_distances_to_skeleton
+    dist_transformed = 1 - (dist_to_skeleton / (dist_to_skeleton + dist_to_border))
+    dist_transformed = np.nan_to_num(dist_transformed)
+    dist_transformed = np.power(dist_transformed, blend_exponent)
+
+    return dist_transformed
 
 
 def gen_circ_mask(
