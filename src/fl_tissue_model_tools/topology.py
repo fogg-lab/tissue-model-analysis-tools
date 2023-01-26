@@ -6,6 +6,7 @@ import gudhi as gd
 import networkx as nx
 from matplotlib.collections import LineCollection
 import matplotlib.pyplot as plt
+from skimage import measure, morphology
 
 from pydmtgraph.dmtgraph import DMTGraph
 
