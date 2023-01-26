@@ -64,7 +64,7 @@ def combine_im_with_mask_dist_transform(
     dist_transformed = np.nan_to_num(dist_transformed)
     dist_transformed = np.power(dist_transformed, blend_exponent)
 
-    return dist_transformed
+    return dist_transformed * img
 
 
 def gen_circ_mask(
