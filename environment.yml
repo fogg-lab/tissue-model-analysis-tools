@@ -20,3 +20,4 @@ dependencies:
   - pytorch
   - torchvision
   - pillow
+  - scikit-image
