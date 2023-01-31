@@ -64,8 +64,8 @@ def plot_colored_tree(edges_and_colors, ax=None, **kwargs):
     ax_provided = ax is not None
     ax = ax if ax_provided else plt.gca()
     # prepare the edges to be plotted
-    edges = [line for line, color in edges_and_colors]
-    colors = [color for line, color in edges_and_colors]
+    edges = [edge for edge, color in edges_and_colors]
+    colors = [color for edge, color in edges_and_colors]
     edges_collection = LineCollection(edges, colors=colors, **kwargs)
     # plot the tree
     ax.add_collection(edges_collection)
@@ -110,6 +110,7 @@ def compute_colored_tree_and_barcode(vertices, edges):
     for g in graph_components:
         # we treat the center of the graph as the root
         center = np.random.choice([n for n in g])
+        # TODO: add option for center
         # create a dict where each vertex points to its parent in the tree.
         # we set parents with a bfs starting at the center.
         # we also use the bfs to compute distance to center
@@ -209,6 +210,115 @@ def __convert_to_networkx_graph(vertices, edges):
         G.add_edge(vertex0, vertex1, weight=edge_length)
     return G
 
+def filter_graph(vertices, edges, delta):
+    """ Remove all branches from a tree that are less than length delta
+
+        Raises:
+            ValueError: The input graph must be a forest
+    """
+    G = __convert_to_networkx_graph(vertices, edges)
+
+    if not nx.is_forest(G):
+        raise ValueError("Input graph must be a forest")
+
+    # function for computing the length of the edge {u,v}
+    edge_length = lambda u, v : np.linalg.norm(vertices[u]-vertices[v])
+
+    filtered_edges = []
+    filtered_barcode = []
+    # compute the path between each vertex and the root of its connected component
+    dist_to_center = { }
+    parent = { v : None for v in G.nodes }
+    graph_components = [ G.subgraph(c).copy() for c in nx.connected_components(G) ]
+    for g in graph_components:
+        # we treat the center of the graph as the root
+        center = np.random.choice([n for n in g])
+        # create a dict where each vertex points to its parent in the tree.
+        # we set parents with a bfs starting at the center.
+        # we also use the bfs to compute distance to center.
+        parent[center] = center
+        dist_to_center[center] = 0
+        unvisited_vertices = [ center ]
+        while len(unvisited_vertices) > 0:
+            v = unvisited_vertices.pop(0)
+            for n in G.neighbors(v):
+                # if the parent of a node has not been assigned,
+                # it has not been visited
+                if parent[n] is None:
+                    parent[n] = v
+                    dist_to_center[n] = dist_to_center[v] + edge_length(n,v)
+                    unvisited_vertices.append(n)
+    # check that the parents were set properly
+    assert all([parent[v] is not None for v in G.nodes])
+    # Each vertex in the tree belongs to a unique branch
+    # corresponding to a leaf. Specifically, a vertex is
+    # in the longest branch from a leaf to the center
+    # of all its descendant leaves.
+    #
+    # Label each vertex with its branch.
+    # We do this by labelling all vertices on the path
+    # between the leaf and the center,
+    # unless we encounter vertex has already been labelled
+    # with a more distant leaf, which means all other vertices on
+    # the path are apart of this branch.
+    leaves = [ v for v in G.nodes if G.degree[v] == 1 ]
+    max_dist_to_leaf = { v : -np.inf for v in G.nodes }
+    branch_label = { }
+    branch_length = { }
+    for leaf in leaves:
+        current_vertex = leaf
+        current_parent = parent[current_vertex]
+        max_dist_to_leaf[leaf] = current_distance = 0
+        branch_label[leaf] = leaf
+        branch_length[leaf] = 0
+        # This while loop follows the unique path from
+        # a leaf to the root.
+        while current_parent != current_vertex:
+            current_distance += edge_length(current_parent, current_vertex)
+            branch_length[leaf] += edge_length(current_parent, current_vertex)
+            if current_distance < max_dist_to_leaf[current_parent]:
+                # We've reached a vertex that has a descendant leaf that is
+                # further away, so it is part of another branch.
+                # Thus, we quit our traversal.
+                break
+            current_vertex = current_parent
+            current_parent = parent[current_vertex]
+            max_dist_to_leaf[current_vertex] = current_distance
+            branch_label[current_vertex] = leaf
+    # now that we have labelled each vertex with its branch,
+    # we fill our list of edges and barcode
+    for i, leaf in enumerate(leaves):
+        if branch_length[leaf] < delta:
+            # if the current branch is less than the threshold, skip it
+            continue
+        current_vertex = leaf
+        current_label = leaf
+        current_parent = parent[leaf]
+        current_distance = 0
+        # Follow the path from the leaf
+        # until we encounter another branch or reach the root.
+        # Add each edge along the way with the color of the branch.
+        while current_label == leaf and current_vertex != current_parent:
+            # update distance from `leaf`.
+            # this is used after the loop finishes to compute the barcode
+            current_distance += edge_length(current_parent, current_vertex)
+            # add current edge to list of returned edges
+            filtered_edges.append([current_vertex, current_parent])
+            # update pointers for next iteration of loop
+            current_vertex = current_parent
+            current_parent = parent[current_vertex]
+            current_label = branch_label[current_vertex]
+        # add the branch of the current leaf to the barcode
+        # its birth is the (negative) distance of the leaf to the center
+        # the death is the distance where we encounter a longer branch
+        birth = -dist_to_center[leaf]
+        death = birth + current_distance
+        filtered_barcode.append((birth, death))
+
+    return np.array(filtered_edges), filtered_barcode
+
+
+
 
 def __shortest_path_tree(
     G: nx.Graph, distances: dict
@@ -266,15 +376,7 @@ def compute_morse_skeleton_and_barcode(im: npt.NDArray[np.double],
         # we use {G} to compute the distance of each vertex from the "center" of the graph
         # The center is a graph-theoretic notion defined here:
         #   https://en.wikipedia.org/wiki/Graph_center
-        G = nx.Graph()
-        for v0, v1 in edges:
-            # add each graph to the graph with weight = Euclidean distance between endpoints
-            # each edge in edges is an array [i, j, _],
-            #   where i and j are ints representing the index of the endpoints.
-            # each vertex in verts is an array [x, y],
-            #   where x and y are the 2d-coordinates of the vertex.
-            edge_length = np.linalg.norm(verts[v0]-verts[v1])
-            G.add_edge(v0, v1, weight=edge_length)
+        G = __convert_to_networkx_graph(verts, edges)
 
         graph_components = [ G.subgraph(c).copy() for c in nx.connected_components(G) ]
         for g in graph_components:
