@@ -1,16 +1,18 @@
 import warnings
 from math import floor
+from typing import Tuple, Callable
 from PIL import Image
 import numpy as np
-from typing import Tuple, List, Union, Callable
 from skimage import measure, morphology
+from cv2 import medianBlur
 
 
 def get_elastic_dual_transform(
-    grid_width_range: Tuple[int, int],
-    grid_height_range: Tuple[int, int],
-    magnitude_range: Tuple[int, int],
-    rs: np.random.RandomState=None
+    grid_width_range: Tuple[int, int] = [4,8],
+    grid_height_range: Tuple[int, int] = [4,8],
+    magnitude_range: Tuple[int, int] = [7,9],
+    rs: np.random.RandomState=None,
+    p: float=0.9
 ) -> Callable:
     """Return a function that performs elastic distortion on an image and mask"""
 
@@ -19,18 +21,15 @@ def get_elastic_dual_transform(
 
     def elastic_dual_transform(image: np.ndarray, mask: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """Perform elastic distortion on an image and mask"""
-        if image.ndim == 2:
-            image = image[..., None]
-        if mask.ndim == 2:
-            mask = mask[..., None]
-        if image.shape != mask.shape:
-            raise ValueError("Image and mask must have the same shape")
-
+        if rs.rand() > p:
+            return {'image': image, 'mask': mask}
         grid_width = rs.randint(grid_width_range[0], grid_width_range[1]+1)
-        grid_height = rs.randint(*grid_height_range[0], grid_height_range[1]+1)
-        magnitude = rs.randint(*magnitude_range[0], magnitude_range[1]+1)
+        grid_height = rs.randint(grid_height_range[0], grid_height_range[1]+1)
+        magnitude = rs.randint(magnitude_range[0], magnitude_range[1]+1)
 
         image, mask = elastic_distortion([image, mask], grid_width, grid_height, magnitude, rs)
+        # apply median blur to mask
+        mask = medianBlur(mask, 5)
 
         return {'image': image, 'mask': mask}
 
