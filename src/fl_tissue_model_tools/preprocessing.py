@@ -341,12 +341,11 @@ def perform_augmentation(
     return imgs
 
 
-def get_augmentor(augments: Tuple[Callable, Callable]) -> Callable:
+def get_augmentor(augmentations: Tuple[Callable, Callable]) -> Callable:
     """Returns a function that applies a list of augmentations to an image/mask pair."""
 
     def augmentor(image: npt.NDArray, mask: npt.NDArray) -> Tuple[npt.NDArray, npt.NDArray]:
-        print(type(augments))
-        for aug in augments:
+        for aug in augmentations:
             transformed = aug(image=image, mask=mask)
             image, mask = transformed['image'], transformed['mask']
         return image, mask
@@ -355,12 +354,11 @@ def get_augmentor(augments: Tuple[Callable, Callable]) -> Callable:
 
 
 def augment_images(imgs: List[npt.NDArray], masks: List[npt.NDArray], augmentor: Callable) -> List[npt.NDArray]:
-    """Augments a set of images by the specified callable
+    """augmentations a set of images by the specified callable
     augmentation functions.
     """
     augmented = []
     for image, mask in zip(imgs, masks):
-        augmentor = get_augmentor(augmentor)
         augmented_image, augmented_mask = augmentor(image, mask)
         augmented.append((augmented_image, augmented_mask))
 
