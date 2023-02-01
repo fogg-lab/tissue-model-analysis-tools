@@ -99,7 +99,7 @@ train_datagen = data_prep.InvasionDataGenerator(
     rs,
     class_weights=True,
     shuffle=True,
-    augmentation_function=prep.augment_imgs
+    augmentation_function=prep.augment_invasion_imgs
 )
 
 val_datagen = data_prep.InvasionDataGenerator(
