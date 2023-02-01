@@ -45,7 +45,24 @@ def __shortest_path_tree(
     return nx.minimum_spanning_tree(C)
 
 def compute_branches_and_barcode(vertices, edges):
-    """ Compute the branches and barcodes of a tree """
+    """ Compute the branches and barcodes of a tree
+
+        Args:
+            vertices (V x 2 numpy array of ints):
+                Array where ith row stores 2d coordinate of ith vertex of a graph
+            edges (E x 2 numpy array of ints):
+                array where kth row [i, j] storing the indices i and j of
+                the kth edge's endpoints in `vertices`
+
+        Returns:
+            branches (list): A list of the branches of the tree.
+                Each entry of branches is an E x 2 numpy array of edges
+            barcode (list): Barcode of the tree with respect to a root.
+                The bar barcode[i] corresponds to the branch branches[i].
+
+        Raises:
+            ValueError: The input graph must be a forest
+    """
     G = __convert_to_networkx_graph(vertices, edges)
     if not nx.is_forest(G):
         raise ValueError("Input graph must be a forest")
@@ -211,8 +228,8 @@ def compute_colored_tree_and_barcode(vertices, edges):
 
     Returns:
         edges_and_colors (list): List of edges and colors.
-            Each item in the list is a tuple of a line and an rgb color.
-            Each line in a tuple with the 2d endpoints of an edge in the tree
+            Each item in the list is a tuple of a edge and an rgb color.
+            Each edge in a tuple with the 2d endpoints of an edge in the tree
         barcode_and_colors (list): list of bars and colors.
             Each item in the list is a tuple of a persistence pair and an rgb color.
 
