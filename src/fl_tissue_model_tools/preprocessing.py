@@ -1,6 +1,4 @@
-from typing import Union, Sequence, Any
-from typing import Tuple, Dict
-from typing import List
+from typing import Union, Sequence, Any, Tuple, Dict, List, Callable
 import random
 import cv2
 import numpy as np
@@ -341,6 +339,32 @@ def perform_augmentation(
         )
 
     return imgs
+
+
+def get_augmentor(augments: Tuple[Callable, Callable]) -> Callable:
+    """Returns a function that applies a list of augmentations to an image/mask pair."""
+
+    def augmentor(image: npt.NDArray, mask: npt.NDArray) -> Tuple[npt.NDArray, npt.NDArray]:
+        print(type(augments))
+        for aug in augments:
+            transformed = aug(image=image, mask=mask)
+            image, mask = transformed['image'], transformed['mask']
+        return image, mask
+
+    return augmentor
+
+
+def augment_images(imgs: List[npt.NDArray], masks: List[npt.NDArray], augmentor: Callable) -> List[npt.NDArray]:
+    """Augments a set of images by the specified callable
+    augmentation functions.
+    """
+    augmented = []
+    for image, mask in zip(imgs, masks):
+        augmentor = get_augmentor(augmentor)
+        augmented_image, augmented_mask = augmentor(image, mask)
+        augmented.append((augmented_image, augmented_mask))
+
+    return augmented
 
 
 def augment_img_mask_pairs(
