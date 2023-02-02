@@ -1,6 +1,4 @@
-from typing import Union, Sequence, Any
-from typing import Tuple, Dict
-from typing import List
+from typing import Union, Sequence, Any, Tuple, Dict, List, Callable
 import random
 import cv2
 import numpy as np
@@ -64,7 +62,7 @@ def combine_im_with_mask_dist_transform(
     dist_transformed = np.nan_to_num(dist_transformed)
     dist_transformed = np.power(dist_transformed, blend_exponent)
 
-    return dist_transformed
+    return dist_transformed * img
 
 
 def gen_circ_mask(
@@ -222,12 +220,12 @@ def exec_threshold(
     sds = np.sqrt(gm.covariances_.squeeze())
 
     # Get mean foreground mean & threshold value
-    fg_dist_idx = np.argmax(means)
-    fg_thresh = min(defs.GS_MAX, means[fg_dist_idx] + sds[fg_dist_idx] * sd_coef)
+    foreground_dist_idx = np.argmax(means)
+    foreground_thresh = min(defs.GS_MAX, means[foreground_dist_idx] + sds[foreground_dist_idx] * sd_coef)
 
     # Apply threshold
     gmm_masked = np.copy(masked)
-    gmm_masked = np.where(gmm_masked <= fg_thresh, 0, gmm_masked)
+    gmm_masked = np.where(gmm_masked <= foreground_thresh, 0, gmm_masked)
 
     return gmm_masked
 
@@ -299,133 +297,124 @@ def blur(
     return proc_img.round().astype(np.uint8)
 
 
-def perform_augmentation(
-    imgs: List[npt.NDArray[Union[np.float_, np.int_]]], rand_state: RandomState,
-    rot: int, hflip: bool, vflip: bool, distort: bool=False, expand_dims: bool=True
-) -> List[npt.NDArray[Union[np.float_, np.int_]]]:
-    """Augment the passed image(s)
-    Args:
-        img: Original image(s).
-        rot: Rotation angle for image.
-        hflip: Whether to horizontally flip image.
-        vflip: Whether to vertically flip image.
-        distort: Whether to apply random elastic distortions to image.
-        expand_dims: Whether to add a depth axis to the image after
-            augmentation steps.
-    Returns:
-        Augmented image.
-    """
+def get_augmentor(augmentations: List[Callable]) -> Callable:
+    """Returns a function that applies a list of augmentations to an image/mask pair."""
 
-    for i, img in enumerate(imgs):
-        horizontal_width = img.shape[:2]
-        # Horizontal flip
-        if hflip:
-            img = cv2.flip(img, 1)
-        # Vertical flip
-        if vflip:
-            img = cv2.flip(img, 0)
-        # Rotation
-        rotation_matrix = cv2.getRotationMatrix2D((horizontal_width[1] // 2, horizontal_width[0] // 2), rot, 1.0)
-        imgs[i] = cv2.warpAffine(img, rotation_matrix, horizontal_width)
+    def augmentor(image: npt.NDArray, mask: npt.NDArray) -> Tuple[npt.NDArray, npt.NDArray]:
+        assert image.shape == mask.shape, 'Image and mask must have the same shape.'
 
-        if expand_dims:
-            imgs[i] = np.expand_dims(imgs[i], 2)
+        added_start_dim = image.shape[0] == 1
+        added_end_dim = image.shape[-1] == 1
+        if added_start_dim or added_end_dim:
+            image = image.squeeze()
+            mask = mask.squeeze()
 
-    if distort:
-        imgs = transforms.elastic_distortion(
-            images = imgs,
-            grid_width=rand_state.randint(4, 8),
-            grid_height=rand_state.randint(4, 8),
-            magnitude=8,
-            rs=rand_state
-        )
+        # some transforms require uint8 images
+        img_min = np.min(image)
+        if np.min(image) < 0:
+            image = image - img_min
+            img_min = 0
+        img_max = np.max(image)
 
-    return imgs
+        if img_max < 1:
+            scale = 255
+        elif img_max <= 255:
+            scale = 1
+        elif img_max <= 65025:
+            scale = 1 / 255
+        else:
+            scale = 255 / img_max
+
+        og_dtype = image.dtype
+
+        image = image * scale
+        image = np.round(image).astype(np.uint8)
+
+        for aug in augmentations:
+            transformed = aug(image=image, mask=mask)
+            image, mask = transformed['image'], transformed['mask']
+
+        image = (image / scale).astype(og_dtype)
+
+        if added_start_dim:
+            image = image[np.newaxis, ...]
+            mask = mask[np.newaxis, ...]
+
+        if added_end_dim:
+            image = image[..., np.newaxis]
+            mask = mask[..., np.newaxis]
+
+        return image, mask
+
+    return augmentor
 
 
-def augment_img_mask_pairs(
+def get_batch_augmentor(augmentations: List[Callable]) -> Callable:
+    """Returns a function that applies a list of augmentations to a batch of image/mask pairs."""
+
+    augmentor = get_augmentor(augmentations)
+
+    def batch_augmentor(images: npt.NDArray, masks: npt.NDArray) -> Tuple[npt.NDArray, npt.NDArray]:
+        assert images.shape == masks.shape, "Images and masks must have the same shape."
+        num_samples = images.shape[0]
+
+        image_mask_pairs = d.compute([
+            d.delayed(augmentor)(images[i], masks[i])[0]
+            for i in range(num_samples)])[0]
+
+        # image_mask_pairs = [augmentor(images[i], masks[i]) for i in range(num_samples)]
+
+        transformed_images, transformed_masks = zip(*image_mask_pairs)
+
+        return np.array(transformed_images), np.array(transformed_masks)
+
+    return batch_augmentor
+
+
+def augment_invasion_imgs(
     images: npt.NDArray[np.float_],
-    masks: npt.NDArray[np.int_],
     rand_state: RandomState,
-    distortion_p: float=0.0,
-) -> Tuple[npt.NDArray[np.float_], npt.NDArray[np.int_]]:
-    """Augment a set of image/mask pairs.
-    Args:
-        images: Original images.
-        masks: Original masks.
-        rand_state: RandomState object to allow for reproducability.
-        distortion_p: Probability of applying elastic distortion to an image/mask pair.
-    Returns:
-        (Augmented images, matched augmented masks)
-    """
-    assert len(images) == len(masks), (
-        f"images and masks must have the same shape, images: {images.shape} != masks: {masks.shape}")
-    num_imgs = len(images)
-    # Cannot parallelize (random state ensures reproducibility)
-    rots = rand_state.choice([0, 90, 180, 270], size=num_imgs)
-    hflips = rand_state.choice([True, False], size=num_imgs)
-    vflips = rand_state.choice([True, False], size=num_imgs)
-    distort = rand_state.choice([True, False], size=num_imgs, p=[distortion_p, 1-distortion_p])
-
-    def aug_imgs(imgs, masks):
-        augmented_imgs = []
-        augmented_masks = []
-        for i in range(num_imgs):
-            img, mask = perform_augmentation([imgs[i], masks[i]], rand_state, rots[i],
-                                             hflips[i], vflips[i], distort[i], rand_state)
-            augmented_imgs.append(img)
-            augmented_masks.append(mask)
-        return (np.array(augmented_imgs), np.array(augmented_masks))
-
-    images, masks = d.compute((d.delayed(aug_imgs)(images, masks)))[0]
-    return images, masks
-
-
-def augment_imgs(
-    images: npt.NDArray[np.float_],  rand_state: RandomState, rot_options=(0, 90, 180, 270),
-    distortion_p: float=0.0, expand_dims: bool=False
+    rot_options=(0, 90, 180, 270),
+    expand_dims: bool=False
 ) -> npt.NDArray[np.float_]:
-    """Augment a set of images.
+    """Transform a list of images with random flips and rotations.
     Args:
         images: Original images.
         rand_state: RandomState object to allow for reproducability.
         rot_options: Random rotation angle choices.
-        distortion_p: Probability of applying elastic distortion to an image/mask pair.
         expand_dims: Whether to add a depth axis to each image after augmentation steps.
     Returns:
-        Augmented image set.
+        Transformed images.
     """
+
     num_images = len(images)
     rots = rand_state.choice(rot_options, size=num_images)
     hflips = rand_state.choice([True, False], size=num_images)
     vflips = rand_state.choice([True, False], size=num_images)
-    distort = rand_state.choice([True, False], size=num_images, p=[distortion_p, 1-distortion_p])
 
-    images = d.compute([d.delayed(perform_augmentation)([images[i]], rand_state, rots[i], hflips[i],
-                  vflips[i], distort[i], expand_dims)[0] for i in range(num_images)])[0]
+    def augment_img(img, idx):
+        # Horizontal flip
+        if hflips[idx]:
+            img = cv2.flip(img, 1)
+
+        # Vertical flip
+        if vflips[idx]:
+            img = cv2.flip(img, 0)
+
+        # Rotation
+        center = (img.shape[1] // 2, img.shape[0] // 2)
+        rotation_matrix = cv2.getRotationMatrix2D(center, rots[idx], 1.0)
+        img = cv2.warpAffine(img, rotation_matrix, img.shape[:2])
+
+        if expand_dims:
+            img = np.expand_dims(img, 2)
+
+        return img
+
+    images = d.compute([d.delayed(augment_img)([images[i]], rots[i], hflips[i],
+                  vflips[i], expand_dims)[0] for i in range(num_images)])[0]
+
     return np.array(images)
-
-
-def map2bin(
-    lab: npt.NDArray[np.int_], fg_vals: Sequence[int], bg_vals: Sequence[int],
-    fg: int=1, bg: int=0
-) -> npt.NDArray[np.int_]:
-    """Convert a mask n-map (e.g., trimap) to a simple binary map.
-    Args:
-        lab: Label mask.
-        fg_vals: Foreground mask values.
-        bg_vals: Background mask values.
-        fg: Desired mask foreground value.
-        bg: Desired mask background value.
-    Returns:
-        Binary mask of same dimension as input mask.
-    """
-    fg_mask = np.isin(lab, fg_vals)
-    bg_mask = np.isin(lab, bg_vals)
-    lab_c = lab.copy()
-    lab_c[fg_mask] = fg
-    lab_c[bg_mask] = bg
-    return lab_c
 
 
 def balanced_class_weights_from_counts(class_counts) -> Dict[Any, float]:
