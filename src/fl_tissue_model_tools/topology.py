@@ -20,61 +20,32 @@ def __random_color(i : int):
     return cvtColor(np.array([[[step*i, 220, 255]]], np.uint8), COLOR_HSV2BGR)[0][0] / 255
 
 
-def plot_colored_barcode(barcode_and_colors, ax=None, **kwargs):
-    """ Plot a colored barcode computed by `compute_colored_tree_and_barcode`
+def __convert_to_networkx_graph(vertices, edges):
+    """ Convert a dmtgraph to a Networkx graph """
+    G = nx.Graph()
+    for vertex0, vertex1 in edges:
+        # Add each edge to the graph with weight = Euclidean distance between endpoints
+        # Each row in `edges` is an array [i, j],
+        #   where i and j are ints representing the index of the endpoints.
+        # Each row in `verts` is an array [x, y],
+        #   where x and y are the 2d-coordinates of the vertex.
+        edge_length = np.linalg.norm(vertices[vertex0]-vertices[vertex1])
+        G.add_edge(vertex0, vertex1, weight=edge_length)
+    return G
+
+def __shortest_path_tree(
+    G: nx.Graph, distances: dict
+):
+    """ Return the shortest path tree of a networkx graph with respect to some root.
 
         Args:
-            barcode_and_colors (list): list of bars and colors in the format returned
-                by `compute_colored_tree_and_barcode`. Each item in the list is
-                a tuple of a persistence pair and a color.
-            ax (matplotlib.axes.Axes): axis on which to plot barcode. defaults to None.
-                If no axis is provided, the tree is just plotted on the current axis of plt.
-            kwargs (dict): Additional keyword arguments.
-                These are forwarded to the ax.barh call.
+            G (networkx.Graph):
+            distances (dict): dictionary of distances to the root
     """
-    # if no axis is provided, fetch the current axis
-    import matplotlib.pyplot as plt
-    ax_provided = ax is not None
-    ax = ax if ax_provided else plt.gca()
-    # sort bars in ascending order by birth time
-    barcode_and_colors.sort(reverse=True)
-    # prepare args for bar plot
-    heights = [i for i in range(len(barcode_and_colors))]
-    births = [bar[0] for bar, color in barcode_and_colors]
-    widths = [bar[1] - bar[0] for bar, color in barcode_and_colors]
-    colors = [color for bar, color in barcode_and_colors]
-    # plot the barcode
-    ax.barh(heights, widths, left=births, color=colors, **kwargs)
-    ax.set_yticks([])
-    ax.set_xlabel("Barcode")
-    if not ax_provided:
-        plt.show()
-
-def plot_colored_tree(edges_and_colors, ax=None, **kwargs):
-    """ Plot a colored tree computed by `compute_colored_tree_and_barcode`
-
-        Args:
-            edges_and_colors (list): List of edges and colors.
-                Each item in the list is a tuple of a line and an rgb color.
-                Each line in a tuple with the 2d endpoints of an edge in the tree
-            ax (matplotlib.axes.Axes): axis on which to plot barcode. defaults to None.
-                If no axis is provided, the tree is just plotted on the current axis of plt.
-            kwargs (dict): Additional keyword arguments.
-                These are forwarded to the LineCollection constructor.
-                For example, kwargs could contain linewidth.
-    """
-    # if no axis is provided, fetch the current axis
-    ax_provided = ax is not None
-    ax = ax if ax_provided else plt.gca()
-    # prepare the edges to be plotted
-    edges = [line for line, color in edges_and_colors]
-    colors = [color for line, color in edges_and_colors]
-    edges_collection = LineCollection(edges, colors=colors, **kwargs)
-    # plot the tree
-    ax.add_collection(edges_collection)
-    ax.set_axis_off()
-    if not ax_provided:
-        plt.show()
+    C = nx.Graph()
+    for vertex0, vertex1 in G.edges():
+        C.add_edge(vertex0, vertex1, weight=max(distances[vertex0], distances[vertex1]))
+    return nx.minimum_spanning_tree(C)
 
 
 def nx_graph_from_binary_skeleton(skeleton: npt.NDArray) -> nx.Graph:
@@ -199,36 +170,33 @@ def get_filtered_mask_and_graph(mask: npt.NDArray) -> Tuple[npt.NDArray, nx.Grap
     return mask, G
 
 
-def compute_colored_tree_and_barcode(vertices, edges):
-    """ Compute a tree and barcode colored according to branches.
+def compute_branches_and_barcode(vertices, edges):
+    """ Compute the branches and barcodes of a tree
 
-    Args:
-        vertices (V x 2 numpy array of ints):
-            Array where ith row stores 2d coordinate of ith vertex of a graph
-        edges (E x 2 numpy array of ints):
-            array where kth row [i, j] storing the indices i and j of
-            the kth edge's endpoints in `vertices`
+        Args:
+            vertices (V x 2 numpy array of ints):
+                Array where ith row stores 2d coordinate of ith vertex of a graph
+            edges (E x 2 numpy array of ints):
+                array where kth row [i, j] storing the indices i and j of
+                the kth edge's endpoints in `vertices`
 
-    Returns:
-        edges_and_colors (list): List of edges and colors.
-            Each item in the list is a tuple of a line and an rgb color.
-            Each line in a tuple with the 2d endpoints of an edge in the tree
-        barcode_and_colors (list): list of bars and colors.
-            Each item in the list is a tuple of a persistence pair and an rgb color.
+        Returns:
+            branches (list): A list of the branches of the tree.
+                Each entry of branches is an E x 2 numpy array of edges
+            barcode (list): Barcode of the tree with respect to a root.
+                The bar barcode[i] corresponds to the branch branches[i].
 
-    Raises:
-        ValueError: The input graph must be a forest
+        Raises:
+            ValueError: The input graph must be a forest
     """
     G = __convert_to_networkx_graph(vertices, edges)
-
     if not nx.is_forest(G):
         raise ValueError("Input graph must be a forest")
-
     # function for computing the length of the edge {u,v}
     edge_length = lambda u, v : np.linalg.norm(vertices[u]-vertices[v])
-    # list of edges and barcodes to be returned
-    edges_and_colors = []
-    barcode_and_colors = []
+    # output lists
+    branches = []
+    barcode = []
     # compute the path between each vertex and the root of its connected component
     dist_to_center = { }
     parent = { v : None for v in G.nodes }
@@ -238,7 +206,7 @@ def compute_colored_tree_and_barcode(vertices, edges):
         center = np.random.choice([n for n in g])
         # create a dict where each vertex points to its parent in the tree.
         # we set parents with a bfs starting at the center.
-        # we also use the bfs to compute distance to center
+        # we also use the bfs to compute distance to center.
         parent[center] = center
         dist_to_center[center] = 0
         unvisited_vertices = [ center ]
@@ -286,14 +254,13 @@ def compute_colored_tree_and_barcode(vertices, edges):
             max_dist_to_leaf[current_vertex] = current_distance
             branch_label[current_vertex] = leaf
     # now that we have labelled each vertex with its branch,
-    # we fill our list of edges and colors
-    # where each branch is a different color.
+    # we fill our list of edges and barcode
     for i, leaf in enumerate(leaves):
         current_vertex = leaf
         current_label = leaf
-        current_color = __random_color(i)
         current_parent = parent[leaf]
         current_distance = 0
+        current_branch = []
         # Follow the path from the leaf
         # until we encounter another branch or reach the root.
         # Add each edge along the way with the color of the branch.
@@ -301,55 +268,148 @@ def compute_colored_tree_and_barcode(vertices, edges):
             # update distance from `leaf`.
             # this is used after the loop finishes to compute the barcode
             current_distance += edge_length(current_parent, current_vertex)
-            # v1 and v2 are the coordinates of the vertex
-            v1 = vertices[current_vertex]
-            v2 = vertices[current_parent]
-            # reverse v1 and v2 as mpl uses image coordinates
-            c1 = (v1[1], v1[0])
-            c2 = (v2[1], v2[0])
-            edges_and_colors.append(([c1, c2], current_color))
+            # add current edge to list of returned edges
+            current_branch.append((current_vertex, current_parent))
             # update pointers for next iteration of loop
             current_vertex = current_parent
             current_parent = parent[current_vertex]
             current_label = branch_label[current_vertex]
+        branches.append(np.array(current_branch))
         # add the branch of the current leaf to the barcode
         # its birth is the (negative) distance of the leaf to the center
         # the death is the distance where we encounter a longer branch
         birth = -dist_to_center[leaf]
         death = birth + current_distance
-        barcode_and_colors.append(((birth, death), current_color))
+        barcode.append((birth, death))
 
-    return edges_and_colors, barcode_and_colors
-
-
-def __convert_to_networkx_graph(vertices, edges):
-    """ Convert a dmtgraph to a Networkx graph """
-    G = nx.Graph()
-    for vertex0, vertex1 in edges:
-        # Add each edge to the graph with weight = Euclidean distance between endpoints
-        # Each row in `edges` is an array [i, j],
-        #   where i and j are ints representing the index of the endpoints.
-        # Each row in `verts` is an array [x, y],
-        #   where x and y are the 2d-coordinates of the vertex.
-        edge_length = np.linalg.norm(vertices[vertex0]-vertices[vertex1])
-        G.add_edge(vertex0, vertex1, weight=edge_length)
-    return G
+    return branches, barcode
 
 
-def __shortest_path_tree(
-    G: nx.Graph, distances: dict
-):
-    """ Return the shortest path tree of a networkx graph with respect to some root.
+
+def plot_colored_barcode(barcode_and_colors, ax=None, **kwargs):
+    """ Plot a colored barcode computed by `compute_colored_tree_and_barcode`
 
         Args:
-            G (networkx.Graph):
-            distances (dict): dictionary of distances to the root
+            barcode_and_colors (list): list of bars and colors in the format returned
+                by `compute_colored_tree_and_barcode`. Each item in the list is
+                a tuple of a persistence pair and a color.
+            ax (matplotlib.axes.Axes): axis on which to plot barcode. defaults to None.
+                If no axis is provided, the tree is just plotted on the current axis of plt.
+            kwargs (dict): Additional keyword arguments.
+                These are forwarded to the ax.barh call.
     """
+    # if no axis is provided, fetch the current axis
+    import matplotlib.pyplot as plt
+    ax_provided = ax is not None
+    ax = ax if ax_provided else plt.gca()
+    # sort bars in ascending order by birth time
+    return_first_element = lambda pair : pair[0] # only use first element of tuple to sort
+    barcode_and_colors.sort(reverse=True, key=return_first_element)
+    # prepare args for bar plot
+    heights = [i for i in range(len(barcode_and_colors))]
+    births = [bar[0] for bar, color in barcode_and_colors]
+    widths = [bar[1] - bar[0] for bar, color in barcode_and_colors]
+    colors = [color for bar, color in barcode_and_colors]
+    # plot the barcode
+    ax.barh(heights, widths, left=births, color=colors, **kwargs)
+    ax.set_yticks([])
+    ax.set_xlabel("Barcode")
+    if not ax_provided:
+        plt.show()
 
-    C = nx.Graph()
-    for vertex0, vertex1 in G.edges():
-        C.add_edge(vertex0, vertex1, weight=max(distances[vertex0], distances[vertex1]))
-    return nx.minimum_spanning_tree(C)
+def plot_colored_tree(edges_and_colors, ax=None, **kwargs):
+    """ Plot a colored tree computed by `compute_colored_tree_and_barcode`
+
+        Args:
+            edges_and_colors (list): List of edges and colors.
+                Each item in the list is a tuple of a line and an rgb color.
+                Each line in a tuple with the 2d endpoints of an edge in the tree
+            ax (matplotlib.axes.Axes): axis on which to plot barcode. defaults to None.
+                If no axis is provided, the tree is just plotted on the current axis of plt.
+            kwargs (dict): Additional keyword arguments.
+                These are forwarded to the LineCollection constructor.
+                For example, kwargs could contain linewidth.
+    """
+    # if no axis is provided, fetch the current axis
+    ax_provided = ax is not None
+    ax = ax if ax_provided else plt.gca()
+    # prepare the edges to be plotted
+    edges = [edge for edge, color in edges_and_colors]
+    colors = [color for edge, color in edges_and_colors]
+    edges_collection = LineCollection(edges, colors=colors, **kwargs)
+    # plot the tree
+    ax.add_collection(edges_collection)
+    ax.set_axis_off()
+    if not ax_provided:
+        plt.show()
+
+def compute_colored_tree_and_barcode(vertices, edges):
+    """ Compute a tree and barcode colored according to branches.
+
+    Args:
+        vertices (V x 2 numpy array of ints):
+            Array where ith row stores 2d coordinate of ith vertex of a graph
+        edges (E x 2 numpy array of ints):
+            array where kth row [i, j] storing the indices i and j of
+            the kth edge's endpoints in `vertices`
+
+    Returns:
+        edges_and_colors (list): List of edges and colors.
+            Each item in the list is a tuple of a edge and an rgb color.
+            Each edge in a tuple with the 2d endpoints of an edge in the tree
+        barcode_and_colors (list): list of bars and colors.
+            Each item in the list is a tuple of a persistence pair and an rgb color.
+
+    Raises:
+        ValueError: The input graph must be a forest
+    """
+    branches, barcode = compute_branches_and_barcode(vertices, edges)
+    edges_and_colors = []
+    barcode_and_colors = []
+    for i, (branch, bar) in enumerate(zip(branches, barcode)):
+        color = __random_color(i)
+        barcode_and_colors.append((bar, color))
+        for v1idx, v2idx in branch:
+            v1 = vertices[v1idx]
+            v2 = vertices[v2idx]
+            # reverse v1 and v2 as mpl uses image coordinates
+            c1 = (v1[1], v1[0])
+            c2 = (v2[1], v2[0])
+            edges_and_colors.append(([c1, c2], color))
+    return edges_and_colors, barcode_and_colors
+
+def filter_graph(vertices, edges, min_branch_length):
+    """ Remove all branches from a tree that are less than length min_branch_lengths
+
+        Args:
+            vertices (V x 2 numpy array of ints):
+                Array where ith row stores 2d coordinate of ith vertex of a graph
+            edges (E x 2 numpy array of ints):
+                array where kth row [i, j] storing the indices i and j of
+                the kth edge's endpoints in `vertices`
+            min_branch_length (int):
+                threshold for branch length.
+                Any branch of shorter than min_branch_length is removed
+
+        Returns:
+            filtered_branches (E' x 2 numpy array of ints):
+                array of all edges in barnches longer than min_branch_length
+            filtered_barcode ():
+                barcode of filtered graph
+
+        Raises:
+            ValueError: The input graph must be a forest
+    """
+    branches, barcode = compute_branches_and_barcode(vertices, edges)
+    filtered_branches = []
+    filtered_barcode = []
+    for branch, bar in zip(branches, barcode):
+        birth, death = bar
+        if death-birth > min_branch_length:
+            filtered_branches.append(branch)
+            filtered_barcode.append(bar)
+    filtered_edges = np.concatenate(filtered_branches, axis=0)
+    return filtered_edges, filtered_barcode
 
 
 def compute_nx_graph(im: npt.NDArray[np.double],
@@ -372,22 +432,7 @@ def compute_nx_graph(im: npt.NDArray[np.double],
     # Slice a bounding box of the connected component to speed up computation
     dmtG = DMTGraph(im)
     verts, edges = dmtG.computeGraph(threshold1, threshold2)
-    G = nx.Graph()
-    # If the graph is not empty, we compute and plot the barcode of the Morse skeleton.
-    # The filtration adds the vertices and edges in decreasing order of distance from the center.
-    if(len(edges) > 0):
-        # create a networkx graph of Morse skeleton
-        # we use {G} to compute the distance of each vertex from the "center" of the graph
-        # The center is a graph-theoretic notion defined here:
-        #   https://en.wikipedia.org/wiki/Graph_center
-        for v0, v1 in edges:
-            # add each graph to the graph with weight = Euclidean distance between endpoints
-            # each edge in edges is an array [i, j, _],
-            #   where i and j are ints representing the index of the endpoints.
-            # each vertex in verts is an array [x, y],
-            #   where x and y are the 2d-coordinates of the vertex.
-            edge_length = np.linalg.norm(verts[v0]-verts[v1])
-            G.add_edge(v0, v1, weight=edge_length)
+    G = __convert_to_networkx_graph(verts, edges)
 
     return G, verts
 
