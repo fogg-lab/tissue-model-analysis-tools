@@ -1,10 +1,42 @@
 import warnings
 from math import floor
+from typing import Tuple, Callable
 from PIL import Image
 import numpy as np
 from skimage import measure, morphology
+from cv2 import medianBlur
 
-def elastic_distortion(images, grid_width, grid_height, magnitude, rs):
+
+def get_elastic_dual_transform(
+    grid_width_range: Tuple[int, int] = [4,8],
+    grid_height_range: Tuple[int, int] = [4,8],
+    magnitude_range: Tuple[int, int] = [7,9],
+    rs: np.random.RandomState=None,
+    p: float=0.9
+) -> Callable:
+    """Return a function that performs elastic distortion on an image and mask"""
+
+    if rs is None:
+        rs = np.random.RandomState()
+
+    def elastic_dual_transform(image: np.ndarray, mask: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """Perform elastic distortion on an image and mask"""
+        if rs.rand() > p:
+            return {'image': image, 'mask': mask}
+        grid_width = rs.randint(grid_width_range[0], grid_width_range[1]+1)
+        grid_height = rs.randint(grid_height_range[0], grid_height_range[1]+1)
+        magnitude = rs.randint(magnitude_range[0], magnitude_range[1]+1)
+
+        image, mask = elastic_distortion([image, mask], grid_width, grid_height, magnitude, rs)
+        # apply median blur to mask
+        mask = medianBlur(mask, 5)
+
+        return {'image': image, 'mask': mask}
+
+    return elastic_dual_transform
+
+
+def elastic_distortion(images, grid_width=None, grid_height=None, magnitude=8, rs=None):
     """
     Elastic distortion operation from the Augmentor library
 
@@ -34,7 +66,7 @@ def elastic_distortion(images, grid_width, grid_height, magnitude, rs):
         if dtypes[i] != np.uint8:
             dtype = np.uint8 if np.max(img) <= 255 else np.uint16
             img = img.astype(dtype)
-        images[i] = Image.fromarray(np.squeeze(img), mode = mode)
+        images[i] = Image.fromarray(np.squeeze(img), mode=mode)
 
     width, height = images[0].size
 

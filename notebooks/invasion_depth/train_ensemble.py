@@ -112,7 +112,7 @@ for model_idx in range(n_models):
         rs,
         class_weights=True,
         shuffle=True,
-        augmentation_function=prep.augment_imgs
+        augmentation_function=prep.augment_invasion_imgs
     )
     val_datagen = data_prep.InvasionDataGenerator(
         val_data_paths,
