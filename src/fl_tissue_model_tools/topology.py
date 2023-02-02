@@ -68,7 +68,7 @@ def compute_branches_and_barcode(vertices, edges):
         raise ValueError("Input graph must be a forest")
     # function for computing the length of the edge {u,v}
     edge_length = lambda u, v : np.linalg.norm(vertices[u]-vertices[v])
-
+    # output lists
     branches = []
     barcode = []
     # compute the path between each vertex and the root of its connected component
@@ -177,7 +177,8 @@ def plot_colored_barcode(barcode_and_colors, ax=None, **kwargs):
     ax_provided = ax is not None
     ax = ax if ax_provided else plt.gca()
     # sort bars in ascending order by birth time
-    barcode_and_colors.sort(reverse=True)
+    return_first_element = lambda pair : pair[0] # only use first element of tuple to sort
+    barcode_and_colors.sort(reverse=True, key=return_first_element)
     # prepare args for bar plot
     heights = [i for i in range(len(barcode_and_colors))]
     births = [bar[0] for bar, color in barcode_and_colors]
@@ -251,17 +252,38 @@ def compute_colored_tree_and_barcode(vertices, edges):
             edges_and_colors.append(([c1, c2], color))
     return edges_and_colors, barcode_and_colors
 
-def filter_graph(vertices, edges, delta):
-    """ Remove all branches from a tree that are less than length delta
+def filter_graph(vertices, edges, min_branch_length):
+    """ Remove all branches from a tree that are less than length min_branch_lengths
+
+        Args:
+            vertices (V x 2 numpy array of ints):
+                Array where ith row stores 2d coordinate of ith vertex of a graph
+            edges (E x 2 numpy array of ints):
+                array where kth row [i, j] storing the indices i and j of
+                the kth edge's endpoints in `vertices`
+            min_branch_length (int):
+                threshold for branch length.
+                Any branch of shorter than min_branch_length is removed
+
+        Returns:
+            filtered_branches (E' x 2 numpy array of ints):
+                array of all edges in barnches longer than min_branch_length
+            filtered_barcode ():
+                barcode of filtered graph
 
         Raises:
             ValueError: The input graph must be a forest
     """
     branches, barcode = compute_branches_and_barcode(vertices, edges)
-    branch_mask = [ (death-birth) > delta for birth, death in barcode ]
-    filtered_branches = [ branch for branch, val in zip(branches, branch_mask) if val ]
-    filtered_barcode = [ bar for bar, val in zip(barcode, branch_mask) if val ]
-    return np.concatenate(filtered_branches, axis=0), filtered_barcode
+    filtered_branches = []
+    filtered_barcode = []
+    for branch, bar in zip(branches, barcode):
+        birth, death = bar
+        if death-birth > min_branch_length:
+            filtered_branches.append(branch)
+            filtered_barcode.append(bar)
+    filtered_edges = np.concatenate(filtered_branches, axis=0)
+    return filtered_edges, filtered_barcode
 
 
 def compute_morse_skeleton_and_barcode(im: npt.NDArray[np.double],
