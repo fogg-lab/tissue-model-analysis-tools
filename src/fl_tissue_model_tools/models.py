@@ -155,9 +155,9 @@ def build_ResNet50_TL(
 
 
 def build_UNetXception(
-    n_outputs: int, img_shape: Tuple[int, int], channels: int=1,
-    filter_counts: Tuple[int, int, int, int]=(32, 64, 128, 256),
-    output_act: str="sigmoid"
+    n_outputs: int, img_shape: Tuple[int, int], channels: int = 1,
+    filter_counts: Tuple[int, int, int, int] = (32, 64, 128, 256),
+    output_act: str = "sigmoid"
 ) -> Model:
     """Build a UNetXception model for semantic segmentation.
 

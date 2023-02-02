@@ -1,9 +1,12 @@
+from typing import Tuple
+
 import numpy as np
 import numpy.typing as npt
 import gudhi as gd
 import networkx as nx
 from matplotlib.collections import LineCollection
 import matplotlib.pyplot as plt
+from skimage import measure, morphology
 
 from pydmtgraph.dmtgraph import DMTGraph
 
@@ -43,6 +46,129 @@ def __shortest_path_tree(
     for vertex0, vertex1 in G.edges():
         C.add_edge(vertex0, vertex1, weight=max(distances[vertex0], distances[vertex1]))
     return nx.minimum_spanning_tree(C)
+
+
+def nx_graph_from_binary_skeleton(skeleton: npt.NDArray) -> nx.Graph:
+    """
+    Create a weighted, undirected networkx graph from a binary skeleton image.
+    The graph will have a 'physical_pos' attribute that maps node ids to their
+    physical coordinates in the skeleton image.
+
+    Args:
+        skeleton (npt.NDArray): binary skeleton image
+    Returns:
+        nx.Graph: weighted, undirected graph
+    """
+    skeleton = skeleton.astype(bool)
+    g = nx.Graph()
+
+    # get physical positions of nodes and add them to the graph
+    node_pos = np.argwhere(skeleton)
+    g.graph['physical_pos'] = node_pos
+
+    # if skeleton is empty, return empty graph
+    if len(node_pos) == 0:
+        return g
+
+    # get node labels
+    node_labels = np.full(skeleton.shape, -1)
+    node_labels[node_pos[:, 0], node_pos[:, 1]] = np.arange(node_pos.shape[0])
+    edge_connected_nodes = np.zeros(skeleton.shape, dtype=bool)
+    weighted_edges = []
+
+    # function to shift the skeleton (pad sides, crop opposite sides from the padding)
+    def shift_2d(arr: npt.NDArray, pad_vals: npt.NDArray) -> npt.NDArray:
+        padded = np.pad(arr, pad_vals)
+        pad_bottom, pad_right = pad_vals[0,1], pad_vals[1,1]
+        h, w = arr.shape
+        shifted = padded[pad_bottom:(h + pad_bottom), pad_right:(w + pad_right)]
+        return shifted
+
+    # shift skeleton in each possible edge direction to find connected nodes
+    # intersection of shifted skeleton and original skeleton gives dest nodes
+    # dest nodes shifted back to original position gives src nodes
+    for (shift_rows, shift_cols) in [(1, 0), (0, 1), (1, 1), (1, -1)]:
+        ## find skeleton nodes connected by an edge for the current shift direction
+
+        # pad and crop to shift skeleton 1 pixel down, right, down-right, or down-left
+        pad_top, pad_bottom = (shift_rows == 1), 0
+        pad_left, pad_right = (shift_cols == 1), (shift_cols == -1)
+        pad_vals = np.array([[pad_top, pad_bottom], [pad_left, pad_right]])
+        shifted_skel = shift_2d(skeleton, pad_vals)
+
+        # dest nodes: intersection of the shifted skeleton and the original skeleton
+        dest_nodes = skeleton * shifted_skel
+        if not np.any(dest_nodes):
+            continue
+
+        # src nodes: dest nodes shifted back to their original position
+        pad_vals = np.flip(pad_vals, axis=1)
+        src_nodes = shift_2d(dest_nodes, pad_vals)
+
+        # add src and dest nodes to edge_connected_nodes
+        edge_connected_nodes += src_nodes + dest_nodes
+
+        # get node ids
+        src_node_ids = node_labels[(node_labels > -1) & src_nodes]
+        dest_node_ids = node_labels[(node_labels > -1) & dest_nodes]
+
+        # create list of weighted edges: [(node_id_1, node_id_2, weight), ...]
+        weight = np.linalg.norm((shift_rows, shift_cols))
+        weights = np.full(src_node_ids.shape, weight)
+        new_weighted_edges = zip(src_node_ids, dest_node_ids, weights)
+        weighted_edges.extend(new_weighted_edges)
+
+    # add weighted edges to graph
+    g.add_weighted_edges_from(weighted_edges)
+
+    # add disconnected nodes to graph
+    isolated_nodes = skeleton * np.logical_not(edge_connected_nodes)
+    if np.any(isolated_nodes):
+        isolated_node_ids = node_labels[(node_labels > -1) & isolated_nodes].tolist()
+        g.add_nodes_from(isolated_node_ids)
+
+    return g
+
+
+def get_filtered_mask_and_graph(mask: npt.NDArray) -> Tuple[npt.NDArray, nx.Graph]:
+    """
+    Remove components from the segmentation mask that do not contain branches.
+    Args:
+        mask (npt.NDArray): Segmentation mask to filter
+    Returns:
+        Tuple[npt.NDArray, nx.Graph]: Filtered mask and nx graph
+    """
+
+    mask = np.copy(mask)
+
+    seg_skel=morphology.skeletonize(mask)
+    G = nx_graph_from_binary_skeleton(seg_skel)
+
+    fork_nodes = {n for n in G.nodes() if G.degree[n] > 2}
+    components = [*nx.connected_components(G)]
+
+    remove_nodes_1_per_cc = []
+    remove_nodes_all = set()
+
+    for cc in components:
+        if not cc.intersection(fork_nodes):
+            cc_node_sample = next(iter(cc))
+            remove_nodes_1_per_cc.append(cc_node_sample)
+            remove_nodes_all.update(cc)
+
+    labeled_components = measure.label(mask, connectivity=2)
+    removed_components = set()
+
+    for node in remove_nodes_1_per_cc:
+        node_coords=G.graph['physical_pos'][node]
+        node_cc_label = labeled_components[node_coords[0]][node_coords[1]]
+        mask[labeled_components==node_cc_label] = 0
+        removed_components.add(node_cc_label)
+
+    G.remove_nodes_from(remove_nodes_all)
+
+    return mask, G
+
 
 def compute_branches_and_barcode(vertices, edges):
     """ Compute the branches and barcodes of a tree
@@ -286,18 +412,36 @@ def filter_graph(vertices, edges, min_branch_length):
     return filtered_edges, filtered_barcode
 
 
-def compute_morse_skeleton_and_barcode(im: npt.NDArray[np.double],
+def compute_nx_graph(im: npt.NDArray[np.double],
                                        threshold1: float=0.5,
                                        threshold2: float=0.0):
     """Fit a Morse skeleton to the image `im`.
-        Also, compute the lower star filtration of the Morse skeleton where each
-        vertex's filtration value is the negative distance from the graph center.
         Args:
             im (npt.NDArray[np.float64]): Grayscale image
             threshold1 (float): threshold for the Morse skeleton simplification step. See paper.
             threshold2 (float): threshold for the edges. We only take the 1-unstable manifold of edges
                                 with value > threshold2. The higher the value, the more disconnected
                                 the graph will be
+        Returns:
+			G: networkx graph with edge weights representing distances between branches
+			verts: vertices of DMTGraph generated from image
+    """
+
+
+    # Compute the Morse skeleton
+    # Slice a bounding box of the connected component to speed up computation
+    dmtG = DMTGraph(im)
+    verts, edges = dmtG.computeGraph(threshold1, threshold2)
+    G = __convert_to_networkx_graph(verts, edges)
+
+    return G, verts
+
+def compute_morse_skeleton_and_barcode(G, verts):
+    """Compute a morse skeleton and barcode given a networkx graph G
+        Also, compute the lower star filtration of the Morse skeleton where each
+        vertex's filtration value is the negative distance from the graph center.
+        Args:
+            G (nx.Graph): networkx graph with edge weights representing distances between branches 
         Returns:
             verts_total (V x 2 numpy array of ints): Array where ith row stores
                                                        2d coordinate of ith vertex in Morse skeleton
@@ -307,61 +451,44 @@ def compute_morse_skeleton_and_barcode(im: npt.NDArray[np.double],
             bc_total (n x 2 numpy array of floats): array where each row is a bar in the barcode
                                                    of the filtration on the Morse skeleton
     """
-
-    # These are initialized to being empty
-    # however, we set the number of columns so we can use np.concatenate later.
     verts_total = np.zeros((0,2))
     edges_total = np.zeros((0,2), dtype=int)
     bc_total = np.zeros((0,2))
 
-    # Compute the Morse skeleton
-    # Slice a bounding box of the connected component to speed up computation
-    dmtG = DMTGraph(im)
-    verts, edges = dmtG.computeGraph(threshold1, threshold2)
+    graph_components = [ G.subgraph(c).copy() for c in nx.connected_components(G) ]
+    for g in graph_components:
+		# Choose an arbitrary vertex as the center and compute the distance of each vertex
+        center = np.random.choice([n for n in g])
+        distances = nx.algorithms.shortest_paths.weighted.single_source_dijkstra_path_length(
+			g, center)
 
-    # If the graph is not empty, we compute and plot the barcode of the Morse skeleton.
-    # The filtration adds the vertices and edges in decreasing order of distance from the center.
-    if(len(edges) > 0):
-        # create a networkx graph of Morse skeleton
-        # we use {G} to compute the distance of each vertex from the "center" of the graph
-        # The center is a graph-theoretic notion defined here:
-        #   https://en.wikipedia.org/wiki/Graph_center
-        G = __convert_to_networkx_graph(verts, edges)
+		# compute the shortest path tree of the graph component
+        spt = __shortest_path_tree(g, distances)
 
-        graph_components = [ G.subgraph(c).copy() for c in nx.connected_components(G) ]
-        for g in graph_components:
-            # Choose an arbitrary vertex as the center and compute the distance of each vertex
-            center = np.random.choice([n for n in g])
-            distances = nx.algorithms.shortest_paths.weighted.single_source_dijkstra_path_length(
-                g, center)
+		# Now, we use the distances to compute the barcode of the Morse skeleton
+		#
+		# Build a Gudhi complex to compute the filtration
+		# `K` is just another representation of the Morse skeleton
+        K = gd.SimplexTree()
 
-            # compute the shortest path tree of the graph component
-            spt = __shortest_path_tree(g, distances)
+		# Add the vertices to the complex with their filtration values
+		# `distances` is a dict with entries of the form {vertex_idx : distance to `center`}
+        for key in distances:
+            K.insert([key], filtration=-distances[key])
 
-            # Now, we use the distances to compute the barcode of the Morse skeleton
-            #
-            # Build a Gudhi complex to compute the filtration
-            # `K` is just another representation of the Morse skeleton
-            K = gd.SimplexTree()
+		# Add the edges to the complex.
+		# The filtation value of an edge is the max filtation value of its vertices.
+        for v0, v1 in spt.edges():
+            K.insert([v0, v1], filtration = max(K.filtration([v0]), K.filtration([v1])))
 
-            # Add the vertices to the complex with their filtration values
-            # `distances` is a dict with entries of the form {vertex_idx : distance to `center`}
-            for key in distances:
-                K.insert([key], filtration=-distances[key])
+		# compute the barcode of the Morse skeleton
+        K.compute_persistence()
 
-            # Add the edges to the complex.
-            # The filtation value of an edge is the max filtation value of its vertices.
-            for v0, v1 in spt.edges():
-                K.insert([v0, v1], filtration = max(K.filtration([v0]), K.filtration([v1])))
+		# retrieve the 0-dimensional barcode
+        bc = K.persistence_intervals_in_dimension(0)
 
-            # compute the barcode of the Morse skeleton
-            K.compute_persistence()
+        bc_total = np.concatenate((bc_total, bc), axis=0)
+        verts_total = np.concatenate((verts_total, verts), axis=0)
+        edges_total = np.concatenate((edges_total, np.array(spt.edges)), axis=0)
 
-            # retrieve the 0-dimensional barcode
-            bc = K.persistence_intervals_in_dimension(0)
-
-            bc_total = np.concatenate((bc_total, bc), axis=0)
-            verts_total = np.concatenate((verts_total, verts), axis=0)
-            edges_total = np.concatenate((edges_total, np.array(spt.edges)), axis=0)
-
-    return verts_total, edges_total, bc_total, G
+    return verts_total, edges_total, bc_total
