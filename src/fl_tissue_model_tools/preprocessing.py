@@ -133,7 +133,7 @@ def gen_circ_mask_auto(
         circles.append(circle)
     if len(circles) == 0:
         circle = {
-            'radius': img.shape[0] * radius_proportion_est,
+            'radius': img.shape[0] * inner_diameter_proportion_est,
             'center_x': img.shape[1] * 0.5,
             'center_y': img.shape[0] * 0.5
         }
