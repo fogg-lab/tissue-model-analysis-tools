@@ -1,4 +1,4 @@
-from typing import Union, Sequence, Any, Tuple, Dict, List, Callable
+from typing import Sequence, Any, Tuple, Dict, List, Callable
 import random
 import cv2
 import numpy as np
@@ -303,46 +303,9 @@ def get_augmentor(augmentations: List[Callable]) -> Callable:
     def augmentor(image: npt.NDArray, mask: npt.NDArray) -> Tuple[npt.NDArray, npt.NDArray]:
         assert image.shape == mask.shape, 'Image and mask must have the same shape.'
 
-        added_start_dim = image.shape[0] == 1
-        added_end_dim = image.shape[-1] == 1
-        if added_start_dim or added_end_dim:
-            image = image.squeeze()
-            mask = mask.squeeze()
-
-        # some transforms require uint8 images
-        img_min = np.min(image)
-        if np.min(image) < 0:
-            image = image - img_min
-            img_min = 0
-        img_max = np.max(image)
-
-        if img_max < 1:
-            scale = 255
-        elif img_max <= 255:
-            scale = 1
-        elif img_max <= 65025:
-            scale = 1 / 255
-        else:
-            scale = 255 / img_max
-
-        og_dtype = image.dtype
-
-        image = image * scale
-        image = np.round(image).astype(np.uint8)
-
         for aug in augmentations:
             transformed = aug(image=image, mask=mask)
             image, mask = transformed['image'], transformed['mask']
-
-        image = (image / scale).astype(og_dtype)
-
-        if added_start_dim:
-            image = image[np.newaxis, ...]
-            mask = mask[np.newaxis, ...]
-
-        if added_end_dim:
-            image = image[..., np.newaxis]
-            mask = mask[..., np.newaxis]
 
         return image, mask
 
@@ -359,10 +322,8 @@ def get_batch_augmentor(augmentations: List[Callable]) -> Callable:
         num_samples = images.shape[0]
 
         image_mask_pairs = d.compute([
-            d.delayed(augmentor)(images[i], masks[i])[0]
+            d.delayed(augmentor)(images[i], masks[i])
             for i in range(num_samples)])[0]
-
-        # image_mask_pairs = [augmentor(images[i], masks[i]) for i in range(num_samples)]
 
         transformed_images, transformed_masks = zip(*image_mask_pairs)
 
