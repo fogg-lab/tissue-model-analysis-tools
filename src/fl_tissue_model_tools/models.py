@@ -1,10 +1,13 @@
 import json
 from operator import lt, gt
 from copy import deepcopy
+from pathlib import Path
 from typing import Sequence, Tuple
 import numpy as np
+from numpy import typing as npt
 import tensorflow as tf
 import keras_tuner as kt
+from PIL import Image
 
 import tensorflow.keras.backend as K
 from tensorflow.keras import Input, Model
@@ -18,6 +21,8 @@ from tensorflow.keras.optimizers import Adam
 
 # Custom
 from fl_tissue_model_tools import data_prep
+from fl_tissue_model_tools.smooth_tiled_predictions import predict_img_with_smooth_windowing
+from fl_tissue_model_tools import defs
 
 
 def _check_consec_factor(x: Sequence[float], factor: float, reverse: bool=False) -> bool:
@@ -511,8 +516,7 @@ class UNetXceptionGridSearch():
                 If higher score of `objective` is good, use `max`, otherwise, use `min`.
             search_verbose: Print out updates during grid search.
         """
-        assert (
-            comparison == "min" or comparison == "max",
+        assert comparison == "min" or comparison == "max", (
             "comparison operator must be either \"min\" or \"max\""
         )
         if comparison == "min":
@@ -526,7 +530,6 @@ class UNetXceptionGridSearch():
             get_best = np.max
             get_best_idx = np.argmax
 
-
         # iterate through the input list of filter counts,
         # fit a unet with each, and save the best
         for i, fc in enumerate(self.filter_counts_options):
@@ -534,7 +537,7 @@ class UNetXceptionGridSearch():
                 print(f"Testing filter counts: {fc}")
             best_weights_file = f"{self.save_dir}/best_weights_config_{i}.h5"
             cp_callback = ModelCheckpoint(
-                best_weights_file, save_best_only=True, save_weights_only=True
+                best_weights_file, save_best_only=True, save_weights_only=True, monitor="loss"
             )
             model = build_UNetXception(
                 self.n_outputs, self.img_shape, channels=self.channels,
@@ -594,3 +597,121 @@ class UNetXceptionGridSearch():
         model.load_weights(f"{self.save_dir}/best_weights_config_{self.best_score_idx}.h5")
         model.compile(optimizer=self.optimizer, loss=self.loss, metrics=self.metrics)
         return model
+
+
+class UNetXceptionPatchSegmentor():
+    """ Class for binary segmentation inference on images in patches with UNetXception model."""
+    def __init__(self, patch_size: int, checkpoint_file: str, filter_counts: Tuple[int],
+                 ds_ratio: float=0.5, norm_mean: float=0, norm_std: float=1, channels: int=1):
+        self.patch_size = patch_size
+        self.channels = channels
+        self.norm_mean = norm_mean
+        self.norm_std = norm_std
+        self.ds_ratio = ds_ratio
+        self.model = build_UNetXception(
+            1, (patch_size, patch_size), channels=channels, filter_counts=filter_counts, output_act="sigmoid"
+        )
+        self.model.load_weights(checkpoint_file)
+
+    def predict(self, x: npt.NDArray, threshold: float = 0.5) -> npt.NDArray:
+        x = x.astype(np.float32)
+        og_shape = x.shape
+        target_shape = (round(og_shape[0] * self.ds_ratio), round(og_shape[1] * self.ds_ratio))
+        if og_shape != target_shape:
+            x = Image.fromarray(x).resize(target_shape, resample=Image.LANCZOS)
+            x = np.array(x)
+        x = (x - self.norm_mean) / self.norm_std
+
+        full_pred = predict_img_with_smooth_windowing(
+            x,
+            window_size=self.patch_size,
+            subdivisions=2,  # Minimal amount of overlap for windowing. Must be an even number.
+            pred_func=self.model.predict
+        )
+
+        pred_thresh = (full_pred > threshold).astype(np.uint8)
+
+        if og_shape != target_shape:
+            full_pred = Image.fromarray(full_pred).resize(og_shape, resample=Image.LANCZOS)
+            full_pred = np.array(full_pred)
+            pred_thresh = Image.fromarray(pred_thresh).resize(og_shape, resample=Image.NEAREST)
+            pred_thresh = np.array(pred_thresh)
+
+        return full_pred, pred_thresh
+
+
+def get_unet_patch_segmentor_from_cfg(cfg_json: str) -> UNetXceptionPatchSegmentor:
+    """Get a UNetXceptionPatchSegmentor object from a config json file.
+
+    Args:
+        cfg_json: Path to config json file.
+
+    Returns:
+        A UNetXceptionPatchSegmentor.
+
+    """
+    with open(cfg_json, "r") as fp:
+        cfg = json.load(fp)
+
+    models_dir = Path(defs.SCRIPT_REL_MODEL_TRAINING_PATH)
+    checkpoint_file = models_dir / "binary_segmentation" / "checkpoints" / cfg["checkpoint_file"]
+
+    segmentor = UNetXceptionPatchSegmentor(
+        cfg["patch_size"],
+        checkpoint_file,
+        cfg["filter_counts"],
+        ds_ratio=cfg.get("ds_ratio", 0),
+        norm_mean=cfg.get("norm_mean", 0),
+        norm_std=cfg.get("norm_std", 1),
+        channels=cfg.get("channels", 1)
+    )
+
+    return segmentor
+
+
+def save_unet_patch_segmentor_cfg(cfg: dict):
+    """Save a UNetXceptionPatchSegmentor config to a json file.
+    Args:
+        cfg: Config dictionary.
+
+    """
+    models_dir = Path(defs.SCRIPT_REL_MODEL_TRAINING_PATH)
+    save_dir = models_dir / "binary_segmentation" / "configs"
+
+    required_keys = ["patch_size", "checkpoint_file", "filter_counts"]
+    optional_keys = ["ds_ratio", "norm_mean", "norm_std", "channels"]
+    for key in required_keys:
+        if cfg.get(key) is None:
+            raise ValueError(f"Missing required config parameter: {key}")
+    for key in optional_keys:
+        if cfg.get(key) is None:
+            print("Warning: Missing optional config parameter: {key}")
+    for key in cfg.keys():
+        if key not in required_keys and key not in optional_keys:
+            raise ValueError(f"Invalid config parameter: {key}")
+
+    exp_num = get_last_exp_num() + 1
+
+    save_path = save_dir / f"unet_patch_segmentor_{exp_num}.json"
+
+    with open(save_path, "w") as fp:
+        json.dump(cfg, fp, indent=4)
+
+
+def get_last_exp_num() -> int:
+    """Get the last experiment number for a UNetXceptionPatchSegmentor config.
+
+    Returns:
+        The last experiment number.
+
+    """
+    models_dir = Path(defs.SCRIPT_REL_MODEL_TRAINING_PATH)
+    save_dir = models_dir / "binary_segmentation" / "configs"
+
+    exp_num = 0
+    for file in save_dir.glob("*.json"):
+        fname = file.name
+        if fname.startswith("unet_patch_segmentor_"):
+            exp_num = max(exp_num, int(fname.split("_")[-1].split(".")[0]))
+
+    return exp_num
