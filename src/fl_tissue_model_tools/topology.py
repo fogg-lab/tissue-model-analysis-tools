@@ -23,6 +23,7 @@ def __random_color(i : int):
 def __convert_to_networkx_graph(vertices, edges):
     """ Convert a dmtgraph to a Networkx graph """
     G = nx.Graph()
+    # TODO: add vertex position
     for vertex0, vertex1 in edges:
         # Add each edge to the graph with weight = Euclidean distance between endpoints
         # Each row in `edges` is an array [i, j],
@@ -284,6 +285,42 @@ def compute_branches_and_barcode(vertices, edges):
 
     return branches, barcode
 
+def smooth_graph(vertices, edges, window_size):
+    """ Smooth a graph using sliding window smoothing
+
+    """
+    def moving_average(A, n=3):
+        """ Computes moving average of array `a` with window size `n` """
+        ret = np.concatenate(([A[0]]*n, A[1:-1], [A[-1]]*n))
+        ret = np.cumsum(ret, axis=0, dtype=float)
+        ret[n:] = ret[n:] - ret[:-n]
+        return ret[n-1:-(n-1)] / n
+
+    G = __convert_to_networkx_graph(vertices, edges)
+    branches, _ = compute_branches_and_barcode(vertices, edges)
+    # We fix the position of all leaves and merge points between two branches
+    is_position_fixed = [ G.degree[v] != 2 for v in G.nodes ]
+    # the smoothed graph will have the same edges as the input graph
+    # but different vertex positions
+    new_vertices = vertices.copy()
+    for branch in branches:
+        # verify that edges in branch are consecutive
+        # this should be true as this is how compute_branches_and_barcode works
+        assert all([ branch[i][1] == branch[i+1][0] for i in range(len(branch)-1) ])
+        branch_vertices = np.array( [branch[i][0] for i in range(len(branch))]+[branch[-1][1]] )
+        # A branch may have fixed points besides its endpoints,
+        # for example, when another branch is attached to the middle of the branch.
+        # We therefore decompose the branch into the segments
+        # connecting fixed points and smooth each of these segments.
+        is_position_fixed[branch_vertices[0]] = True
+        is_position_fixed[branch_vertices[-1]] = True
+        branch_fixed_vertices = [ i for i, vertex in enumerate(branch_vertices) if is_position_fixed[vertex] ]
+        for i in range(len(branch_fixed_vertices)-1):
+            segment_start, segment_end = branch_fixed_vertices[i], branch_fixed_vertices[i+1]
+            segment_vertices = branch_vertices[segment_start:segment_end+1]
+            new_vertices[segment_vertices] = moving_average(vertices[segment_vertices], window_size)
+    return new_vertices, edges
+
 
 
 def plot_colored_barcode(barcode_and_colors, ax=None, **kwargs):
@@ -441,7 +478,7 @@ def compute_morse_skeleton_and_barcode(G, verts):
         Also, compute the lower star filtration of the Morse skeleton where each
         vertex's filtration value is the negative distance from the graph center.
         Args:
-            G (nx.Graph): networkx graph with edge weights representing distances between branches 
+            G (nx.Graph): networkx graph with edge weights representing distances between branches
         Returns:
             verts_total (V x 2 numpy array of ints): Array where ith row stores
                                                        2d coordinate of ith vertex in Morse skeleton
