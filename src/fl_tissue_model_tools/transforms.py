@@ -5,8 +5,39 @@ from PIL import Image
 import numpy as np
 import numpy.typing as npt
 from skimage import measure, morphology
+from scipy.spatial import KDTree
 import networkx as nx
-from cv2 import medianBlur
+import cv2
+
+def combine_im_with_mask_dist_transform(
+    img: npt.NDArray, mask: npt.NDArray, blend_exponent: float = 1
+) -> npt.NDArray[np.float]:
+    """Highlight centerlines of mask components in image using distance transform.
+    Args:
+        img: The image.
+        mask: The binary mask.
+        blend_exponent: The exponent applied to transformed mask before blending with the image.
+                        For example, a value of 1.5 will highlight centerlines more prominently,
+                        while a value of 0.5 will retain more detail of the original image.
+    Returns:
+        The image blended with the transformed mask.
+    """
+    img = np.copy(img)
+    mask = np.copy(mask)
+    mask = (mask / np.max(mask)).astype(np.uint8)
+    dist_to_border = cv2.distanceTransform(mask, cv2.DIST_L2, 5)
+    skeleton = morphology.skeletonize(mask).astype(np.uint8)
+    skel_coords = np.argwhere(skeleton)
+    skeleton = KDTree(skel_coords)
+    mask_coords = np.argwhere(mask)
+    mask_distances_to_skeleton, _ = skeleton.query(mask_coords)
+    dist_to_skeleton = np.zeros(mask.shape)
+    dist_to_skeleton[mask_coords[:, 0], mask_coords[:, 1]] = mask_distances_to_skeleton
+    dist_transformed = 1 - (dist_to_skeleton / (dist_to_skeleton + dist_to_border))
+    dist_transformed = np.nan_to_num(dist_transformed)
+    dist_transformed = np.power(dist_transformed, blend_exponent)
+
+    return dist_transformed * img
 
 
 def get_elastic_dual_transform(
@@ -31,7 +62,7 @@ def get_elastic_dual_transform(
 
         image, mask = elastic_distortion([image, mask], grid_width, grid_height, magnitude, rs)
         # apply median blur to mask
-        mask = medianBlur(mask, 5)
+        mask = cv2.medianBlur(mask, 5)
 
         return {'image': image, 'mask': mask}
 
@@ -288,7 +319,7 @@ def nx_graph_from_binary_skeleton(skeleton: npt.NDArray) -> nx.Graph:
     return g
 
 
-def filter_branch_seg_mask(mask: npt.NDArray) -> Tuple[npt.NDArray, nx.Graph]:
+def filter_branch_seg_mask(mask: npt.NDArray) -> npt.NDArray:
     """
     Remove components from the segmentation mask that do not contain branches.
     Args:
@@ -325,4 +356,4 @@ def filter_branch_seg_mask(mask: npt.NDArray) -> Tuple[npt.NDArray, nx.Graph]:
 
     G.remove_nodes_from(remove_nodes_all)
 
-    return mask, G
+    return mask
