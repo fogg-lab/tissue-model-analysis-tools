@@ -48,8 +48,6 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
     pred, mask = model.predict(img)     # pred is unthresholded
     img = exposure.equalize_adapthist(img)  # equalize
 
-    print(mask.min(), mask.max())
-
     if save_intermediates:
         save_path = str(vis_dir / "equalized.png")
         cv2.imwrite(save_path, (img*256).astype(np.uint8))
