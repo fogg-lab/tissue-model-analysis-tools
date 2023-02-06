@@ -1,11 +1,16 @@
 from typing import Tuple
 import math
+import subprocess
+import pickle
+import os
+from time import time
 
 import numpy as np
 import numpy.typing as npt
 import networkx as nx
 from matplotlib.collections import LineCollection
 import matplotlib.pyplot as plt
+import cv2
 from cv2 import cvtColor, COLOR_HSV2BGR
 
 from pydmtgraph.dmtgraph import DMTGraph
@@ -15,7 +20,7 @@ class MorseGraph:
     """Morse skeleton of an image represented as a forest. Each tree is a connected component."""
 
     def __init__(self, img: npt.NDArray, thresholds: Tuple[float, float]=(1,4),
-                 min_branch_length: int=10, smoothing_window: int=15):
+                 min_branch_length: int=15, smoothing_window: int=15):
         self.barcode = None
         self._leaves = None
         self._branches = None
@@ -203,7 +208,6 @@ class MorseGraph:
         parent = self._parent
         verts = self._vertices
         leaves = [n for n in self._G.nodes if self._G.degree[n] == 1]
-
         max_dist_to_leaf = { v : -np.inf for v in self._G.nodes }
         branch_label = { }
         for leaf in leaves:
@@ -214,7 +218,7 @@ class MorseGraph:
             # This while loop follows the unique path from
             # a leaf to the root.
             while current_parent != current_vertex:
-                current_distance += self.__edge_len(verts, current_parent, current_vertex)
+                current_distance += np.linalg.norm(verts[current_parent] - verts[current_vertex])
                 if current_distance < max_dist_to_leaf[current_parent]:
                     # We've reached a vertex that has a descendant leaf that is
                     # further away, so it is part of another branch.
@@ -334,16 +338,17 @@ class MorseGraph:
 
         filtered_branches = []
         filtered_barcode = []
+        filtered_edges = set()
 
         for branch, bar in zip(self._branches, self.barcode):
             birth, death = bar
             if death - birth > min_branch_length:
                 filtered_branches.append(branch)
                 filtered_barcode.append(bar)
+                filtered_edges.update([tuple(e) for e in branch])
 
         self._branches = filtered_branches
 
-        filtered_edges = np.concatenate(filtered_branches, axis=0)
         edges_to_remove = [e for e in self._G.edges if e not in filtered_edges]
         self._G.remove_edges_from(edges_to_remove)
         self.barcode = filtered_barcode
@@ -405,8 +410,22 @@ class MorseGraph:
 
         # Compute the Morse skeleton
         # Slice a bounding box of the connected component to speed up computation
-        dmtG = DMTGraph(im)
-        verts, edges = dmtG.computeGraph(threshold1, threshold2)
+        #dmtG = DMTGraph(im)
+        #verts, edges = dmtG.computeGraph(threshold1, threshold2)
+
+        # spawn subprocess to compute the graph as temporary workaround for memory leak in DMTGraph
+        cur_file_path = os.path.dirname(os.path.abspath(__file__))
+        subprocess_path = os.path.join(cur_file_path, 'compute_graph_proc.py')
+        rand_id=np.random.randint(0,1000000)
+        fname=cur_file_path + '/tmp'+str(rand_id)
+        #with tempfile.NamedTemporaryFile() as f:
+        cv2.imwrite(fname+'.png', im)
+        cmd = ['python', subprocess_path, fname+'.png', str(threshold1), str(threshold2), fname + '.pkl']
+        subprocess.check_call(cmd)
+        with open(fname + '.pkl', 'rb') as f2:
+            verts, edges = pickle.load(f2)
+        os.remove(fname+'.png')
+        os.remove(fname+'.pkl')
 
         G = MorseGraph.__convert_to_networkx_graph(edges)
 
