@@ -1,330 +1,56 @@
 from typing import Tuple
+import math
 
 import numpy as np
 import numpy.typing as npt
-import gudhi as gd
 import networkx as nx
 from matplotlib.collections import LineCollection
 import matplotlib.pyplot as plt
-from skimage import measure, morphology
+from cv2 import cvtColor, COLOR_HSV2BGR
 
 from pydmtgraph.dmtgraph import DMTGraph
 
-def __random_color(i : int):
-    """ Convert an int to a random color """
-    from cv2 import cvtColor, COLOR_HSV2BGR
 
-    phi = 0.618033988749895
-    step = 180*phi
+class MorseGraph:
+    """Morse skeleton of an image represented as a forest. Each tree is a connected component."""
 
-    return cvtColor(np.array([[[step*i, 220, 255]]], np.uint8), COLOR_HSV2BGR)[0][0] / 255
-
-
-def __convert_to_networkx_graph(vertices, edges):
-    """ Convert a dmtgraph to a Networkx graph """
-    G = nx.Graph()
-    # TODO: add vertex position
-    for vertex0, vertex1 in edges:
-        # Add each edge to the graph with weight = Euclidean distance between endpoints
-        # Each row in `edges` is an array [i, j],
-        #   where i and j are ints representing the index of the endpoints.
-        # Each row in `verts` is an array [x, y],
-        #   where x and y are the 2d-coordinates of the vertex.
-        edge_length = np.linalg.norm(vertices[vertex0]-vertices[vertex1])
-        G.add_edge(vertex0, vertex1, weight=edge_length)
-    return G
-
-def __shortest_path_tree(
-    G: nx.Graph, distances: dict
-):
-    """ Return the shortest path tree of a networkx graph with respect to some root.
-
-        Args:
-            G (networkx.Graph):
-            distances (dict): dictionary of distances to the root
-    """
-    C = nx.Graph()
-    for vertex0, vertex1 in G.edges():
-        C.add_edge(vertex0, vertex1, weight=max(distances[vertex0], distances[vertex1]))
-    return nx.minimum_spanning_tree(C)
+    def __init__(self, img: npt.NDArray, thresholds: Tuple[float, float]=(1,4),
+                 min_branch_length: int=10, smoothing_window: int=15):
+        self.barcode = None
+        self._leaves = None
+        self._branches = None
+        self._parent = None
+        self._dist_to_root = None
+        self._edges_and_colors = None
+        self._barcode_and_colors = None
+        self._G = None
+        self._branch_label = None
+        self._vertices = None
+        self.__compute_graph(img, thresholds)
+        self.__get_branch_labels()
+        self.__compute_branches_and_barcode()
+        self.__smooth_graph(smoothing_window)
+        self.__filter_graph(min_branch_length)
 
 
-def nx_graph_from_binary_skeleton(skeleton: npt.NDArray) -> nx.Graph:
-    """
-    Create a weighted, undirected networkx graph from a binary skeleton image.
-    The graph will have a 'physical_pos' attribute that maps node ids to their
-    physical coordinates in the skeleton image.
-
-    Args:
-        skeleton (npt.NDArray): binary skeleton image
-    Returns:
-        nx.Graph: weighted, undirected graph
-    """
-    skeleton = skeleton.astype(bool)
-    g = nx.Graph()
-
-    # get physical positions of nodes and add them to the graph
-    node_pos = np.argwhere(skeleton)
-    g.graph['physical_pos'] = node_pos
-
-    # if skeleton is empty, return empty graph
-    if len(node_pos) == 0:
-        return g
-
-    # get node labels
-    node_labels = np.full(skeleton.shape, -1)
-    node_labels[node_pos[:, 0], node_pos[:, 1]] = np.arange(node_pos.shape[0])
-    edge_connected_nodes = np.zeros(skeleton.shape, dtype=bool)
-    weighted_edges = []
-
-    # function to shift the skeleton (pad sides, crop opposite sides from the padding)
-    def shift_2d(arr: npt.NDArray, pad_vals: npt.NDArray) -> npt.NDArray:
-        padded = np.pad(arr, pad_vals)
-        pad_bottom, pad_right = pad_vals[0,1], pad_vals[1,1]
-        h, w = arr.shape
-        shifted = padded[pad_bottom:(h + pad_bottom), pad_right:(w + pad_right)]
-        return shifted
-
-    # shift skeleton in each possible edge direction to find connected nodes
-    # intersection of shifted skeleton and original skeleton gives dest nodes
-    # dest nodes shifted back to original position gives src nodes
-    for (shift_rows, shift_cols) in [(1, 0), (0, 1), (1, 1), (1, -1)]:
-        ## find skeleton nodes connected by an edge for the current shift direction
-
-        # pad and crop to shift skeleton 1 pixel down, right, down-right, or down-left
-        pad_top, pad_bottom = (shift_rows == 1), 0
-        pad_left, pad_right = (shift_cols == 1), (shift_cols == -1)
-        pad_vals = np.array([[pad_top, pad_bottom], [pad_left, pad_right]])
-        shifted_skel = shift_2d(skeleton, pad_vals)
-
-        # dest nodes: intersection of the shifted skeleton and the original skeleton
-        dest_nodes = skeleton * shifted_skel
-        if not np.any(dest_nodes):
-            continue
-
-        # src nodes: dest nodes shifted back to their original position
-        pad_vals = np.flip(pad_vals, axis=1)
-        src_nodes = shift_2d(dest_nodes, pad_vals)
-
-        # add src and dest nodes to edge_connected_nodes
-        edge_connected_nodes += src_nodes + dest_nodes
-
-        # get node ids
-        src_node_ids = node_labels[(node_labels > -1) & src_nodes]
-        dest_node_ids = node_labels[(node_labels > -1) & dest_nodes]
-
-        # create list of weighted edges: [(node_id_1, node_id_2, weight), ...]
-        weight = np.linalg.norm((shift_rows, shift_cols))
-        weights = np.full(src_node_ids.shape, weight)
-        new_weighted_edges = zip(src_node_ids, dest_node_ids, weights)
-        weighted_edges.extend(new_weighted_edges)
-
-    # add weighted edges to graph
-    g.add_weighted_edges_from(weighted_edges)
-
-    # add disconnected nodes to graph
-    isolated_nodes = skeleton * np.logical_not(edge_connected_nodes)
-    if np.any(isolated_nodes):
-        isolated_node_ids = node_labels[(node_labels > -1) & isolated_nodes].tolist()
-        g.add_nodes_from(isolated_node_ids)
-
-    return g
+    ### Public methods ###
 
 
-def get_filtered_mask_and_graph(mask: npt.NDArray) -> Tuple[npt.NDArray, nx.Graph]:
-    """
-    Remove components from the segmentation mask that do not contain branches.
-    Args:
-        mask (npt.NDArray): Segmentation mask to filter
-    Returns:
-        Tuple[npt.NDArray, nx.Graph]: Filtered mask and nx graph
-    """
-
-    mask = np.copy(mask)
-
-    seg_skel=morphology.skeletonize(mask)
-    G = nx_graph_from_binary_skeleton(seg_skel)
-
-    fork_nodes = {n for n in G.nodes() if G.degree[n] > 2}
-    components = [*nx.connected_components(G)]
-
-    remove_nodes_1_per_cc = []
-    remove_nodes_all = set()
-
-    for cc in components:
-        if not cc.intersection(fork_nodes):
-            cc_node_sample = next(iter(cc))
-            remove_nodes_1_per_cc.append(cc_node_sample)
-            remove_nodes_all.update(cc)
-
-    labeled_components = measure.label(mask, connectivity=2)
-    removed_components = set()
-
-    for node in remove_nodes_1_per_cc:
-        node_coords=G.graph['physical_pos'][node]
-        node_cc_label = labeled_components[node_coords[0]][node_coords[1]]
-        mask[labeled_components==node_cc_label] = 0
-        removed_components.add(node_cc_label)
-
-    G.remove_nodes_from(remove_nodes_all)
-
-    return mask, G
+    def get_total_branch_length(self) -> float:
+        """Get the sum of persistence interval lengths of a barcode."""
+        bar_lengths = self.__barcode_interval_lengths()
+        return np.sum(bar_lengths)
 
 
-def compute_branches_and_barcode(vertices, edges):
-    """ Compute the branches and barcodes of a tree
-
-        Args:
-            vertices (V x 2 numpy array of ints):
-                Array where ith row stores 2d coordinate of ith vertex of a graph
-            edges (E x 2 numpy array of ints):
-                array where kth row [i, j] storing the indices i and j of
-                the kth edge's endpoints in `vertices`
-
-        Returns:
-            branches (list): A list of the branches of the tree.
-                Each entry of branches is an E x 2 numpy array of edges
-            barcode (list): Barcode of the tree with respect to a root.
-                The bar barcode[i] corresponds to the branch branches[i].
-
-        Raises:
-            ValueError: The input graph must be a forest
-    """
-    G = __convert_to_networkx_graph(vertices, edges)
-    if not nx.is_forest(G):
-        raise ValueError("Input graph must be a forest")
-    # function for computing the length of the edge {u,v}
-    edge_length = lambda u, v : np.linalg.norm(vertices[u]-vertices[v])
-    # output lists
-    branches = []
-    barcode = []
-    # compute the path between each vertex and the root of its connected component
-    dist_to_center = { }
-    parent = { v : None for v in G.nodes }
-    graph_components = [ G.subgraph(c).copy() for c in nx.connected_components(G) ]
-    for g in graph_components:
-        # we treat the center of the graph as the root
-        center = np.random.choice([n for n in g])
-        # create a dict where each vertex points to its parent in the tree.
-        # we set parents with a bfs starting at the center.
-        # we also use the bfs to compute distance to center.
-        parent[center] = center
-        dist_to_center[center] = 0
-        unvisited_vertices = [ center ]
-        while len(unvisited_vertices) > 0:
-            v = unvisited_vertices.pop(0)
-            for n in G.neighbors(v):
-                # if the parent of a node has not been assigned,
-                # it has not been visited
-                if parent[n] is None:
-                    parent[n] = v
-                    dist_to_center[n] = dist_to_center[v] + edge_length(n,v)
-                    unvisited_vertices.append(n)
-    # check that the parents were set properly
-    assert all([parent[v] is not None for v in G.nodes])
-    # Each vertex in the tree belongs to a unique branch
-    # corresponding to a leaf. Specifically, a vertex is
-    # in the longest branch from a leaf to the center
-    # of all its descendant leaves.
-    #
-    # Label each vertex with its branch.
-    # We do this by labelling all vertices on the path
-    # between the leaf and the center,
-    # unless we encounter vertex has already been labelled
-    # with a more distant leaf, which means all other vertices on
-    # the path are apart of this branch.
-    leaves = [ v for v in G.nodes if G.degree[v] == 1 ]
-    max_dist_to_leaf = { v : -np.inf for v in G.nodes }
-    branch_label = { }
-    for leaf in leaves:
-        current_vertex = leaf
-        current_parent = parent[current_vertex]
-        max_dist_to_leaf[leaf] = current_distance = 0
-        branch_label[leaf] = leaf
-        # This while loop follows the unique path from
-        # a leaf to the root.
-        while current_parent != current_vertex:
-            current_distance += edge_length(current_parent, current_vertex)
-            if current_distance < max_dist_to_leaf[current_parent]:
-                # We've reached a vertex that has a descendant leaf that is
-                # further away, so it is part of another branch.
-                # Thus, we quit our traversal.
-                break
-            current_vertex = current_parent
-            current_parent = parent[current_vertex]
-            max_dist_to_leaf[current_vertex] = current_distance
-            branch_label[current_vertex] = leaf
-    # now that we have labelled each vertex with its branch,
-    # we fill our list of edges and barcode
-    for i, leaf in enumerate(leaves):
-        current_vertex = leaf
-        current_label = leaf
-        current_parent = parent[leaf]
-        current_distance = 0
-        current_branch = []
-        # Follow the path from the leaf
-        # until we encounter another branch or reach the root.
-        # Add each edge along the way with the color of the branch.
-        while current_label == leaf and current_vertex != current_parent:
-            # update distance from `leaf`.
-            # this is used after the loop finishes to compute the barcode
-            current_distance += edge_length(current_parent, current_vertex)
-            # add current edge to list of returned edges
-            current_branch.append((current_vertex, current_parent))
-            # update pointers for next iteration of loop
-            current_vertex = current_parent
-            current_parent = parent[current_vertex]
-            current_label = branch_label[current_vertex]
-        branches.append(np.array(current_branch))
-        # add the branch of the current leaf to the barcode
-        # its birth is the (negative) distance of the leaf to the center
-        # the death is the distance where we encounter a longer branch
-        birth = -dist_to_center[leaf]
-        death = birth + current_distance
-        barcode.append((birth, death))
-
-    return branches, barcode
-
-def smooth_graph(vertices, edges, window_size):
-    """ Smooth a graph using sliding window smoothing
-
-    """
-    def moving_average(A, n=3):
-        """ Computes moving average of array `a` with window size `n` """
-        ret = np.concatenate(([A[0]]*n, A[1:-1], [A[-1]]*n))
-        ret = np.cumsum(ret, axis=0, dtype=float)
-        ret[n:] = ret[n:] - ret[:-n]
-        return ret[n-1:-(n-1)] / n
-
-    G = __convert_to_networkx_graph(vertices, edges)
-    branches, _ = compute_branches_and_barcode(vertices, edges)
-    # We fix the position of all leaves and merge points between two branches
-    is_position_fixed = [ G.degree[v] != 2 for v in G.nodes ]
-    # the smoothed graph will have the same edges as the input graph
-    # but different vertex positions
-    new_vertices = vertices.copy()
-    for branch in branches:
-        # verify that edges in branch are consecutive
-        # this should be true as this is how compute_branches_and_barcode works
-        assert all([ branch[i][1] == branch[i+1][0] for i in range(len(branch)-1) ])
-        branch_vertices = np.array( [branch[i][0] for i in range(len(branch))]+[branch[-1][1]] )
-        # A branch may have fixed points besides its endpoints,
-        # for example, when another branch is attached to the middle of the branch.
-        # We therefore decompose the branch into the segments
-        # connecting fixed points and smooth each of these segments.
-        is_position_fixed[branch_vertices[0]] = True
-        is_position_fixed[branch_vertices[-1]] = True
-        branch_fixed_vertices = [ i for i, vertex in enumerate(branch_vertices) if is_position_fixed[vertex] ]
-        for i in range(len(branch_fixed_vertices)-1):
-            segment_start, segment_end = branch_fixed_vertices[i], branch_fixed_vertices[i+1]
-            segment_vertices = branch_vertices[segment_start:segment_end+1]
-            new_vertices[segment_vertices] = moving_average(vertices[segment_vertices], window_size)
-    return new_vertices, edges
+    def get_average_branch_length(self) -> float:
+        """Return the average bar length of a barcode."""
+        bar_lengths = self.__barcode_interval_lengths()
+        bar_sum = np.sum(bar_lengths)
+        return bar_sum / len(bar_lengths)
 
 
-
-def plot_colored_barcode(barcode_and_colors, ax=None, **kwargs):
-    """ Plot a colored barcode computed by `compute_colored_tree_and_barcode`
+    def plot_colored_barcode(self, ax=None, **kwargs):
+        """ Plot a colored barcode computed by `compute_colored_tree_and_barcode`.
 
         Args:
             barcode_and_colors (list): list of bars and colors in the format returned
@@ -334,28 +60,34 @@ def plot_colored_barcode(barcode_and_colors, ax=None, **kwargs):
                 If no axis is provided, the tree is just plotted on the current axis of plt.
             kwargs (dict): Additional keyword arguments.
                 These are forwarded to the ax.barh call.
-    """
-    # if no axis is provided, fetch the current axis
-    import matplotlib.pyplot as plt
-    ax_provided = ax is not None
-    ax = ax if ax_provided else plt.gca()
-    # sort bars in ascending order by birth time
-    return_first_element = lambda pair : pair[0] # only use first element of tuple to sort
-    barcode_and_colors.sort(reverse=True, key=return_first_element)
-    # prepare args for bar plot
-    heights = [i for i in range(len(barcode_and_colors))]
-    births = [bar[0] for bar, color in barcode_and_colors]
-    widths = [bar[1] - bar[0] for bar, color in barcode_and_colors]
-    colors = [color for bar, color in barcode_and_colors]
-    # plot the barcode
-    ax.barh(heights, widths, left=births, color=colors, **kwargs)
-    ax.set_yticks([])
-    ax.set_xlabel("Barcode")
-    if not ax_provided:
-        plt.show()
 
-def plot_colored_tree(edges_and_colors, ax=None, **kwargs):
-    """ Plot a colored tree computed by `compute_colored_tree_and_barcode`
+        Initializes:
+            Calls self.__compute_colored_tree_and_barcode() to initialize tree & barcode as needed.
+        """
+
+        if not self._barcode_and_colors:
+            self.__compute_colored_tree_and_barcode()
+
+        # if no axis is provided, fetch the current axis
+        ax_provided = ax is not None
+        ax = ax if ax_provided else plt.gca()
+        # sort bars in ascending order by birth time
+        return_first_element = lambda pair : pair[0] # only use first element of tuple to sort
+        self._barcode_and_colors.sort(reverse=True, key=return_first_element)
+        # prepare args for bar plot
+        heights = [*range(len(self._barcode_and_colors))]
+        barcode, colors = zip(*self._barcode_and_colors)
+        births, widths = zip(*[(bar[0], bar[1] - bar[0]) for bar in barcode])
+        # plot the barcode
+        ax.barh(heights, widths, left=births, color=colors, **kwargs)
+        ax.set_yticks([])
+        ax.set_xlabel("Barcode")
+        if not ax_provided:
+            plt.show()
+
+
+    def plot_colored_tree(self, ax=None, **kwargs):
+        """ Plot a colored tree computed by `compute_colored_tree_and_barcode`
 
         Args:
             edges_and_colors (list): List of edges and colors.
@@ -366,166 +98,445 @@ def plot_colored_tree(edges_and_colors, ax=None, **kwargs):
             kwargs (dict): Additional keyword arguments.
                 These are forwarded to the LineCollection constructor.
                 For example, kwargs could contain linewidth.
-    """
-    # if no axis is provided, fetch the current axis
-    ax_provided = ax is not None
-    ax = ax if ax_provided else plt.gca()
-    # prepare the edges to be plotted
-    edges = [edge for edge, color in edges_and_colors]
-    colors = [color for edge, color in edges_and_colors]
-    edges_collection = LineCollection(edges, colors=colors, **kwargs)
-    # plot the tree
-    ax.add_collection(edges_collection)
-    ax.set_axis_off()
-    if not ax_provided:
-        plt.show()
 
-def compute_colored_tree_and_barcode(vertices, edges):
-    """ Compute a tree and barcode colored according to branches.
+        Side effects:
+            Calls self.__compute_colored_tree_and_barcode() to initialize tree & barcode as needed.
+        """
 
-    Args:
-        vertices (V x 2 numpy array of ints):
-            Array where ith row stores 2d coordinate of ith vertex of a graph
-        edges (E x 2 numpy array of ints):
-            array where kth row [i, j] storing the indices i and j of
-            the kth edge's endpoints in `vertices`
+        if not self._edges_and_colors:
+            self.__compute_colored_tree_and_barcode()
 
-    Returns:
-        edges_and_colors (list): List of edges and colors.
-            Each item in the list is a tuple of a edge and an rgb color.
-            Each edge in a tuple with the 2d endpoints of an edge in the tree
-        barcode_and_colors (list): list of bars and colors.
-            Each item in the list is a tuple of a persistence pair and an rgb color.
+        # if no axis is provided, fetch the current axis
+        ax_provided = ax is not None
+        ax = ax if ax_provided else plt.gca()
+        # prepare the edges to be plotted
+        edges, colors = zip(*self._edges_and_colors)
+        # add alpha channel to colors (fixed at 1.0)
+        colors = [(*c, 1.0) for c in colors]
 
-    Raises:
-        ValueError: The input graph must be a forest
-    """
-    branches, barcode = compute_branches_and_barcode(vertices, edges)
-    edges_and_colors = []
-    barcode_and_colors = []
-    for i, (branch, bar) in enumerate(zip(branches, barcode)):
-        color = __random_color(i)
-        barcode_and_colors.append((bar, color))
-        for v1idx, v2idx in branch:
-            v1 = vertices[v1idx]
-            v2 = vertices[v2idx]
-            # reverse v1 and v2 as mpl uses image coordinates
-            c1 = (v1[1], v1[0])
-            c2 = (v2[1], v2[0])
-            edges_and_colors.append(([c1, c2], color))
-    return edges_and_colors, barcode_and_colors
+        #if 'linewidth' not in kwargs and 'linewidths' not in kwargs:
+            #kwargs['linewidth'] = np.max([xlim, ylim]) / 100.0
 
-def filter_graph(vertices, edges, min_branch_length):
-    """ Remove all branches from a tree that are less than length min_branch_lengths
+        edges_collection = LineCollection(edges, colors=colors, **kwargs)
+        # plot the tree
+        ax.add_collection(edges_collection)
+
+        ax.set_axis_off()
+        ax.autoscale()
+
+        if not ax_provided:
+            plt.show()
+
+
+    ### Private methods ###
+
+
+    def __compute_graph(self, img, thresholds) -> Tuple[nx.Graph, np.ndarray]:
+        """Get morse skeleton graph and initialize attributes for the graph.
+            Initializes:
+                self._parent (dict): Maps each vertex to its parent in the tree.
+                self._dist_to_root (dict): Maps each vertex to its distance to the root of its tree.
+                self._G (nx.Graph): Graph of the morse skeleton (a forest).
+                self._vertices (V x 2 numpy array of floats):
+                    Array where ith row stores 2d coordinate of ith vertex of a graph.
+        """
+
+        G, vertices = self.__compute_nx_graph(img, *thresholds)
+
+        # Make G a forest
+
+        forest = nx.Graph()
+
+        parent = {n: None for n in G.nodes()}
+        dist_to_root = {}   # each node's distance to the root of its tree
+
+        graph_components = [G.subgraph(c) for c in nx.connected_components(G)]
+
+        skipped_vertices = set()
+
+        for g in graph_components:
+            root, max_degree = max(g.degree, key=lambda x: x[1])
+            if max_degree <= 2:
+                skipped_vertices.update(g.nodes())
+                continue    # skip connected components that are just one branch
+            # create a dict where each vertex points to its parent in the tree.
+            # we set parents with a bfs starting at the root.
+            # we also use the bfs to compute distance to root.
+            parent[root] = root
+            dist_to_root[root] = 0
+            unvisited_vertices = [root]
+            while unvisited_vertices:
+                v = unvisited_vertices.pop(0)
+                for n in G.neighbors(v):
+                    if parent[n] is None:
+                        forest.add_edge(v, n)
+                        parent[n] = v
+                        dist_to_root[n] = dist_to_root[v] + self.__edge_len(vertices, v, n)
+                        unvisited_vertices.append(n)
+
+        # check that the parents were set properly
+        assert all([parent[n] is not None for n in G.nodes if n not in skipped_vertices])
+
+        # check that the forest is a forest
+        assert nx.is_forest(forest)
+
+        self._parent = parent
+        self._dist_to_root = dist_to_root
+        self._G = forest
+        self._vertices = vertices
+
+
+    def __get_branch_labels(self):
+        """Label each vertex with its branch.
+            Each vertex in the tree belongs to a unique branch corresponding to a leaf.
+            Specifically, a vertex is in the longest branch from a leaf to the center
+            of all its descendant leaves.
+            We do this by labelling all vertices on the path between the leaf and the center,
+            unless we encounter vertex has already been labeled with a more distant leaf,
+            which means all other vertices on the path are apart of this branch.
+
+        Initializes:
+            self._leaves (list): List of vertices that are leaves in the forest.
+            self._branch_label (dict): maps each vertex to its branch.
+        """
+
+        parent = self._parent
+        verts = self._vertices
+        leaves = [n for n in self._G.nodes if self._G.degree[n] == 1]
+
+        max_dist_to_leaf = { v : -np.inf for v in self._G.nodes }
+        branch_label = { }
+        for leaf in leaves:
+            current_vertex = leaf
+            current_parent = parent[current_vertex]
+            max_dist_to_leaf[leaf] = current_distance = 0
+            branch_label[leaf] = leaf
+            # This while loop follows the unique path from
+            # a leaf to the root.
+            while current_parent != current_vertex:
+                current_distance += self.__edge_len(verts, current_parent, current_vertex)
+                if current_distance < max_dist_to_leaf[current_parent]:
+                    # We've reached a vertex that has a descendant leaf that is
+                    # further away, so it is part of another branch.
+                    # Thus, we quit our traversal.
+                    break
+                current_vertex = current_parent
+                current_parent = parent[current_vertex]
+                max_dist_to_leaf[current_vertex] = current_distance
+                branch_label[current_vertex] = leaf
+
+        self._leaves = leaves
+        self._branch_label = branch_label
+
+
+    def __compute_branches_and_barcode(self) -> None:
+        """ Compute the branches and barcodes of the forest.
+
+        Initializes:
+            self._branches (list): A list of the branches of the tree.
+                Each entry of branches is an E x 2 numpy array of edges
+            self.barcode (list): Barcode of the tree with respect to a root.
+                The bar barcode[i] corresponds to the branch branches[i].
+
+        Raises:
+            ValueError: If the graph is not a forest.
+        """
+
+        if not nx.is_forest(self._G):
+            raise ValueError("Graph must be a forest")
+
+        branches = []
+        barcode = []
+        verts = self._vertices
+
+        for leaf in self._leaves:
+            current_vertex = leaf
+            current_label = leaf
+            current_parent = self._parent[leaf]
+            current_distance = 0
+            current_branch = []
+            # Follow the path from the leaf
+            # until we encounter another branch or reach the root.
+            # Add each edge along the way with the color of the branch.
+            while current_label == leaf and current_vertex != current_parent:
+                # update distance from `leaf`.
+                # this is used after the loop finishes to compute the barcode
+                current_distance += self.__edge_len(verts, current_parent, current_vertex)
+                # add current edge to list of returned edges
+                current_branch.append((current_vertex, current_parent))
+                # update pointers for next iteration of loop
+                current_vertex = current_parent
+                current_parent = self._parent[current_vertex]
+                current_label = self._branch_label[current_vertex]
+            branches.append(np.array(current_branch))
+            # add the branch of the current leaf to the barcode
+            # its birth is the (negative) distance of the leaf to the center
+            # the death is the distance where we encounter a longer branch
+            birth = -self._dist_to_root[leaf]
+            death = birth + current_distance
+            barcode.append((birth, death))
+
+        self._branches = branches
+        self.barcode = barcode
+
+
+    def __smooth_graph(self, window_size):
+        """ Smooth a graph using sliding window smoothing.
+            Args:
+                window_size (int): Size of the window to use for smoothing.
+            Side effects:
+                self._vertices is updated with the smoothed vertex positions.
+        """
+
+        if window_size <= 1:
+            return
+
+        vertices = self._vertices
+
+        # We fix the position of all leaves and merge points between two branches
+        fixed_verts = {v for v in self._G.nodes if self._G.degree[v] != 2}
+        # the smoothed graph will have the same edges as the input graph
+        # but different vertex positions
+        new_vertices = vertices.copy()
+        for branch in self._branches:
+            # verify that edges in branch are consecutive
+            # this should be true as this is how compute_branches_and_barcode works
+            assert all([ branch[i][1] == branch[i+1][0] for i in range(len(branch)-1) ])
+            branch_vertices = np.array( [branch[i][0] for i in range(len(branch))]+[branch[-1][1]] )
+            # A branch may have fixed points besides its endpoints,
+            # for example, when another branch is attached to the middle of the branch.
+            # We therefore decompose the branch into the segments
+            # connecting fixed points and smooth each of these segments.
+            branch_fixed_vertices = [ i for i, vertex in enumerate(branch_vertices) if vertex in fixed_verts ]
+            for i in range(len(branch_fixed_vertices)-1):
+                segment_start, segment_end = branch_fixed_vertices[i], branch_fixed_vertices[i+1]
+                segment_vertices = branch_vertices[segment_start:segment_end+1]
+                smoothed_verts = self.__moving_average_fixed_ends(vertices[segment_vertices], window_size)
+                new_vertices[segment_vertices] = smoothed_verts
+
+        self._vertices = new_vertices
+
+
+    def __filter_graph(self, min_branch_length):
+        """ Remove all branches from a tree that are less than length min_branch_lengths.
 
         Args:
-            vertices (V x 2 numpy array of ints):
-                Array where ith row stores 2d coordinate of ith vertex of a graph
-            edges (E x 2 numpy array of ints):
-                array where kth row [i, j] storing the indices i and j of
-                the kth edge's endpoints in `vertices`
             min_branch_length (int):
                 threshold for branch length.
                 Any branch of shorter than min_branch_length is removed
 
-        Returns:
+        Updates:
             filtered_branches (E' x 2 numpy array of ints):
-                array of all edges in barnches longer than min_branch_length
-            filtered_barcode ():
-                barcode of filtered graph
+                updated to array of all edges in branches longer than min_branch_length
+            self.barcode: updated to the barcode of filtered graph
+            self._G: updated to the filtered graph (removes edges not in filtered_branches)
+        """
 
-        Raises:
-            ValueError: The input graph must be a forest
-    """
-    branches, barcode = compute_branches_and_barcode(vertices, edges)
-    filtered_branches = []
-    filtered_barcode = []
-    for branch, bar in zip(branches, barcode):
-        birth, death = bar
-        if death-birth > min_branch_length:
-            filtered_branches.append(branch)
-            filtered_barcode.append(bar)
-    filtered_edges = np.concatenate(filtered_branches, axis=0)
-    return filtered_edges, filtered_barcode
+        filtered_branches = []
+        filtered_barcode = []
+
+        for branch, bar in zip(self._branches, self.barcode):
+            birth, death = bar
+            if death - birth > min_branch_length:
+                filtered_branches.append(branch)
+                filtered_barcode.append(bar)
+
+        self._branches = filtered_branches
+
+        filtered_edges = np.concatenate(filtered_branches, axis=0)
+        edges_to_remove = [e for e in self._G.edges if e not in filtered_edges]
+        self._G.remove_edges_from(edges_to_remove)
+        self.barcode = filtered_barcode
 
 
-def compute_nx_graph(im: npt.NDArray[np.double],
-                                       threshold1: float=0.5,
-                                       threshold2: float=0.0):
-    """Fit a Morse skeleton to the image `im`.
+    def __barcode_interval_lengths(self) -> float:
+        """Get persistence interval lengths in the barcode."""
+        barcode = np.array(self.barcode)
+        bar_lengths = barcode[:, 1] - barcode[:, 0]
+        bar_lengths = bar_lengths[~np.isinf(bar_lengths)]
+        return bar_lengths
+
+
+    def __compute_colored_tree_and_barcode(self):
+        """ Compute a tree and barcode colored according to branches.
+
+        Initialize the following attributes:
+            edges_and_colors (list): List of edges and colors.
+                Each item in the list is a tuple of a edge and an rgb color.
+                Each edge in a tuple with the 2d endpoints of an edge in the tree
+            barcode_and_colors (list): list of bars and colors.
+                Each item in the list is a tuple of a persistence pair and an rgb color.
+        """
+
+        edges_and_colors = []
+        barcode_and_colors = []
+
+        for i, (branch, bar) in enumerate(zip(self._branches, self.barcode)):
+            color = self.__random_color(i)
+            barcode_and_colors.append((bar, color))
+            for v1idx, v2idx in branch:
+                v1 = self._vertices[v1idx]
+                v2 = self._vertices[v2idx]
+                # reverse v1 and v2 as mpl uses image coordinates
+                c1 = (v1[1], v1[0])
+                c2 = (v2[1], v2[0])
+                edges_and_colors.append(([c1, c2], color))
+
+        self._edges_and_colors = edges_and_colors
+        self._barcode_and_colors = barcode_and_colors
+
+
+    ### Utilities ###
+
+    @staticmethod
+    def __compute_nx_graph(im: npt.NDArray[np.double],
+                         threshold1: float=0.5, threshold2: float=0.0):
+        """Fit a Morse skeleton to the image `im`.
+            Args:
+                im (npt.NDArray[np.float64]): Grayscale image
+                threshold1 (float): threshold for the Morse skeleton simplification step. See paper.
+                threshold2 (float): threshold for the edges. We only take the 1-unstable manifold of edges
+                                    with value > threshold2. The higher the value, the more disconnected
+                                    the graph will be
+            Returns:
+                G (nx.Graph): Graph of the Morse skeleton.
+                verts (V x 2 numpy array of floats): vertices of DMTGraph generated from image
+        """
+
+        # Compute the Morse skeleton
+        # Slice a bounding box of the connected component to speed up computation
+        dmtG = DMTGraph(im)
+        verts, edges = dmtG.computeGraph(threshold1, threshold2)
+
+        G = MorseGraph.__convert_to_networkx_graph(edges)
+
+        verts = verts.astype(float)
+
+        return G, verts
+
+
+    @staticmethod
+    def __prep_moving_avg_fixed_endpoints(A: npt.ArrayLike, n: int) -> npt.NDArray:
+        """Return array prepared for moving average fit fixed at original endpoints of A.
         Args:
-            im (npt.NDArray[np.float64]): Grayscale image
-            threshold1 (float): threshold for the Morse skeleton simplification step. See paper.
-            threshold2 (float): threshold for the edges. We only take the 1-unstable manifold of edges
-                                with value > threshold2. The higher the value, the more disconnected
-                                the graph will be
-        Returns:
-			G: networkx graph with edge weights representing distances between branches
-			verts: vertices of DMTGraph generated from image
-    """
+            A: Array to be transformed.
+            n: Window size for the moving average fit.
+        """
+        # Repeat elements in the first and last windows n - (indices from endpoint) times.
+        # With this method, the moving average is fixed to the original endpoints in a natural way.
+        # Examples:
+        #   n=3, A=[0,1,2,3,4,5,6,7], A_transformed=[0,0,0,1,1,2,3,4,5,6,6,7,7,7]
+        #   n=4, A=[0,1,2,3,4,5,6,7], A_transformed=[0,0,0,0,1,1,1,2,2,3,4,5,5,6,6,6,7,7,7,7]
+
+        # make sure window size is at least 2
+        assert n >= 2
+
+        # make sure first and last window don't overlap more than 1 element at most
+        assert min(n, math.ceil(len(A)/2)) == n
+
+        # Elements less than window size from either end will not be repeated
+        A_transformed = A[n-1:-(n-1)]
+        for i in reversed(range(n-1)):
+            idx1, idx2 = i, -i-1
+            repeat = n - i
+            A_transformed = np.concatenate(([A[idx1]]*repeat, A_transformed, [A[idx2]]*repeat))
+
+        return A_transformed
 
 
-    # Compute the Morse skeleton
-    # Slice a bounding box of the connected component to speed up computation
-    dmtG = DMTGraph(im)
-    verts, edges = dmtG.computeGraph(threshold1, threshold2)
-    G = __convert_to_networkx_graph(verts, edges)
+    @staticmethod
+    def __moving_average(A, n=3):
+        """ Computes moving average of array `A` with window size `n` """
+        ret = np.cumsum(A, axis=0, dtype=float)
+        ret[n:] = ret[n:] - ret[:-n]
+        return ret[n-1:] / n
 
-    return G, verts
 
-def compute_morse_skeleton_and_barcode(G, verts):
-    """Compute a morse skeleton and barcode given a networkx graph G
-        Also, compute the lower star filtration of the Morse skeleton where each
-        vertex's filtration value is the negative distance from the graph center.
+    @staticmethod
+    def __moving_average_fixed_ends(A: npt.ArrayLike, n: int) -> npt.NDArray:
+        """Computes moving average of array `A` with window size `n` fixed at original endpoints of A.
         Args:
-            G (nx.Graph): networkx graph with edge weights representing distances between branches
+            A: Array to be transformed.
+            n: Window size for the moving average fit.
+        """
+
+        # make sure first and last window don't overlap more than 1 element at most
+        n = min(n, math.ceil(len(A)/2))
+
+        assert n != 0
+
+        if n==1:
+            return A
+
+        A_transformed = MorseGraph.__prep_moving_avg_fixed_endpoints(A, n)
+        moving_avg = MorseGraph.__moving_average(A_transformed, n)
+
+        return MorseGraph.__interp_n_verts_uniform_spacing(moving_avg, len(A))
+
+
+    @staticmethod
+    def __interp_n_verts_uniform_spacing(verts: npt.ArrayLike, n: int) -> npt.NDArray:
+        """Interpolate n points along the polygonal chain defined by `verts`.
+            The returned sequence is fixed to start and end at the original endpoints of `verts`.
+        Args:
+            verts: Original sequence of vertices.
+            n: Number of interpolated vertices to return.
         Returns:
-            verts_total (V x 2 numpy array of ints): Array where ith row stores
-                                                       2d coordinate of ith vertex in Morse skeleton
-            edges_total (E x 2 numpy array of ints): array where kth row [i, j]
-                                                       storing the indices i and j of the kth edge's
-                                                       endpoints in `verts_total`
-            bc_total (n x 2 numpy array of floats): array where each row is a bar in the barcode
-                                                   of the filtration on the Morse skeleton
-    """
-    verts_total = np.zeros((0,2))
-    edges_total = np.zeros((0,2), dtype=int)
-    bc_total = np.zeros((0,2))
+            npt.NDArray: Interpolated vertices, uniformly spaced by euclidean distance.
+        """
 
-    graph_components = [ G.subgraph(c).copy() for c in nx.connected_components(G) ]
-    for g in graph_components:
-		# Choose an arbitrary vertex as the center and compute the distance of each vertex
-        center = np.random.choice([n for n in g])
-        distances = nx.algorithms.shortest_paths.weighted.single_source_dijkstra_path_length(
-			g, center)
+        assert len(verts) >= 2
+        assert n >= 2
 
-		# compute the shortest path tree of the graph component
-        spt = __shortest_path_tree(g, distances)
+        # Get the spacing to use between interpolated vertices
+        dists = np.linalg.norm(verts[1:] - verts[:-1], axis=1)
+        total_dist = np.sum(dists)
+        accum_dists = np.cumsum(np.concatenate(([0], dists)))
+        interp_step = total_dist / (n - 1)
 
-		# Now, we use the distances to compute the barcode of the Morse skeleton
-		#
-		# Build a Gudhi complex to compute the filtration
-		# `K` is just another representation of the Morse skeleton
-        K = gd.SimplexTree()
+        # The first vertex is fixed to the the first vertex of the original sequence
+        interp_verts = [verts[0]]
 
-		# Add the vertices to the complex with their filtration values
-		# `distances` is a dict with entries of the form {vertex_idx : distance to `center`}
-        for key in distances:
-            K.insert([key], filtration=-distances[key])
+        for i in range(1, n-1):
+            interp_dist = i * interp_step
+            idx = np.searchsorted(accum_dists, interp_dist, side='right') - 1
+            # Interpolate between vertices[idx] and vertices[idx+1]
+            # The new vertex is a weighted average of the two vertices around it
+            lineseg_travel_prop = (interp_dist - accum_dists[idx]) / (accum_dists[idx+1] - accum_dists[idx])
+            new_vert = verts[idx] + (verts[idx+1] - verts[idx]) * lineseg_travel_prop
+            interp_verts.append(new_vert)
 
-		# Add the edges to the complex.
-		# The filtation value of an edge is the max filtation value of its vertices.
-        for v0, v1 in spt.edges():
-            K.insert([v0, v1], filtration = max(K.filtration([v0]), K.filtration([v1])))
+        # The last vertex is fixed to the the last vertex of the original sequence
+        interp_verts.append(verts[-1])
 
-		# compute the barcode of the Morse skeleton
-        K.compute_persistence()
+        return np.array(interp_verts)
 
-		# retrieve the 0-dimensional barcode
-        bc = K.persistence_intervals_in_dimension(0)
 
-        bc_total = np.concatenate((bc_total, bc), axis=0)
-        verts_total = np.concatenate((verts_total, verts), axis=0)
-        edges_total = np.concatenate((edges_total, np.array(spt.edges)), axis=0)
 
-    return verts_total, edges_total, bc_total
+    @staticmethod
+    def __random_color(i: int):
+        """ Convert an int to a random color """
+
+        phi = 0.618033988749895
+        step = 180*phi
+
+        return cvtColor(np.array([[[step*i, 220, 255]]], np.uint8), COLOR_HSV2BGR)[0][0] / 255
+
+
+    @staticmethod
+    def __convert_to_networkx_graph(edges) -> nx.Graph:
+        """ Convert a dmtgraph to a Networkx graph """
+        G = nx.Graph()
+        for vertex0, vertex1 in edges:
+            # Each row in `edges` is an array [i, j],
+            #   where i and j are ints representing the index of the endpoints.
+            # Each row in `verts` is an array [x, y],
+            #   where x and y are the 2d-coordinates of the vertex.
+            G.add_edge(vertex0, vertex1)
+        return G
+
+
+    @staticmethod
+    def __edge_len(verts, v1_idx, v2_idx):
+        """ Compute the Euclidean distance between two vertices """
+        return np.linalg.norm(verts[v1_idx] - verts[v2_idx])

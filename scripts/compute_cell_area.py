@@ -13,7 +13,6 @@ from fl_tissue_model_tools import preprocessing as prep
 from fl_tissue_model_tools import analysis as an
 from fl_tissue_model_tools import script_util as su
 
-LINESEP = os.linesep
 DEFAULT_CONFIG_PATH = "../config/default_cell_area_computation.json"
 THRESH_SUBDIR = "thresholded"
 CALC_SUBDIR = "calculations"
@@ -263,7 +262,7 @@ def main():
 
     ### Save results ###
     if verbose:
-        print(f"{LINESEP}Saving results...")
+        print(f"{os.linesep}Saving results...")
 
     img_ids = [Path(img_n).stem for img_n in all_img_paths]
     area_df = pd.DataFrame(
