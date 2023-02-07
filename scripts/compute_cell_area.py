@@ -156,7 +156,7 @@ def threshold_images(
 
 def compute_areas(
     imgs: List[npt.NDArray], circ_pix_area: List[int]
-) -> npt.NDArray[np.float_]:
+) -> npt.NDArray[float]:
     """Compute non-zero pixel area of thresholded images.
 
     Args:
