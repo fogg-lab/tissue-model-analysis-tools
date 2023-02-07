@@ -3,8 +3,41 @@ from math import floor
 from typing import Tuple, Callable
 from PIL import Image
 import numpy as np
+import numpy.typing as npt
 from skimage import measure, morphology
-from cv2 import medianBlur
+from scipy.spatial import KDTree
+import networkx as nx
+import cv2
+
+def combine_im_with_mask_dist_transform(
+    img: npt.NDArray, mask: npt.NDArray, blend_exponent: float = 1
+) -> npt.NDArray[float]:
+    """Highlight centerlines of mask components in image using distance transform.
+    Args:
+        img: The image.
+        mask: The binary mask.
+        blend_exponent: The exponent applied to transformed mask before blending with the image.
+                        For example, a value of 1.5 will highlight centerlines more prominently,
+                        while a value of 0.5 will retain more detail of the original image.
+    Returns:
+        The image blended with the transformed mask.
+    """
+    img = np.copy(img)
+    mask = np.copy(mask)
+    mask = (mask / np.max(mask)).astype(np.uint8)
+    dist_to_border = cv2.distanceTransform(mask, cv2.DIST_L2, 5)
+    skeleton = morphology.skeletonize(mask).astype(np.uint8)
+    skel_coords = np.argwhere(skeleton)
+    skeleton = KDTree(skel_coords)
+    mask_coords = np.argwhere(mask)
+    mask_distances_to_skeleton, _ = skeleton.query(mask_coords)
+    dist_to_skeleton = np.zeros(mask.shape)
+    dist_to_skeleton[mask_coords[:, 0], mask_coords[:, 1]] = mask_distances_to_skeleton
+    dist_transformed = 1 - (dist_to_skeleton / (dist_to_skeleton + dist_to_border))
+    dist_transformed = np.nan_to_num(dist_transformed)
+    dist_transformed = np.power(dist_transformed, blend_exponent)
+
+    return dist_transformed * img
 
 
 def get_elastic_dual_transform(
@@ -29,7 +62,7 @@ def get_elastic_dual_transform(
 
         image, mask = elastic_distortion([image, mask], grid_width, grid_height, magnitude, rs)
         # apply median blur to mask
-        mask = medianBlur(mask, 5)
+        mask = cv2.medianBlur(mask, 5)
 
         return {'image': image, 'mask': mask}
 
@@ -170,6 +203,7 @@ def elastic_distortion(images, grid_width=None, grid_height=None, magnitude=8, r
 
     return augmented_images
 
+
 def remove_small_islands(mask, min_area0=100, min_area1=100, connectivity0=1, connectivity1=1):
     '''Remove small islands from a binary mask.
 
@@ -200,4 +234,126 @@ def remove_small_islands(mask, min_area0=100, min_area1=100, connectivity0=1, co
         labeled_regions = morphology.remove_small_objects(labeled_regions, min_size=min_area1)
 
     mask[labeled_regions == 0] = 0
+    return mask
+
+
+def nx_graph_from_binary_skeleton(skeleton: npt.NDArray) -> nx.Graph:
+    """
+    Create a weighted, undirected networkx graph from a binary skeleton image.
+    The graph will have a 'physical_pos' attribute that maps node ids to their
+    physical coordinates in the skeleton image.
+
+    Args:
+        skeleton (npt.NDArray): binary skeleton image
+    Returns:
+        nx.Graph: weighted, undirected graph
+    """
+    skeleton = skeleton.astype(bool)
+    g = nx.Graph()
+
+    # get physical positions of nodes and add them to the graph
+    node_pos = np.argwhere(skeleton)
+    g.graph['physical_pos'] = node_pos
+
+    # if skeleton is empty, return empty graph
+    if len(node_pos) == 0:
+        return g
+
+    # get node labels
+    node_labels = np.full(skeleton.shape, -1)
+    node_labels[node_pos[:, 0], node_pos[:, 1]] = np.arange(node_pos.shape[0])
+    edge_connected_nodes = np.zeros(skeleton.shape, dtype=bool)
+    weighted_edges = []
+
+    # function to shift the skeleton (pad sides, crop opposite sides from the padding)
+    def shift_2d(arr: npt.NDArray, pad_vals: npt.NDArray) -> npt.NDArray:
+        padded = np.pad(arr, pad_vals)
+        pad_bottom, pad_right = pad_vals[0,1], pad_vals[1,1]
+        h, w = arr.shape
+        shifted = padded[pad_bottom:(h + pad_bottom), pad_right:(w + pad_right)]
+        return shifted
+
+    # shift skeleton in each possible edge direction to find connected nodes
+    # intersection of shifted skeleton and original skeleton gives dest nodes
+    # dest nodes shifted back to original position gives src nodes
+    for (shift_rows, shift_cols) in [(1, 0), (0, 1), (1, 1), (1, -1)]:
+        ## find skeleton nodes connected by an edge for the current shift direction
+
+        # pad and crop to shift skeleton 1 pixel down, right, down-right, or down-left
+        pad_top, pad_bottom = (shift_rows == 1), 0
+        pad_left, pad_right = (shift_cols == 1), (shift_cols == -1)
+        pad_vals = np.array([[pad_top, pad_bottom], [pad_left, pad_right]])
+        shifted_skel = shift_2d(skeleton, pad_vals)
+
+        # dest nodes: intersection of the shifted skeleton and the original skeleton
+        dest_nodes = skeleton * shifted_skel
+        if not np.any(dest_nodes):
+            continue
+
+        # src nodes: dest nodes shifted back to their original position
+        pad_vals = np.flip(pad_vals, axis=1)
+        src_nodes = shift_2d(dest_nodes, pad_vals)
+
+        # add src and dest nodes to edge_connected_nodes
+        edge_connected_nodes += src_nodes + dest_nodes
+
+        # get node ids
+        src_node_ids = node_labels[(node_labels > -1) & src_nodes]
+        dest_node_ids = node_labels[(node_labels > -1) & dest_nodes]
+
+        # create list of weighted edges: [(node_id_1, node_id_2, weight), ...]
+        weight = np.linalg.norm((shift_rows, shift_cols))
+        weights = np.full(src_node_ids.shape, weight)
+        new_weighted_edges = zip(src_node_ids, dest_node_ids, weights)
+        weighted_edges.extend(new_weighted_edges)
+
+    # add weighted edges to graph
+    g.add_weighted_edges_from(weighted_edges)
+
+    # add disconnected nodes to graph
+    isolated_nodes = skeleton * np.logical_not(edge_connected_nodes)
+    if np.any(isolated_nodes):
+        isolated_node_ids = node_labels[(node_labels > -1) & isolated_nodes].tolist()
+        g.add_nodes_from(isolated_node_ids)
+
+    return g
+
+
+def filter_branch_seg_mask(mask: npt.NDArray) -> npt.NDArray:
+    """
+    Remove components from the segmentation mask that do not contain branches.
+    Args:
+        mask (npt.NDArray): Segmentation mask to filter
+    Returns:
+        Tuple[npt.NDArray, nx.Graph]: Filtered mask and nx graph
+    """
+
+    mask = np.copy(mask)
+
+    seg_skel=morphology.skeletonize(mask)
+    G = nx_graph_from_binary_skeleton(seg_skel)
+
+    fork_nodes = {n for n in G.nodes() if G.degree[n] > 2}
+    components = [*nx.connected_components(G)]
+
+    remove_nodes_1_per_cc = []
+    remove_nodes_all = set()
+
+    for cc in components:
+        if not cc.intersection(fork_nodes):
+            cc_node_sample = next(iter(cc))
+            remove_nodes_1_per_cc.append(cc_node_sample)
+            remove_nodes_all.update(cc)
+
+    labeled_components = measure.label(mask, connectivity=2)
+    removed_components = set()
+
+    for node in remove_nodes_1_per_cc:
+        node_coords=G.graph['physical_pos'][node]
+        node_cc_label = labeled_components[node_coords[0]][node_coords[1]]
+        mask[labeled_components==node_cc_label] = 0
+        removed_components.add(node_cc_label)
+
+    G.remove_nodes_from(remove_nodes_all)
+
     return mask
