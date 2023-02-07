@@ -11,7 +11,7 @@ import cv2
 
 def combine_im_with_mask_dist_transform(
     img: npt.NDArray, mask: npt.NDArray, blend_exponent: float = 1
-) -> npt.NDArray[np.float]:
+) -> npt.NDArray[float]:
     """Highlight centerlines of mask components in image using distance transform.
     Args:
         img: The image.
