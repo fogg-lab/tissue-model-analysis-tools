@@ -1,8 +1,9 @@
 name: tissue-model-analysis
 channels:
-  - anaconda
   - conda-forge
+  - defaults
 dependencies:
+  - albumentations
   - boost
   - cudatoolkit=11.2
   - cudnn=8.1.0
@@ -16,6 +17,7 @@ dependencies:
   - pip
   - python=3.10
   - scikit-learn
+  - scikit-image
   - setuptools
   - pip:
     - keras-tuner

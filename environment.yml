@@ -1,9 +1,9 @@
 name: tissue-model-analysis
 channels:
   - conda-forge
-  - pytorch
   - defaults
 dependencies:
+  - albumentations
   - boost
   - cxx-compiler
   - dask
@@ -17,7 +17,5 @@ dependencies:
   - setuptools
   - tensorflow
   - keras-tuner
-  - pytorch
-  - torchvision
   - pillow
   - scikit-image
