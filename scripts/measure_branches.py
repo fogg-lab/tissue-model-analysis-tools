@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+from typing import Tuple
 import json
 import csv
 
@@ -21,7 +22,10 @@ DEFAULT_CONFIG_PATH = "../config/default_branching_computation.json"
 
 
 def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output_dir: Path,
-                well_width_microns: int, save_intermediates: bool) -> None:
+                well_width_microns: int, save_intermediates: bool,
+                morse_thresholds: Tuple[float, float],
+                graph_smoothing_window: int,
+                min_branch_length: int) -> None:
     '''Measure branches in image and save results to output directory.
 
     Args:
@@ -48,11 +52,9 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
     pred, mask = model.predict(img)     # pred is unthresholded
     img = exposure.equalize_adapthist(img)  # equalize
 
-    print(mask.min(), mask.max())
-
     if save_intermediates:
         save_path = str(vis_dir / "equalized.png")
-        cv2.imwrite(save_path, (img*256).astype(np.uint8))
+        cv2.imwrite(save_path, np.round(img*255).astype(np.uint8))
         save_path = str(vis_dir / "prediction.png")
         cv2.imwrite(save_path, (pred*256).astype(np.uint8))
         save_path = str(vis_dir / "mask.png")
@@ -69,13 +71,13 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
 
     if save_intermediates:
         save_path = str(vis_dir / "masked_image.png")
-        cv2.imwrite(save_path, (img*256).astype(np.uint8))
+        cv2.imwrite(save_path, np.round(img*255).astype(np.uint8))
 
     img = pred * img    # weight by prediction
 
     if save_intermediates:
         save_path = str(vis_dir / "masked_weighted_image.png")
-        cv2.imwrite(save_path, (img*256).astype(np.uint8))
+        cv2.imwrite(save_path, np.round(img*255).astype(np.uint8))
 
     img = img.astype(np.float32)
 
@@ -85,16 +87,18 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
 
     if save_intermediates:
         save_path = str(vis_dir / "blurred_image.png")
-        cv2.imwrite(save_path, (img*256).astype(np.uint8))
+        cv2.imwrite(save_path, np.round(img*255).astype(np.uint8))
 
-    img = (img*256).astype(np.double)   # convert to double
+    img = np.round(img*255).astype(np.double)   # convert to double
 
     print("")
     print("Computing graph and barcode...")
 
     try:
-        morse_graph = MorseGraph(img)
-    except nx.exception.NetworkXPointlessConcept as exc:
+        morse_graph = MorseGraph(img, thresholds=morse_thresholds,
+                                 smoothing_window=graph_smoothing_window,
+                                 min_branch_length=min_branch_length)
+    except nx.exception.NetworkXPointlessConcept:
         print(f"No branches found for {img_path.stem}.")
         return
 
@@ -153,6 +157,9 @@ def main():
         config = json.load(config_fp)
 
     well_width_microns = config.get("well_width_microns", 1000.0)
+    morse_thresholds = config.get("graph_thresh_1", 1), config.get("graph_thresh_2", 4)
+    graph_smoothing_window = config.get("graph_smoothing_window", 15)
+    min_branch_length = config.get("min_branch_length", 15)
     model_cfg_path = config.get("model_cfg_path", "")
     use_latest_model_cfg = config.get("use_latest_model_cfg", True)
 
@@ -202,7 +209,8 @@ def main():
 
     ### Analyze images ###
     for img_path in img_paths:
-        analyze_img(Path(img_path), model, output_dir, well_width_microns, args.save_intermediates)
+        analyze_img(Path(img_path), model, output_dir, well_width_microns, args.save_intermediates,
+                    morse_thresholds, graph_smoothing_window, min_branch_length)
 
 
 if __name__ == "__main__":
