@@ -15,7 +15,7 @@ from . import transforms
 
 def min_max_(
     img: npt.NDArray, new_min: float, new_max: float, old_min: float, old_max: float
-) -> npt.NDArray[np.float64]:
+) -> npt.NDArray[float]:
     """Normalize the array `img` from the range [`old_min`, `old_max`]
        to the range [`new_min`, `new_max`]
     Args:
@@ -36,7 +36,7 @@ def min_max_(
 
 def combine_im_with_mask_dist_transform(
     img: npt.NDArray, mask: npt.NDArray, blend_exponent: float = 1
-) -> npt.NDArray[np.float]:
+) -> npt.NDArray[float]:
     """Highlight centerlines of mask components in image using distance transform.
     Args:
         img: The image.
@@ -333,11 +333,11 @@ def get_batch_augmentor(augmentations: List[Callable]) -> Callable:
 
 
 def augment_invasion_imgs(
-    images: npt.NDArray[np.float_],
+    images: npt.NDArray[float],
     rand_state: RandomState,
     rot_options=(0, 90, 180, 270),
     expand_dims: bool=False
-) -> npt.NDArray[np.float_]:
+) -> npt.NDArray[float]:
     """Transform a list of images with random flips and rotations.
     Args:
         images: Original images.
