@@ -1,4 +1,4 @@
-from typing import Union, Sequence, Any, Tuple, Dict, List, Callable
+from typing import Sequence, Any, Tuple, Dict, List, Callable
 import random
 import cv2
 import numpy as np
@@ -15,7 +15,7 @@ from . import transforms
 
 def min_max_(
     img: npt.NDArray, new_min: float, new_max: float, old_min: float, old_max: float
-) -> npt.NDArray[np.float64]:
+) -> npt.NDArray[float]:
     """Normalize the array `img` from the range [`old_min`, `old_max`]
        to the range [`new_min`, `new_max`]
     Args:
@@ -36,7 +36,7 @@ def min_max_(
 
 def combine_im_with_mask_dist_transform(
     img: npt.NDArray, mask: npt.NDArray, blend_exponent: float = 1
-) -> npt.NDArray[np.float]:
+) -> npt.NDArray[float]:
     """Highlight centerlines of mask components in image using distance transform.
     Args:
         img: The image.
@@ -303,46 +303,9 @@ def get_augmentor(augmentations: List[Callable]) -> Callable:
     def augmentor(image: npt.NDArray, mask: npt.NDArray) -> Tuple[npt.NDArray, npt.NDArray]:
         assert image.shape == mask.shape, 'Image and mask must have the same shape.'
 
-        added_start_dim = image.shape[0] == 1
-        added_end_dim = image.shape[-1] == 1
-        if added_start_dim or added_end_dim:
-            image = image.squeeze()
-            mask = mask.squeeze()
-
-        # some transforms require uint8 images
-        img_min = np.min(image)
-        if np.min(image) < 0:
-            image = image - img_min
-            img_min = 0
-        img_max = np.max(image)
-
-        if img_max < 1:
-            scale = 255
-        elif img_max <= 255:
-            scale = 1
-        elif img_max <= 65025:
-            scale = 1 / 255
-        else:
-            scale = 255 / img_max
-
-        og_dtype = image.dtype
-
-        image = image * scale
-        image = np.round(image).astype(np.uint8)
-
         for aug in augmentations:
             transformed = aug(image=image, mask=mask)
             image, mask = transformed['image'], transformed['mask']
-
-        image = (image / scale).astype(og_dtype)
-
-        if added_start_dim:
-            image = image[np.newaxis, ...]
-            mask = mask[np.newaxis, ...]
-
-        if added_end_dim:
-            image = image[..., np.newaxis]
-            mask = mask[..., np.newaxis]
 
         return image, mask
 
@@ -359,10 +322,8 @@ def get_batch_augmentor(augmentations: List[Callable]) -> Callable:
         num_samples = images.shape[0]
 
         image_mask_pairs = d.compute([
-            d.delayed(augmentor)(images[i], masks[i])[0]
+            d.delayed(augmentor)(images[i], masks[i])
             for i in range(num_samples)])[0]
-
-        # image_mask_pairs = [augmentor(images[i], masks[i]) for i in range(num_samples)]
 
         transformed_images, transformed_masks = zip(*image_mask_pairs)
 
@@ -372,11 +333,11 @@ def get_batch_augmentor(augmentations: List[Callable]) -> Callable:
 
 
 def augment_invasion_imgs(
-    images: npt.NDArray[np.float_],
+    images: npt.NDArray[float],
     rand_state: RandomState,
     rot_options=(0, 90, 180, 270),
     expand_dims: bool=False
-) -> npt.NDArray[np.float_]:
+) -> npt.NDArray[float]:
     """Transform a list of images with random flips and rotations.
     Args:
         images: Original images.
