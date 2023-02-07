@@ -50,6 +50,49 @@ def verbose_footer() -> None:
     print(verbose_end)
 
 
+def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
+    """Parse commandline arguments to the branching script.
+
+    Args:
+        arg_defaults: Default values for the commandline arguments that have
+            default values.
+
+    Returns:
+        Parsed commandline arguments.
+
+    """
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("in_root", type=str, help=(
+        "Full path to root directory of input images. "
+        "Ex: [...]/my_data/images/experiment_1_yyyy_mm_dd/")
+    )
+
+    parser.add_argument("out_root", type=str, help=(
+        "Full path to root directory where output will be stored. "
+        "Ex: [...]/my_data/analysis_output/experiment_1_yyyy_mm_dd/. "
+        "In this example, experiment_1_yyyy_mm_dd/ will be created if it "
+        "does not already exist. If it does exist then the contents of "
+        "experiment_1_yyyy_mm_dd/ will be overwritten.")
+    )
+
+    parser.add_argument("-c", "--config", type=str,
+        default=arg_defaults["default_config_path"], help=(
+        "Full path to branching configuration file. Ex: "
+        "[...]/my_data/analysis_output/experiment_1_yyyy_mm_dd/branching_config.json")
+    )
+
+    parser.add_argument("-i", "--save-intermediates", action="store_true", help=(
+        "Save intermediate images generated during branching analysis.")
+    )
+
+    parser.add_argument("-v", "--verbose", action="store_true", help=(
+        "Print verbose output to the console.")
+    )
+
+    return parser.parse_args()
+
+
 ### Parse Arguments ###
 def parse_cell_area_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
     """Parse commandline arguments to the cell area computation script.
