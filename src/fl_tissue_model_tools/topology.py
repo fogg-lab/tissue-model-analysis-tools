@@ -3,7 +3,6 @@ import math
 import subprocess
 import pickle
 import os
-from time import time
 
 import numpy as np
 import numpy.typing as npt
