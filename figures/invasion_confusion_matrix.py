@@ -14,7 +14,11 @@ true = pd.DataFrame(invaded_pred)
 
 matrix = confusion_matrix(true, pred)
 
+plt.rcParams.update({'font.size': 32})
+
 display = ConfusionMatrixDisplay(confusion_matrix=matrix, display_labels=["Not Invaded", "Invaded"])
 display.plot()
+
+display.ax_.set_title("Cancer Invasion Confusion Matrix")
 
 plt.show()
