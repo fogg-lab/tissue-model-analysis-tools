@@ -263,7 +263,7 @@ def compute_branches_and_barcode(vertices, edges):
         current_distance = 0
         current_branch = []
         # Follow the path from the leaf
-        # until we encounter another branch or reach the root.
+        # until either we reach the root or encounter another branch.
         # Add each edge along the way with the color of the branch.
         while current_label == leaf and current_vertex != current_parent:
             # update distance from `leaf`.
@@ -275,53 +275,101 @@ def compute_branches_and_barcode(vertices, edges):
             current_vertex = current_parent
             current_parent = parent[current_vertex]
             current_label = branch_label[current_vertex]
-        branches.append(np.array(current_branch))
-        # add the branch of the current leaf to the barcode
-        # its birth is the (negative) distance of the leaf to the center
-        # the death is the distance where we encounter a longer branch
-        birth = -dist_to_center[leaf]
-        death = birth + current_distance
-        barcode.append((birth, death))
+        if len(current_branch) > 0:
+            branches.append(np.array(current_branch))
+            # add the current branch to the barcode
+            # its birth is the (negative) distance of the leaf to the center
+            # the death is the distance where we encounter a longer branch
+            birth = -dist_to_center[leaf]
+            death = birth + current_distance
+            barcode.append((birth, death))
 
     return branches, barcode
 
 def smooth_graph(vertices, edges, window_size):
     """ Smooth a graph using sliding window smoothing
 
+        We smooth a graph by perform moving average smoothing
+        on all consecutive segment of degree 2 vertices.
+        We fix the position off all leaves and degree >=3 branchpoints.
+
+        Args:
+            vertices (list): list of vertex positions
+            edges (list): list of edge endpoints
+            window_size (int): size of window for moving average smoothing
+
+        Returns:
+            new_vertices (list): list of smooth vertex positions
+            new_edges (list): list of smoothed edge enpoints
     """
     def moving_average(A, n=3):
-        """ Computes moving average of array `a` with window size `n` """
+        """ Computes moving average of array `A` with window size `n` """
         ret = np.concatenate(([A[0]]*n, A[1:-1], [A[-1]]*n))
         ret = np.cumsum(ret, axis=0, dtype=float)
         ret[n:] = ret[n:] - ret[:-n]
-        return ret[n-1:-(n-1)] / n
+        return ret[n-1:] / n
 
     G = __convert_to_networkx_graph(vertices, edges)
     branches, _ = compute_branches_and_barcode(vertices, edges)
     # We fix the position of all leaves and merge points between two branches
-    is_position_fixed = [ G.degree[v] != 2 for v in G.nodes ]
-    # the smoothed graph will have the same edges as the input graph
-    # but different vertex positions
-    new_vertices = vertices.copy()
+    # This dict stores a bool indicating if the position of a vertex is fixed.
+    is_position_fixed = { v : G.degree[v] != 2 for v in G.nodes }
+    # list of smoothed vertices and edges
+    new_vertices = np.zeros((0,2), dtype="float")
+    new_edges = np.zeros((0,2), dtype="int")
+    # index of the original vertices in the list new_vertices
+    vertex_idx_dict = {}
     for branch in branches:
-        # verify that edges in branch are consecutive
-        # this should be true as this is how compute_branches_and_barcode works
-        assert all([ branch[i][1] == branch[i+1][0] for i in range(len(branch)-1) ])
-        branch_vertices = np.array( [branch[i][0] for i in range(len(branch))]+[branch[-1][1]] )
-        # A branch may have fixed points besides its endpoints,
+        # we use the branches of the tree to identify
+        # consecutive segments of degree 2 vertices.
+
+        # Verify that edges in branch are consecutive.
+        # This should be true as this is how compute_branches_and_barcode works
+        assert all([ branch[i,1] == branch[i+1,0] for i in range(len(branch)-1) ])
+        branch_vertices = np.array( [branch[i,0] for i in range(len(branch))]+[branch[-1, 1]] )
+        # A branch may have fixed points besides its endpoints;
         # for example, when another branch is attached to the middle of the branch.
-        # We therefore decompose the branch into the segments
-        # connecting fixed points and smooth each of these segments.
+        # We therefore decompose the branch into the segments connecting fixed points
+        # and smooth each of these segments.
         is_position_fixed[branch_vertices[0]] = True
         is_position_fixed[branch_vertices[-1]] = True
         branch_fixed_vertices = [ i for i, vertex in enumerate(branch_vertices) if is_position_fixed[vertex] ]
-        for i in range(len(branch_fixed_vertices)-1):
-            segment_start, segment_end = branch_fixed_vertices[i], branch_fixed_vertices[i+1]
+        for segment_start, segment_end in zip(branch_fixed_vertices[:-1], branch_fixed_vertices[1:]):
             segment_vertices = branch_vertices[segment_start:segment_end+1]
-            new_vertices[segment_vertices] = moving_average(vertices[segment_vertices], window_size)
-    return new_vertices, edges
-
-
+            smoothed_vertices = moving_average(vertices[segment_vertices], window_size)
+            num_smoothed_vertices = len(smoothed_vertices)
+            # check that the position of the endpoints were fixed
+            assert np.all(np.isclose(smoothed_vertices[0], vertices[segment_vertices[0]]))
+            assert np.all(np.isclose(smoothed_vertices[-1], vertices[segment_vertices[-1]]))
+            # Add vertices to return array
+            prev_num_vertices = new_vertices.shape[0]
+            new_vertices = np.concatenate((new_vertices, smoothed_vertices[1:-1]), axis=0)
+            # The endpoints of a segment may be shared with other branches.
+            # Therefore, we check if the endpoints have already appeared in another branch.
+            # If so, we find their index in the list of new_vertices.
+            v0 = segment_vertices[0]
+            vn = segment_vertices[-1]
+            if v0 in vertex_idx_dict:
+                v0_idx = vertex_idx_dict[v0]
+            else:
+                v0_idx = new_vertices.shape[0]
+                vertex_idx_dict[v0] = v0_idx
+                new_vertices = np.vstack((new_vertices, smoothed_vertices[0]))
+            if vn in vertex_idx_dict:
+                vn_idx = vertex_idx_dict[vn]
+            else:
+                vn_idx = new_vertices.shape[0]
+                vertex_idx_dict[vn] = vn_idx
+                new_vertices = np.vstack((new_vertices, smoothed_vertices[-1]))
+            # Add edges to return array.
+            smoothed_vertices_idx = np.array(
+                [v0_idx]
+              + [prev_num_vertices+j for j in range(num_smoothed_vertices-2)]
+              + [vn_idx]
+            )
+            segment_edges = np.array([[smoothed_vertices_idx[j], smoothed_vertices_idx[j+1]] for j in range(num_smoothed_vertices-1)])
+            new_edges = np.concatenate((new_edges, segment_edges), axis=0)
+    return new_vertices, new_edges
 
 def plot_colored_barcode(barcode_and_colors, ax=None, **kwargs):
     """ Plot a colored barcode computed by `compute_colored_tree_and_barcode`
@@ -430,7 +478,7 @@ def filter_graph(vertices, edges, min_branch_length):
 
         Returns:
             filtered_branches (E' x 2 numpy array of ints):
-                array of all edges in barnches longer than min_branch_length
+                array of all edges in branches longer than min_branch_length
             filtered_barcode ():
                 barcode of filtered graph
 
@@ -525,7 +573,7 @@ def compute_morse_skeleton_and_barcode(G, verts):
         bc = K.persistence_intervals_in_dimension(0)
 
         bc_total = np.concatenate((bc_total, bc), axis=0)
-        verts_total = np.concatenate((verts_total, verts), axis=0)
+        # verts_total = np.concatenate((verts_total, verts), axis=0)
         edges_total = np.concatenate((edges_total, np.array(spt.edges)), axis=0)
 
-    return verts_total, edges_total, bc_total
+    return verts, edges_total, bc_total
