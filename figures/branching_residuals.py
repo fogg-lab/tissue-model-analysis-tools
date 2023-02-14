@@ -1,26 +1,19 @@
-import random
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
 import pandas as pd
 
-fig = plt.figure(figsize=(10,6))
+fig = plt.figure(figsize=(10, 6))
 plt.rcParams.update({'font.size': 22})
 
-def get_random_vals(lower_bound, upper_bound, num_vals):
-    hand_measured_points = []
-    model_points = []
-    for i in range(num_vals):
-        hand_measured_points.append(random.uniform(lower_bound, upper_bound))
-        model_points.append(random.uniform(lower_bound, upper_bound))
+# Data from sheet found here: https://docs.google.com/spreadsheets/d/1k34RgHDlJp-wIw-DkAz7MyrL0M9bASq3jitGeXD5BG8/edit#gid=598864832
 
-    df = pd.DataFrame({
-        'x': model_points,
-        'y': hand_measured_points,
-    })
+hand_measured_points = [85.81, 81.74, 68.26, 67.96, 59.01, 100.4, 102.27, 132.61, 125.71]
+model_points = [133.55, 89.9, 73.66, 66.57, 95.33, 67.91, 66.57, 95.33, 67.91]
 
-    return df
-
-df = get_random_vals(100.0, 2000.0, 20)
+df = pd.DataFrame({
+    'x': model_points,
+    'y': hand_measured_points,
+})
 
 y = df['y']
 x = df['x']
