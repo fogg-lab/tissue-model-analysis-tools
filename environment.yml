@@ -19,3 +19,4 @@ dependencies:
   - keras-tuner
   - pillow
   - scikit-image
+  - tqdm
