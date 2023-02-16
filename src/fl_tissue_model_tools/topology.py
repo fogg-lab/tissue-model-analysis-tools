@@ -21,7 +21,7 @@ def __random_color(i : int):
 
 
 def __convert_to_networkx_graph(vertices, edges):
-    """ Convert a dmtgraph to a Networkx graph """
+    """ Convert a dmtgraph to a networkx graph """
     G = nx.Graph()
     # TODO: add vertex position
     for vertex0, vertex1 in edges:
@@ -301,6 +301,7 @@ def smooth_graph(vertices, edges, window_size):
         Returns:
             new_vertices (list): list of smooth vertex positions
             new_edges (list): list of smoothed edge enpoints
+            new_barcode (list): barcode of smoothed graph
     """
     def moving_average(A, n=3):
         """ Computes moving average of array `A` with window size `n` """
@@ -309,17 +310,27 @@ def smooth_graph(vertices, edges, window_size):
         ret[n:] = ret[n:] - ret[:-n]
         return ret[n-1:] / n
 
+    def branch_length(_vertices, _edges):
+        length = 0
+        for u, v in _edges:
+            length += np.linalg.norm(_vertices[u]-_vertices[v])
+        return length
+
+
+
     G = __convert_to_networkx_graph(vertices, edges)
-    branches, _ = compute_branches_and_barcode(vertices, edges)
+    branches, barcode = compute_branches_and_barcode(vertices, edges)
     # We fix the position of all leaves and merge points between two branches
     # This dict stores a bool indicating if the position of a vertex is fixed.
     is_position_fixed = { v : G.degree[v] != 2 for v in G.nodes }
     # list of smoothed vertices and edges
     new_vertices = np.zeros((0,2), dtype="float")
     new_edges = np.zeros((0,2), dtype="int")
+    new_barcode = np.zeros((0,2), dtype="int")
     # index of the original vertices in the list new_vertices
     vertex_idx_dict = {}
-    for branch in branches:
+    for branch, bar in zip(branches, barcode):
+        length = 0
         # we use the branches of the tree to identify
         # consecutive segments of degree 2 vertices.
 
@@ -369,7 +380,11 @@ def smooth_graph(vertices, edges, window_size):
             )
             segment_edges = np.array([[smoothed_vertices_idx[j], smoothed_vertices_idx[j+1]] for j in range(num_smoothed_vertices-1)])
             new_edges = np.concatenate((new_edges, segment_edges), axis=0)
-    return new_vertices, new_edges
+            # add segment length to branch length
+            length += branch_length(new_vertices, segment_edges)
+        # add bar to barcode
+        new_barcode = np.vstack((new_barcode, [bar[0],bar[0]+length]))
+    return new_vertices, new_edges, new_barcode
 
 def plot_colored_barcode(barcode_and_colors, ax=None, **kwargs):
     """ Plot a colored barcode computed by `compute_colored_tree_and_barcode`
