@@ -25,7 +25,7 @@ def parse_args() -> argparse.Namespace:
 
 def main():
     args = parse_args()
-    img = cv2.imread(args.img, cv2.IMREAD_GRAYSCALE)
+    img = cv2.imread(args.img, cv2.IMREAD_ANYDEPTH)
 
     if img is None:
         print("Error: Could not read image")

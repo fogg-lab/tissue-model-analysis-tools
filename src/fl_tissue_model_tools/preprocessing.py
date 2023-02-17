@@ -117,6 +117,18 @@ def gen_circ_mask_auto(
     radius_max = img.shape[0] * target_radius_proportion_range[1]
     center_x_min, center_x_max = img.shape[1] * 0.43, img.shape[1] * 0.57
     center_y_min, center_y_max = center_x_min, center_x_max
+
+    def get_circle(points_3: Sequence[Tuple[float, float]]):
+        """Get circle parameters from 3 points: [(x,y),(x,y),(x,y)]"""
+        x, y, z = [xcoord+ycoord*1j for (xcoord,ycoord) in points_3]
+        w = (z-x) / (y-x)
+        c = (x-y)*(w-abs(w)**2)/2j/w.imag-x
+        return {
+            'radius': abs(c+x),
+            'center_x': c.real * -1,
+            'center_y': c.imag * -1
+        }
+
     for _ in range(150):
         circle_points_3 = random.sample(edge_xy, k=3)
         try:
@@ -145,17 +157,6 @@ def gen_circ_mask_auto(
     mask_center = round(mask_center_x), round(mask_center_y)
 
     return gen_circ_mask(mask_center, mask_radius, edgefilter.shape, mask_val)
-
-def get_circle(points_3: Sequence[Tuple[float, float]]):
-    """Get circle parameters from 3 points: [(x,y),(x,y),(x,y)]"""
-    x, y, z = [xcoord+ycoord*1j for (xcoord,ycoord) in points_3]
-    w = (z-x) / (y-x)
-    c = (x-y)*(w-abs(w)**2)/2j/w.imag-x
-    return {
-        'radius': abs(c+x),
-        'center_x': c.real * -1,
-        'center_y': c.imag * -1
-    }
 
 
 def apply_mask(img: npt.NDArray, mask: npt.NDArray) -> npt.NDArray:
