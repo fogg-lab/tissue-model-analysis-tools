@@ -165,7 +165,7 @@ def proj_focus_stacking(
     for i, z_img in enumerate(stack):
         output = cv2.bitwise_not(z_img, output, mask=masks[i])
 
-    return defs.GS_MAX - output
+    return defs.MAX_UINT8 - output
 
 
 def proj_avg(stack: npt.NDArray, axis: int=0, dtype=np.uint8) -> npt.NDArray:
