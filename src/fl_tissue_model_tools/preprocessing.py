@@ -1,4 +1,4 @@
-from typing import Sequence, Any, Tuple, Dict, List, Callable
+from typing import Sequence, Any, Tuple, Dict, List, Callable, Optional
 import random
 import cv2
 import numpy as np
@@ -7,10 +7,12 @@ from numpy.random import RandomState
 import dask as d
 from sklearn.mixture import GaussianMixture
 from skimage import exposure, filters, morphology
+from scipy.ndimage import generate_binary_structure
 from scipy.spatial import KDTree
 
 from . import defs
 from . import transforms
+from .gwdt_impl import gwdt_impl
 
 
 def min_max_(
@@ -222,7 +224,7 @@ def exec_threshold(
 
     # Get mean foreground mean & threshold value
     foreground_dist_idx = np.argmax(means)
-    foreground_thresh = min(defs.GS_MAX, means[foreground_dist_idx] + sds[foreground_dist_idx] * sd_coef)
+    foreground_thresh = min(defs.MAX_UINT8, means[foreground_dist_idx] + sds[foreground_dist_idx] * sd_coef)
 
     # Apply threshold
     gmm_masked = np.copy(masked)
@@ -246,7 +248,7 @@ def dt_blur(
     """
 
     proc_img = cv2.distanceTransform(
-        bin_thresh(img, defs.GS_MAX).round().astype(np.uint8), dist_metric, 5
+        bin_thresh(img, defs.MAX_UINT8).round().astype(np.uint8), dist_metric, 5
     )
     return blur(proc_img, blur_itr, k_size)
 
@@ -268,13 +270,61 @@ def sdt_blur(
         Signed distance transformed and blurred image.
     """
     # all pixels of value greater than 0
-    mask = bin_thresh(img, defs.GS_MAX).round().astype(np.uint8)
+    mask = bin_thresh(img, defs.MAX_UINT8).round().astype(np.uint8)
     # distance of pixels in the mask
     proc_img = cv2.distanceTransform(mask, dist_metric, 5)
     # distance of pixels not in the mask
     proc_img -= cv2.distanceTransform(np.logical_not(mask).astype(np.uint8),
                                       dist_metric, 5)
     return blur(proc_img, blur_itr, k_size, gs=False)
+
+
+def dt_gray_weighted(img: npt.NDArray, threshold: int, structure: Optional[npt.NDArray] = None):
+    """Gray-weighted distance transform
+    From https://github.com/chunglabmit/gwdt/blob/master/gwdt/gwdt.py (MIT License)
+
+    This algorithm finds the weighted manhattan distance from the background
+    to every foreground point. The distance is the smallest sum of image values
+    along a path. Path steps are taken in directions indicated by the structure.
+
+    Args:
+        img: Image to be transformed.
+        threshold: Threshold value for foreground.
+        structure: Structuring element used for the distance transform.
+    Returns:
+        npt.NDArray: Gray-weighted distance transform of the image.
+    """
+
+    if structure is None:
+        structure = generate_binary_structure(img.ndim, 1)
+
+    foreground_img = img - threshold
+    foreground_img[foreground_img < 0] = 0
+
+    pad_size = [(_//2, _//2) for _ in structure.shape]
+    padded_img = np.pad(img, pad_size).astype(np.float32)
+    d = np.mgrid[tuple([slice(-ps[0], ps[1]+1) for ps in pad_size])]
+    d = d[:, structure]
+    stride = []
+    for idx in range(d.shape[1]):
+        accumulator = 0
+        for idx2 in range(d.shape[0]):
+            accumulator += padded_img.strides[idx2] * d[idx2, idx] /\
+                           padded_img.dtype.itemsize
+        if accumulator != 0:
+            stride.append(accumulator)
+    strides = np.array(stride, np.int64)
+    marks = np.zeros(padded_img.shape, np.uint8)
+    # MARK_ALIVE = 1
+    # MARK_FAR = 3
+    # so False * 2 + 1 = MARK_ALIVE and
+    #    True * 2 + 1 = MARK_FAR
+    mark_slices = [slice(ps[0], s-ps[1])
+                   for ps, s in zip(pad_size, padded_img.shape)]
+    marks[tuple(mark_slices)] = (img > 0) * 2 + 1
+    output = np.zeros(padded_img.shape, np.float32)
+    gwdt_impl(padded_img.ravel(), output.ravel(), strides, marks.ravel())
+    return output[tuple(mark_slices)]
 
 
 def blur(
@@ -290,7 +340,7 @@ def blur(
         Blurred image.
     """
     proc_img = img.copy()
-    for i in range(blur_itr):
+    for _ in range(blur_itr):
         proc_img = cv2.GaussianBlur(proc_img, (k_size, k_size), 0)
 
     if gs == False:
@@ -322,9 +372,10 @@ def get_batch_augmentor(augmentations: List[Callable]) -> Callable:
         assert images.shape == masks.shape, "Images and masks must have the same shape."
         num_samples = images.shape[0]
 
-        image_mask_pairs = d.compute([
-            d.delayed(augmentor)(images[i], masks[i])
-            for i in range(num_samples)])[0]
+        #image_mask_pairs = d.compute([
+        #    d.delayed(augmentor)(images[i], masks[i])
+        #    for i in range(num_samples)])[0]
+        image_mask_pairs = [augmentor(images[i], masks[i]) for i in range(num_samples)]
 
         transformed_images, transformed_masks = zip(*image_mask_pairs)
 
