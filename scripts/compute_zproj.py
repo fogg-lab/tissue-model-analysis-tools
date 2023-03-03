@@ -40,7 +40,7 @@ def get_zstack(zs_path: str, descending: bool) -> npt.NDArray:
 
     for z_path in z_paths:
         z_img = cv2.imread(z_path, cv2.IMREAD_ANYDEPTH)
-        z_img_norm = prep.min_max_(z_img, 0, defs.GS_MAX, 0, defs.TIF_MAX)
+        z_img_norm = prep.min_max_(z_img, 0, defs.MAX_UINT8, 0, defs.MAX_UINT16)
         z_stack.append(z_img_norm.round().astype(np.uint8))
 
     return np.array(z_stack)
@@ -59,11 +59,11 @@ def save_zproj(zproj: npt.NDArray, out_root: str, zid: str, zproj_type: str, ext
         OSError: Unsupported file extension supplied.
     """
     old_min = 0
-    old_max = defs.GS_MAX
+    old_max = defs.MAX_UINT8
 
     cast_type = np.uint16
     new_min = 0
-    new_max = defs.TIF_MAX
+    new_max = defs.MAX_UINT16
 
     zproj_out_path = os.path.join(out_root, f"{zid}_{zproj_type}{ext}")
     zproj_out_img = prep.min_max_(zproj, new_min, new_max, old_min, old_max).astype(cast_type)

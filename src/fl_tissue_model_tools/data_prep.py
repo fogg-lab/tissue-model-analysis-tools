@@ -47,7 +47,7 @@ def load_inv_depth_img(path: str, img_hw: Tuple[int, int]) -> npt.NDArray:
     """
     img = cv2.imread(path, cv2.IMREAD_ANYDEPTH)
     img = prep.min_max_(cv2.resize(img, img_hw, cv2.INTER_LANCZOS4).astype(np.float32),
-                        0, defs.GS_MAX, 0, defs.TIF_MAX)
+                        0, defs.MAX_UINT8, 0, defs.MAX_UINT16)
     img = np.repeat(img[:, :, np.newaxis], 3, axis=2)
     return img
 
