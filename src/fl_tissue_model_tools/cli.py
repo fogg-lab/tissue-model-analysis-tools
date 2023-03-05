@@ -31,6 +31,8 @@ def main():
 
     if args.command is None and len(commands) == 1:
         configure()
+        print(f'{defs.PKG_NAME} configured successfully.')
+        return
 
     if args.command is None:
         print('Command options:')
@@ -84,7 +86,11 @@ def main():
 
     for required_dir in required_dirs:
         if not required_dir.exists():
+            print(f'{required_dir} not found. Running configure...')
             configure()
+            for required_dir in required_dirs:  # Make sure it worked
+                assert required_dir.exists(), f"Configuration failed: {required_dir} not found"
+            print(f'Configuration complete. Proceeding with {args.command}...')
             break
 
     if args.command:
