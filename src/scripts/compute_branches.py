@@ -9,7 +9,7 @@ import cv2
 from matplotlib import pyplot as plt
 import networkx as nx
 from sklearn.mixture import GaussianMixture
-from skimage.exposure import equalize_adapthist, rescale_intensity
+from skimage.exposure import rescale_intensity
 
 from fl_tissue_model_tools import helper
 from fl_tissue_model_tools import script_util as su
