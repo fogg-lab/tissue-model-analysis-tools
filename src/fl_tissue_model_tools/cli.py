@@ -4,11 +4,14 @@ import sys
 from glob import glob
 from pathlib import Path
 
-from fl_tissue_model_tools import configure, defs
+from fl_tissue_model_tools import defs
+from fl_tissue_model_tools.configure import configure
 
-COMMANDS = ['configure'] + [Path(script).stem for script in glob(str(defs.SCRIPT_DIR / '*.py'))]
+def get_script_commands() -> list:
+    return [Path(script).stem for script in glob(str(defs.SCRIPT_DIR / '*.py'))]
 
 def main():
+    commands = ['configure'] + get_script_commands()
 
     # Arguments are the command and any arguments for the command
     parser = argparse.ArgumentParser(description='Description the command-line interface')
@@ -16,7 +19,7 @@ def main():
     cmdline_args = sys.argv[1:]
 
     if len(cmdline_args) > 0:
-        parser.add_argument('command', type=str, choices=COMMANDS, default=None,
+        parser.add_argument('command', type=str, choices=commands, default=None,
                             help='Command to run')
 
     parser.add_argument('command_args', nargs=argparse.REMAINDER,
@@ -26,10 +29,13 @@ def main():
 
     args.command = args.command if len(cmdline_args) > 0 else None
 
+    if args.command is None and len(commands) == 1:
+        configure()
+
     if args.command is None:
         print('Command options:')
 
-        for i, command in enumerate(COMMANDS):
+        for i, command in enumerate(commands):
             print(f'  {i+1}. {command}')
 
         command_num = input('Enter the number of the command to run (or q to quit): ')
@@ -47,18 +53,26 @@ def main():
             print(f'Invalid command number: \'{command_num}\'')
             sys.exit(1)
 
-        if command_num < 1 or command_num > len(COMMANDS):
+        if command_num < 1 or command_num > len(commands):
             print(f'Invalid command number: {command_num}')
             sys.exit(1)
 
-        args.command = COMMANDS[command_num - 1]
-
-    if args.command == 'configure':
-        configure.configure()
-        return
+        args.command = commands[command_num - 1]
 
     if not args.command_args:
         args.command_args = input('Arguments, if any (or -h to list options): ').split()
+
+    if args.command == 'configure':
+        if len(args.command_args) > 1:
+            print('Too many arguments for the configure command')
+            sys.exit(1)
+        if args.command_args and args.command_args[0] == '-h':
+            configure(print_help=True)
+        elif args.command_args:
+            configure(base_dir=args.command_args[0])
+        else:
+            configure()
+        return
 
     # Make sure the base directory and its subdirectories exist
     required_dirs = [
@@ -70,7 +84,7 @@ def main():
 
     for required_dir in required_dirs:
         if not required_dir.exists():
-            configure.configure()
+            configure()
             break
 
     if args.command:

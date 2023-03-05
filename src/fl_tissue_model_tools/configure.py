@@ -15,11 +15,9 @@ Creates the following directory structure:
             compute_zproj.py
 '''
 
-import argparse
 from pathlib import Path
 import sys
 import configparser
-import pkg_resources
 
 from fl_tissue_model_tools import defs
 
@@ -48,82 +46,79 @@ BASE_DIR_SUBDIRS = [
 
 USER_HOME = Path.home().resolve()
 
-def configure():
-    description ='Create or move the base directory for config files, scripts, data, and output.'
-    parser = argparse.ArgumentParser(description=description)
+def configure(base_dir: str='', print_help: bool=False):
+    '''Create or move the base directory for config files, scripts, data, and output.'''
+
+    if print_help:  # print help message and exit
+        print(f'Usage: Pass in the preferred base directory location for {defs.PKG_NAME}.')
+        print('If no base directory is specified, you will be prompted to enter one ' +
+              'or accept the default.')
+        sys.exit(0)
 
     default_base_dir = str(defs.BASE_DIR)
     if not default_base_dir:
         default_base_dir = str(USER_HOME / defs.PKG_NAME)
 
-    parser.add_argument('--base_dir', type=str, default='', help='Base directory')
-
-    args = parser.parse_args()
-
     print(f'\nEnter the preferred base directory location for {defs.PKG_NAME}.')
     print(f'The default base directory is \'{defs.PKG_NAME}\' in the current user\'s home folder.')
 
-    if args.base_dir == '':
-        args.base_dir = input(f'Base directory [{default_base_dir}]: ')
+    if base_dir == '':
+        base_dir = input(f'Base directory [{default_base_dir}]: ') or default_base_dir
         print('')
 
-    if args.base_dir == '':
-        args.base_dir = default_base_dir
-
-    base_dir = Path(args.base_dir)
+    prev_base_dir = str(defs.BASE_DIR)
 
     # Ensure that base_dir.parent exists
-    if not base_dir.parent.is_dir():
+    if not Path(base_dir).parent.is_dir():
         print(f'Error - Parent directory does not exist: {base_dir.parent}')
         return
 
-    # Get previous base_dir from config file
-    cfg_path = pkg_resources.resource_filename('fl_tissue_model_tools', 'fl_tissue_model_tools.cfg')
-    config = configparser.ConfigParser()
-    config.read(cfg_path)
-    prev_base_dir = Path(config['fl_tissue_model_tools']['base_dir'])
-
-    if base_dir.exists():
+    if Path(base_dir).exists():
         print(f'Base directory already exists: {base_dir}')
-    elif prev_base_dir.exists():
+    elif Path(prev_base_dir).exists():
         print(f'Moving base directory from {prev_base_dir} to {base_dir}')
         try:
-            prev_base_dir.rename(base_dir)
+            Path(prev_base_dir).rename(base_dir)
         except PermissionError:
             print(f'Cannot move directory {prev_base_dir} to {base_dir}: Permission denied')
             sys.exit(1)
     else:
         print(f'Creating base directory: {base_dir}')
         try:
-            base_dir.mkdir(parents=True)
+            Path(base_dir).mkdir(parents=True)
         except PermissionError:
             print(f'Cannot create directory {base_dir}: Permission denied')
             sys.exit(1)
 
     for subdir in BASE_DIR_SUBDIRS:
-        if not (base_dir / subdir).exists():
+        subdir_path = Path(base_dir) / subdir
+        if not subdir_path.exists():
             print(f'Creating {subdir} directory')
-            (base_dir / subdir).mkdir(parents=True)
+            subdir_path.mkdir(parents=True)
 
     # Copy config files and scripts to base_dir
     for src_dir, dest_dir, filenames in [(defs.PKG_CONFIG_DIR, CFG_SUBDIR, CFG_FILES),
                                          (defs.PKG_SCRIPTS_DIR, SCRIPTS_SUBDIR, SCRIPTS)]:
         for filename in filenames:
             src_path = src_dir / filename
-            dest_path = base_dir / dest_dir / filename
+            dest_path = Path(base_dir) / dest_dir / filename
             if not dest_path.exists():
                 print(f'Copying {filename} to {dest_path}')
                 dest_path.write_bytes(src_path.read_bytes())
 
-    # Keep the base directory relative to current user's home directory
-    args.base_dir = args.base_dir.replace(str(USER_HOME), '~')
+    if base_dir != prev_base_dir:
+        # Update package config file with new base_dir
 
-    config.set('fl_tissue_model_tools', 'base_dir', args.base_dir)
-    with open(cfg_path, 'w', encoding='utf-8') as config_file:
-        config.write(config_file)
+        config = configparser.ConfigParser()
+        config.read(defs.PKG_CFG_PATH)
+
+        # Keep the base directory relative to current user's home directory
+        config.set(defs.PKG_NAME, 'base_dir', base_dir.replace(str(USER_HOME), '~'))
+        with open(defs.PKG_CFG_PATH, 'w', encoding='utf-8') as config_file:
+            config.write(config_file)
 
     print(f'\nThe base directory for {defs.PKG_NAME} is now: {base_dir}')
 
-    if str(USER_HOME) in str(base_dir):
-        print(f'Note: For other users, \"{str(USER_HOME)}\" will be replaced with ' +
-              'that user\'s home directory.')
+    if str(USER_HOME) in base_dir and str(USER_HOME) not in str(defs.PKG_BASE_DIR):
+        # Make note about multiple users if package is installed system-wide
+        print(f'Note: For other users, \"{USER_HOME}\" will be replaced with their home directory.')
