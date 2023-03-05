@@ -5,7 +5,6 @@ channels:
 dependencies:
   - albumentations
   - boost
-  - cxx-compiler
   - dask
   - gudhi
   - jupyterlab

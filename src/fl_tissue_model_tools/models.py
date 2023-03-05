@@ -4,6 +4,9 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Sequence, Tuple
 from itertools import product
+import os
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 import numpy as np
 from numpy import typing as npt
@@ -23,7 +26,7 @@ from tensorflow.keras.losses import Loss
 
 from fl_tissue_model_tools.smooth_tiled_predictions import predict_img_with_smooth_windowing
 from fl_tissue_model_tools import defs
-
+from fl_tissue_model_tools import models_util as mu
 
 def build_ResNet50_TL(
     n_outputs: int, img_shape: Tuple[int, int],
@@ -101,7 +104,7 @@ def build_UNetXception(
     # Validate filter counts
     filter_counts = sorted(filter_counts)
 
-    assert _check_consec_factor(filter_counts, factor=2), ("Filter depths do not "
+    assert mu.check_consec_factor(filter_counts, factor=2), ("Filter depths do not "
                                                            "increase consecutively "
                                                            "by a factor of 2.")
 
@@ -365,7 +368,7 @@ class ResNet50TLHyperModel(kt.HyperModel):
         model.load_weights(self.mcp_best_frozen_weights_path)
 
         # Fit fine tuned full model
-        toggle_TL_freeze(model, self.base_model_name)
+        mu.toggle_TL_freeze(model, self.base_model_name)
         model.compile(fine_tune_opt, self.loss, weighted_metrics=self.weighted_metrics)
 
         return model.fit(
