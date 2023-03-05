@@ -8,7 +8,7 @@ SETUP_CFG = configparser.ConfigParser()
 SETUP_CFG.read(Path(__file__).resolve().parent / 'setup.cfg')
 PKG_NAME = SETUP_CFG['metadata']['name']
 ENTRY_POINT_FUNCTION = f'{PKG_NAME}.cli:main'
-CFG_FILE = os.path.join(PKG_NAME, f'{PKG_NAME}.cfg')
+CFG_FILE = os.path.join(PKG_NAME, f'package.cfg')
 ENTRYPOINT_COMMANDS = [
     'tissue-model-analysis-tools',
     'tmat',
@@ -20,6 +20,10 @@ config = configparser.ConfigParser()
 
 # Default base dir is relative to user's home directory, expanded at runtime
 # However on first run, the configuration script will ask for a base dir
+config['metadata'] = {
+    'name': PKG_NAME
+}
+
 config[PKG_NAME] = {
     'base_dir': Path('~') / PKG_NAME
 }
