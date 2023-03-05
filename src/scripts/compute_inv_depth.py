@@ -2,23 +2,25 @@ import os
 import sys
 import json
 from pathlib import Path
-import tensorflow.keras.backend as K
-import tensorflow as tf
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 import numpy as np
 import dask as d
 import pandas as pd
+import tensorflow.keras.backend as K
+import tensorflow as tf
 
-from fl_tissue_model_tools import models, data_prep
+from fl_tissue_model_tools import models, data_prep, defs
 from fl_tissue_model_tools import script_util as su
 from fl_tissue_model_tools import zstacks as zs
 
+DEFAULT_CONFIG_PATH = str(defs.SCRIPT_CONFIG_DIR) / "default_invasion_depth_computation.json"
 
-default_config_path = "../config/default_invasion_depth_computation.json"
 
 def main():
-    args = su.parse_inv_depth_args({"default_config_path": default_config_path})
+    args = su.parse_inv_depth_args({"default_config_path": DEFAULT_CONFIG_PATH})
     verbose = args.verbose
-
 
     ### Verify input source ###
     try:
@@ -27,7 +29,6 @@ def main():
         print(f"{su.SFM.failure} {e}")
         sys.exit()
 
-
     ### Verify output destination ###
     try:
         su.inv_depth_verify_output_dir(args.out_root, verbose=verbose)
@@ -35,21 +36,20 @@ def main():
         print(f"{su.SFM.failure} {e}")
         sys.exit()
 
-
     ### Load best hyperparameters ###
     if verbose:
         su.verbose_header("Loading Classifier")
 
-    with open("../model_training/invasion_depth_best_hp.json", 'r') as fp:
+    best_hp_path = defs.MODEL_TRAINING_DIR / "invasion_depth_best_hp.json"
+    with open(best_hp_path, 'r') as fp:
         best_hp = json.load(fp)
 
-
     ### Load model training parameters ###
-    with open("../model_training/invasion_depth_training_values.json", 'r') as fp:
+    training_params_path = defs.MODEL_TRAINING_DIR / "invasion_depth_training_params.json"
+    with open(training_params_path, 'r') as fp:
        training_values = json.load(fp)
     if training_values["rs_seed"] == "None":
         training_values["rs_seed"] = None
-
 
     ### Set model variables ###
     cls_thresh = training_values["cls_thresh"]
@@ -58,7 +58,6 @@ def main():
     n_outputs = 1
     last_resnet_layer = best_hp["last_resnet_layer"]
     descending = bool(args.order)
-
 
     ### Load config ###
     config_path = args.config
@@ -69,11 +68,13 @@ def main():
         sys.exit()
     n_pred_models = config["n_pred_models"]
 
+    best_ensemble_dir = defs.MODEL_TRAINING_DIR / "best_ensemble"
 
     ### Create models ###
     best_val_losses = np.zeros(n_models)
     for i in range(n_models):
-        h_df = pd.read_csv(f"../model_training/best_ensemble/best_model_history_{i}.csv")
+        out_csv = str(best_ensemble_dir / f"best_model_history_{i}.csv")
+        h_df = pd.read_csv(out_csv)
         ft_h_df = h_df.query("training_stage=='finetune'")
         best_val_losses[i] = ft_h_df.val_loss.min()
 
@@ -94,8 +95,8 @@ def main():
         # Set trainable to True, load weights, then set back to False
         ith_best_idx = sorted_best_model_idx[i]
         m.trainable = True
-        m.load_weights("../model_training/best_ensemble/best_finetune_weights_"
-            f"{ith_best_idx}.h5")
+        weights_path = str(best_ensemble_dir / f"best_finetune_weights_{ith_best_idx}.h5")
+        m.load_weights(weights_path)
         m.trainable = False
         if verbose:
             print(f"... Classifier {i} loaded.")
@@ -104,7 +105,6 @@ def main():
         print("All classifiers loaded.")
         print(su.SFM.success)
         su.verbose_footer()
-
 
     ### Generate predictions ###
     if verbose:
@@ -136,7 +136,8 @@ def main():
             print("Saving results...")
         output_file = pd.DataFrame({"img_name": [Path(zp).name for zp in zpaths],
                         "inv_prob": yhatp.squeeze(), "inv_label": yhat.squeeze()})
-        output_file.to_csv(f"{args.out_root}/invasion_depth_predictions.csv", index=False)
+        out_csv_path = str(args.out_root / "invasion_depth_predictions.csv")
+        output_file.to_csv(out_csv_path, index=False)
         if verbose:
             print("... Results saved.")
 

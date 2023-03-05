@@ -9,6 +9,8 @@ import cv2
 
 from numpy.random import RandomState
 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 from tensorflow.keras import utils
 from tensorflow.keras.applications import resnet50
 
