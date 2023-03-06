@@ -83,15 +83,15 @@ def main():
         defs.BASE_DIR,
         defs.SCRIPT_CONFIG_DIR,
         defs.SCRIPT_DIR,
-        defs.OUTPUT_DIR
+        defs.MODEL_TRAINING_DIR
     ]
 
     for required_dir in required_dirs:
-        if not required_dir.exists():
-            print(f'{required_dir} not found. Running configure...')
+        if not required_dir.is_dir():
+            print(f'{required_dir} directory not found. Running configure...')
             configure()
             for required_dir in required_dirs:  # Make sure it worked
-                assert required_dir.exists(), f"Configuration failed: {required_dir} not found"
+                assert required_dir.is_dir(), f"Configuration failed: {required_dir} not found"
             print(f'Configuration complete. Proceeding with {args.command}...')
             break
 
