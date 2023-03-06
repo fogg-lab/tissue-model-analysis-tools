@@ -31,9 +31,9 @@ git clone --recurse-submodules git@github.com:fogg-lab/tissue-model-analysis-too
 ```
 
 #### Create conda environment
-Build a `conda` environment using the `environment.yml` file. If you have a CUDA-capable (NVIDIA) GPU, use `environment_gpu.yml` for GPU-accelerated training and inference.
+Build a conda environment using the `environment.yml` file. If you have a CUDA-capable (NVIDIA) GPU, use `environment_gpu.yml` for GPU-accelerated training and inference.
 
-For more information on how to manage `conda` environments, see [environment management reference](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html).
+For more information on how to manage conda environments, see [environment management reference](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html).
 
 If you cloned the repo, `cd` to the project directory and run:
 ```bash
@@ -54,7 +54,7 @@ conda activate tissue-model-analysis
 
 #### Install `fl_tissue_model_tools` Package
 
-1. To install the `fl_tissue_model_tools` package, ensure that your `conda` environment is activated.
+1. To install the `fl_tissue_model_tools` package, ensure that your conda environment is activated.
 
 2. Install with pip:
 
@@ -111,7 +111,7 @@ Four command-line tools which handle the following operations:
 
 To use these tools:
 
-1. Ensure `conda` environment is active & all setup procedures have been followed (see [Install `fl_tissue_model_tools` Package](#install-fl_tissue_model_tools-package) )
+1. Ensure conda environment is active & all setup procedures have been followed (see [Install `fl_tissue_model_tools` Package](#install-fl_tissue_model_tools-package) )
 2. Within a terminal window, execute the commandline tools via (see sections below for details)
 ```bash
 # non-interactive
