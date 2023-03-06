@@ -54,11 +54,15 @@ setup(
     packages=[
         PKG_NAME,
         f'{PKG_NAME}.scripts',
-        f'{PKG_NAME}.config',
-        f'{PKG_NAME}.model_training',
         f'{PKG_NAME}.figures'
     ],
-    package_data={PKG_NAME: [str(CFG_FILE)]},
+    package_data={
+        PKG_NAME: [
+            str(CFG_FILE),
+            'config/*.json',
+            'model_training/*.json'
+        ]
+    },
     include_package_data=True,
     url='https://github.com/fogg-lab/tissue-model-analysis-tools',
     license='MIT',
