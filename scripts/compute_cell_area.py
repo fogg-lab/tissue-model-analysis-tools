@@ -13,7 +13,7 @@ from fl_tissue_model_tools import preprocessing as prep
 from fl_tissue_model_tools import analysis as an
 from fl_tissue_model_tools import script_util as su
 
-DEFAULT_CONFIG_PATH = str(defs.SCRIPT_CONFIG_DIR) / "default_cell_area_computation.json"
+DEFAULT_CONFIG_PATH = str(defs.SCRIPT_CONFIG_DIR / "default_cell_area_computation.json")
 THRESH_SUBDIR = "thresholded"
 CALC_SUBDIR = "calculations"
 
