@@ -18,8 +18,6 @@ def main():
 
     cmdline_args = sys.argv[1:]
 
-    print(f'cmdline_args = {cmdline_args}')
-
     if len(cmdline_args) > 0:
         parser.add_argument('command', type=str, choices=commands, default=None,
                             help='Command to run')
