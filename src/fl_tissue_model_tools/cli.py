@@ -6,19 +6,19 @@ from pathlib import Path
 
 from fl_tissue_model_tools import defs
 from fl_tissue_model_tools.configure import configure
+from fl_tissue_model_tools.update_package import update_package
 
 def get_script_commands() -> list:
-    return [Path(script).stem for script in glob(str(defs.SCRIPT_DIR / '*.py'))]
+    commands = [Path(script).stem for script in glob(str(defs.SCRIPT_DIR / '*.py'))]
+    return commands
 
 def main():
-    commands = ['configure'] + get_script_commands()
+    commands = ['configure', 'update'] + get_script_commands()
 
     # Arguments are the command and any arguments for the command
     parser = argparse.ArgumentParser(description='Description the command-line interface')
 
-    cmdline_args = sys.argv[1:]
-
-    if len(cmdline_args) > 0:
+    if len(sys.argv[1:]) > 0:
         parser.add_argument('command', type=str, choices=commands, default=None,
                             help='Command to run')
 
@@ -27,11 +27,30 @@ def main():
 
     args = parser.parse_args()
 
-    args.command = args.command if len(cmdline_args) > 0 else None
+    args.command = args.command if len(sys.argv[1:]) > 0 else None
 
     if args.command is None and len(commands) == 1:
         configure()
         print(f'{defs.PKG_NAME} configured successfully.')
+        return
+
+    if args.command == 'update':
+        force = False
+        if len(args.command_args) == 1:
+            if args.command_args[0] in ['--help', '-h']:
+                print('Update the package from GitHub.')
+                print('Usage: update [--help] [--force]')
+                print('  --help, -h: Show this help message and exit')
+                print('  --force, -f: Replace scripts and config files without confirmation')
+                return
+            elif args.command_args[0] in ['--force', '-f']:
+                force = True
+        elif len(args.command_args) > 1:
+            print('Error: Too many arguments for the update command (expected between 0 and 1). '
+                  'Use --help to list options.')
+            return
+        update_package()
+        configure(replace_subdirs=True, force_replace=force)
         return
 
     if args.command is None:
@@ -66,7 +85,8 @@ def main():
 
     if args.command == 'configure':
         if len(args.command_args) > 1:
-            print('Error: Too many arguments for the configure command.')
+            print('Error: Too many arguments for the configure command (expected between 0 and 1).'
+                  ' Use --help to list options.')
             print('If you entered a path with spaces, enclose the path in quotes'
                   ' or prepend each space with a backslash (\\) to escape it.')
             sys.exit(1)
