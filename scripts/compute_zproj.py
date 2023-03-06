@@ -1,11 +1,10 @@
 import os
 import sys
 from pathlib import Path
+import subprocess
 import numpy as np
 import numpy.typing as npt
 import cv2
-
-import compute_cell_area as area
 
 from fl_tissue_model_tools import defs
 from fl_tissue_model_tools import preprocessing as prep
@@ -40,7 +39,7 @@ def get_zstack(zs_path: str, descending: bool) -> npt.NDArray:
 
     for z_path in z_paths:
         z_img = cv2.imread(z_path, cv2.IMREAD_ANYDEPTH)
-        z_img_norm = prep.min_max_(z_img, 0, defs.GS_MAX, 0, defs.TIF_MAX)
+        z_img_norm = prep.min_max_(z_img, 0, defs.MAX_UINT8, 0, defs.MAX_UINT16)
         z_stack.append(z_img_norm.round().astype(np.uint8))
 
     return np.array(z_stack)
@@ -59,11 +58,11 @@ def save_zproj(zproj: npt.NDArray, out_root: str, zid: str, zproj_type: str, ext
         OSError: Unsupported file extension supplied.
     """
     old_min = 0
-    old_max = defs.GS_MAX
+    old_max = defs.MAX_UINT8
 
     cast_type = np.uint16
     new_min = 0
-    new_max = defs.TIF_MAX
+    new_max = defs.MAX_UINT16
 
     zproj_out_path = os.path.join(out_root, f"{zid}_{zproj_type}{ext}")
     zproj_out_img = prep.min_max_(zproj, new_min, new_max, old_min, old_max).astype(cast_type)
@@ -73,10 +72,11 @@ def save_zproj(zproj: npt.NDArray, out_root: str, zid: str, zproj_type: str, ext
 def main():
     '''Computes z projections and saves to output directory.'''
 
+    print(sys.argv[1:])
+
     args = su.parse_zproj_args()
     verbose = args.verbose
     compute_cell_area = args.area
-
 
     ### Verify input source ###
     try:
@@ -85,14 +85,12 @@ def main():
         print(f"{su.SFM.failure} {error}")
         sys.exit()
 
-
     ### Verify output destination ###
     try:
         su.zproj_verify_output_dir(args.out_root, verbose=verbose)
     except PermissionError as error:
         print(f"{su.SFM.failure} {error}")
         sys.exit()
-
 
     ### Compute Z projections ###
     if verbose:
@@ -134,9 +132,14 @@ def main():
             sys.argv.remove("-a")
         elif "--area" in sys.argv:
             sys.argv.remove("--area")
-        # Set in_root to out_root (where z projections are saved)
-        sys.argv[-2] = sys.argv[-1]
-        area.main()
+
+        script_path = defs.SCRIPT_DIR / "compute_cell_area.py"
+
+        options = [arg for arg in sys.argv[1:] if arg != args.in_root and arg != args.out_root]
+
+        # use out_root as both in_root and out_root
+        subprocess.run([sys.executable, script_path, *options, args.out_root, args.out_root],
+                       check=True)
 
 
 if __name__ == "__main__":

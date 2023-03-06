@@ -90,7 +90,8 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
         "Print verbose output to the console.")
     )
 
-    return parser.parse_args()
+    args = parser.parse_args()
+    return _strip_quotes(args)
 
 
 ### Parse Arguments ###
@@ -136,7 +137,7 @@ def parse_cell_area_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
         "Verbose output during script execution.")
 
     args = parser.parse_args()
-    return args
+    return _strip_quotes(args)
 
 
 def parse_zproj_args() -> argparse.Namespace:
@@ -183,7 +184,7 @@ def parse_zproj_args() -> argparse.Namespace:
         help="Verbose output during script execution.")
 
     args = parser.parse_args()
-    return args
+    return _strip_quotes(args)
 
 
 def parse_inv_depth_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
@@ -226,7 +227,7 @@ def parse_inv_depth_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
                         help="Verbose output during script execution.")
 
     args = parser.parse_args()
-    return args
+    return _strip_quotes(args)
 
 
 ### File/Directory Validation ###
@@ -570,3 +571,9 @@ def inv_depth_verify_config_file(config_path: str, n_models: int,
         verbose_footer()
 
     return config
+
+def _strip_quotes(args: argparse.Namespace) -> argparse.Namespace:
+    """Strips quotes around in_root and out_root arguments (escaped by the interactive prompt)."""
+    args.in_root = args.in_root.strip("'").strip('"')
+    args.out_root = args.out_root.strip("'").strip('"')
+    return args
