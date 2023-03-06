@@ -20,7 +20,7 @@ Run these commands on the command line:
 conda env create -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/environment.yml
 conda activate tissue-model-analysis
 pip install -I fl_tissue_model_tools@git+https://github.com/fogg-lab/tissue-model-analysis-tools.git#subdirectory=src
-tmat
+tmat configure
 ```
 
 ### Detailed setup
