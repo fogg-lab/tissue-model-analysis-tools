@@ -16,30 +16,13 @@ Creates the following directory structure:
 '''
 
 from pathlib import Path
+import shutil
 import sys
 import re
+from glob import glob
 import configparser
 
 from fl_tissue_model_tools import defs
-
-CFG_FILES = [
-    'default_branching_computation.json',
-    'default_cell_area_computation.json',
-    'default_invasion_depth_computation.json'
-]
-
-SCRIPTS = [
-    'compute_branches.py',
-    'compute_cell_area.py',
-    'compute_inv_depth.py',
-    'compute_zproj.py'
-]
-
-MODEL_CFG_FILES = [
-    'invasion_depth_best_hp.json',
-    'invasion_depth_hp_space.json',
-    'invasion_depth_training_values.json',
-]
 
 CFG_SUBDIR = 'config'
 SCRIPTS_SUBDIR = 'scripts'
@@ -103,22 +86,16 @@ def configure(target_base_dir: str=''):
             print(f'Cannot create directory {target_base_dir}: Permission denied')
             sys.exit(1)
 
-    for subdir in [CFG_SUBDIR, SCRIPTS_SUBDIR, MODEL_SUBDIR]:
-        subdir_path = Path(target_base_dir) / subdir
-        if not subdir_path.exists():
-            print(f'Creating {subdir} directory')
-            subdir_path.mkdir(parents=True)
-
-    # Copy config files and scripts to target_base_dir
-    for src_dir, dest_dir, filenames in [(defs.PKG_CONFIG_DIR, CFG_SUBDIR, CFG_FILES),
-                                         (defs.PKG_SCRIPTS_DIR, SCRIPTS_SUBDIR, SCRIPTS),
-                                         (defs.PKG_MODEL_DIR, MODEL_SUBDIR, MODEL_CFG_FILES)]:
-        for filename in filenames:
-            src_path = src_dir / filename
-            dest_path = Path(target_base_dir) / dest_dir / filename
-            if not dest_path.exists():
-                print(f'Copying {filename} to {dest_path}')
-                dest_path.write_bytes(src_path.read_bytes())
+    # Copy subdirectories into the base directory
+    for src_dir, dest_dir in [(defs.PKG_CONFIG_DIR, CFG_SUBDIR),
+                              (defs.PKG_SCRIPTS_DIR, SCRIPTS_SUBDIR),
+                              (defs.PKG_MODEL_DIR, MODEL_SUBDIR)]:
+        dest_dir_path = Path(target_base_dir) / dest_dir
+        if not dest_dir_path.exists():
+            print(f'Creating {dest_dir} directory')
+            shutil.copytree(src_dir, dest_dir_path)
+        else:
+            print(f'{dest_dir} directory already exists - skipping')
 
     if target_base_dir != prev_base_dir:
         # Update package config file with new base_dir
