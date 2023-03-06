@@ -8,12 +8,9 @@ from fl_tissue_model_tools import defs
 from fl_tissue_model_tools.configure import configure
 from fl_tissue_model_tools.update_package import update_package
 
-def get_script_commands() -> list:
-    commands = [Path(script).stem for script in glob(str(defs.SCRIPT_DIR / '*.py'))]
-    return commands
 
 def main():
-    commands = ['configure', 'update'] + get_script_commands()
+    commands = ['configure'] + [Path(script).stem for script in glob(str(defs.SCRIPT_DIR / '*.py'))]
 
     # Arguments are the command and any arguments for the command
     parser = argparse.ArgumentParser(description='Description the command-line interface')
