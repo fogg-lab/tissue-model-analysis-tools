@@ -17,6 +17,7 @@ Creates the following directory structure:
 
 from pathlib import Path
 import sys
+import re
 import configparser
 
 from fl_tissue_model_tools import defs
@@ -46,23 +47,34 @@ BASE_DIR_SUBDIRS = [
 
 USER_HOME = Path.home().resolve()
 
-def configure(target_base_dir: str='', print_help: bool=False):
+def configure(target_base_dir: str=''):
     '''Create or move the base directory for config files, scripts, data, and output.'''
 
-    if print_help:  # print help message and return
-        print(f'Usage: Pass in the preferred base directory location for {defs.PKG_NAME}.')
-        print('If no base directory is specified, you will be prompted to enter one ' +
-              'or accept the default.')
-        return
+    if (re.search("^[A-Z]:", target_base_dir)
+            and ('\\' not in target_base_dir)
+            and ('/' not in target_base_dir)):
+        # Contains a drive letter but no slashes - likely got stripped by the shell
+        print(f'\nWARNING: Path received from the command line may be invalid: {target_base_dir}')
+        print('If you are using a unix-style shell on Windows like Git Bash,'
+                ' you should type your path in one of these ways:')
+        print(r"""  1. Enclose the path in quotes (' or ")""")
+        print(r"""  2. Use forward slashes (/) instead of single bash slashes (\)""")
+        print(r"""  3. Use double bash slashes (\\) instead of single bash slashes (\)""")
+        print('In any case, enclosing the path in quotes at the command line is recommended.')
+        print('')
+        # Verify the path with the user, with y/n prompt and 20 second timeout
+        is_valid = input(f'Use the path \'{target_base_dir}\'? [y/n]: ')
+        if is_valid.lower() != 'y':
+            print('Exiting...')
+            sys.exit(1)
 
     default_base_dir = str(defs.BASE_DIR)
     if not default_base_dir:
         default_base_dir = str(USER_HOME / defs.PKG_NAME)
 
-    print(f'\nEnter the preferred base directory location for {defs.PKG_NAME}.')
-    print(f'The default base directory is \'{defs.PKG_NAME}\' in the current user\'s home folder.')
-
     if target_base_dir == '':
+        print(f'\nEnter the preferred base directory location for {defs.PKG_NAME}.')
+        print(f'If it does not exist, it will be created. Leave empty to use the default.')
         target_base_dir = input(f'Base directory [{default_base_dir}]: ') or default_base_dir
         print('')
 
