@@ -19,7 +19,7 @@ PKG_NAME = _pkg_config['metadata']['name']
 # Paths to scripts and config files from this package
 PKG_SCRIPTS_DIR = PKG_BASE_DIR / 'scripts'
 PKG_CONFIG_DIR = PKG_BASE_DIR / 'config'
-PKG_MODEL_TRAINING_DIR = PKG_BASE_DIR / 'model_training'
+PKG_MODEL_DIR = PKG_BASE_DIR / 'model_training'
 
 # Get the user-specified base directory to store scripts, config, and output
 _user_base_dir = _pkg_config[PKG_NAME]['base_dir']
