@@ -16,7 +16,7 @@ def main():
     parser = argparse.ArgumentParser(description='Description the command-line interface')
 
     if len(sys.argv[1:]) > 0:
-        parser.add_argument('command', type=str, choices=commands, default=None,
+        parser.add_argument('command', type=str, choices=commands+['update'], default=None,
                             help='Command to run')
 
     parser.add_argument('command_args', nargs=argparse.REMAINDER,
