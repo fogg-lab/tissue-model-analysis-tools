@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+import shutil
 import configparser
 from setuptools import setup, Extension
 from platform import python_version_tuple
@@ -17,6 +18,14 @@ ENTRYPOINT_COMMANDS = [
 ]
 CFG_FILE = Path(PKG_NAME) / 'package.cfg'
 PROJECT_ROOT = Path('.').resolve().parent
+
+# copy scripts, model_training and config directories to package directory
+for dir_name in ['scripts', 'model_training', 'config']:
+    src_dir = PROJECT_ROOT / dir_name
+    dest_dir = Path(PKG_NAME) / dir_name
+    if dest_dir.exists():
+        shutil.rmtree(dest_dir)
+    shutil.copytree(src_dir, dest_dir)
 
 config = configparser.ConfigParser()
 
@@ -58,13 +67,13 @@ setup(
     package_data={
         PKG_NAME: [
             str(CFG_FILE),
-            str(PROJECT_ROOT / 'config' / '*.json'),
-            str(PROJECT_ROOT / 'model_training' / '*.json'),
-            str(PROJECT_ROOT / 'model_training' / 'best_ensemble' / '*.h5'),
-            str(PROJECT_ROOT / 'model_training' / 'best_ensemble' / '*.csv'),
-            str(PROJECT_ROOT / 'model_training' / 'binary_segmentation' / 'checkpoints' / '*.h5'),
-            str(PROJECT_ROOT / 'model_training' / 'binary_segmentation' / 'configs' / '*.json'),
-            str(PROJECT_ROOT / 'scripts' / '*.py'),
+            str(Path(PKG_NAME) / 'config' / '*.json'),
+            str(Path(PKG_NAME) / 'model_training' / '*.json'),
+            str(Path(PKG_NAME) / 'model_training' / 'best_ensemble' / '*.h5'),
+            str(Path(PKG_NAME) / 'model_training' / 'best_ensemble' / '*.csv'),
+            str(Path(PKG_NAME) / 'model_training' / 'binary_segmentation' / 'checkpoints' / '*.h5'),
+            str(Path(PKG_NAME) / 'model_training' / 'binary_segmentation' / 'configs' / '*.json'),
+            str(Path(PKG_NAME) / 'scripts' / '*.py'),
         ]
     },
     include_package_data=True,
