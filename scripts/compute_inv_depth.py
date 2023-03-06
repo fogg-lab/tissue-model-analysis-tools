@@ -45,7 +45,7 @@ def main():
         best_hp = json.load(fp)
 
     ### Load model training parameters ###
-    training_params_path = defs.MODEL_TRAINING_DIR / "invasion_depth_training_params.json"
+    training_params_path = defs.MODEL_TRAINING_DIR / "invasion_depth_training_values.json"
     with open(training_params_path, 'r') as fp:
        training_values = json.load(fp)
     if training_values["rs_seed"] == "None":
