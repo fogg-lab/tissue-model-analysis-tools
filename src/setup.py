@@ -16,8 +16,10 @@ ENTRYPOINT_COMMANDS = [
     PKG_NAME,
     PKG_NAME.replace('_', '-')
 ]
-CFG_FILE = Path(PKG_NAME) / 'package.cfg'
+
 PROJECT_ROOT = Path('.').resolve().parent
+PKG_ROOT = Path(PKG_NAME).resolve()
+CFG_FILE = PKG_ROOT / 'package.cfg'
 
 # copy scripts, model_training and config directories to package directory
 for dir_name in ['scripts', 'model_training', 'config']:
@@ -67,13 +69,13 @@ setup(
     package_data={
         PKG_NAME: [
             str(CFG_FILE),
-            str(Path(PKG_NAME) / 'config' / '*.json'),
-            str(Path(PKG_NAME) / 'model_training' / '*.json'),
-            str(Path(PKG_NAME) / 'model_training' / 'best_ensemble' / '*.h5'),
-            str(Path(PKG_NAME) / 'model_training' / 'best_ensemble' / '*.csv'),
-            str(Path(PKG_NAME) / 'model_training' / 'binary_segmentation' / 'checkpoints' / '*.h5'),
-            str(Path(PKG_NAME) / 'model_training' / 'binary_segmentation' / 'configs' / '*.json'),
-            str(Path(PKG_NAME) / 'scripts' / '*.py'),
+            str(PKG_ROOT / 'config' / '*.json'),
+            str(PKG_ROOT / 'model_training' / '*.json'),
+            str(PKG_ROOT / 'model_training' / 'best_ensemble' / '*.h5'),
+            str(PKG_ROOT / 'model_training' / 'best_ensemble' / '*.csv'),
+            str(PKG_ROOT / 'model_training' / 'binary_segmentation' / 'checkpoints' / '*.h5'),
+            str(PKG_ROOT / 'model_training' / 'binary_segmentation' / 'configs' / '*.json'),
+            str(PKG_ROOT / 'scripts' / '*.py'),
         ]
     },
     include_package_data=True,
