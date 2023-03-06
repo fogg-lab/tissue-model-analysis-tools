@@ -61,6 +61,10 @@ setup(
             str(CFG_FILE),
             'config/*.json',
             'model_training/*.json'
+            'model_training/best_ensemble/*.h5',
+            'model_training/best_ensemble/*.csv',
+            'model_training/binary_segmentation/checkpoints/*.h5',
+            'model_training/binary_segmentation/configs/*.json',
         ]
     },
     include_package_data=True,
