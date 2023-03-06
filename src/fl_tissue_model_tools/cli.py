@@ -115,7 +115,7 @@ def main():
     if args.command:
         # Run the command as a subprocess
         script_path = defs.SCRIPT_DIR / f'{args.command}.py'
-        command = [sys.executable, script_path, *args.command_args]
+        command = [sys.executable, str(script_path), *args.command_args]
         if args.command_args == ['-h']:
             print(f'Getting options for: {args.command}')
         else:
