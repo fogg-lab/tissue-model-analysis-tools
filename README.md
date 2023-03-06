@@ -7,9 +7,25 @@
 
 ## Setup
 
-*Create environment and install the package*
+*Create the conda environment and install the fl_tissue_model_tools package*
 
-### Optional: Clone repository
+### Prerequisite: [conda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html)
+
+**Tip**: Enable [libmamba solver](https://www.anaconda.com/blog/a-faster-conda-for-a-growing-community) to create the conda environment faster.
+
+### Quick setup
+
+Run these commands in your terminal:
+```bash
+conda env create -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/environment.yml
+conda activate tissue-model-analysis
+pip install -I fl_tissue_model_tools@git+https://github.com/fogg-lab/tissue-model-analysis-tools.git#subdirectory=src
+tmat
+```
+
+### Detailed setup
+
+#### Optional: Clone repository
 ```
 git clone --recurse-submodules git@github.com:fogg-lab/tissue-model-analysis-tools.git
 ```
@@ -18,8 +34,6 @@ git clone --recurse-submodules git@github.com:fogg-lab/tissue-model-analysis-too
 Build a `conda` environment using the `environment.yml` file. If you have a CUDA-capable (NVIDIA) GPU, use `environment_gpu.yml` for GPU-accelerated training and inference.
 
 For more information on how to manage `conda` environments, see [environment management reference](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html).
-
-**Tip**: Use the `libmamba` solver to create the environment faster (see [here](https://www.anaconda.com/blog/a-faster-conda-for-a-growing-community)).
 
 If you cloned the repo, `cd` to the project directory and run:
 ```bash
@@ -50,11 +64,8 @@ pip install -e .
 ```
 If you didn't clone the repo, run this command:
 ```bash
-pip install -I 'fl_tissue_model_tools @ git+https://github.com/fogg-lab/tissue-model-analysis-tools.git@packaging#subdirectory=src'
-# pip install -I 'fl_tissue_model_tools @ git+https://github.com/fogg-lab/tissue-model-analysis-tools.git#subdirectory=src'
+pip install -I fl_tissue_model_tools@git+https://github.com/fogg-lab/tissue-model-analysis-tools.git#subdirectory=src
 ```
-
-## TODO: before pulling this into main, remove the first command in the code block above, uncomment the second command, and remove this here line
 
 3. The `fl_tissue_model_tools` package should now be accessible from any code within the python environment in which it was installed. Additionally, the `tissue-model-analysis-tools` (or `tmat` for short) command has been added to your terminal as an entrypoint for running the package scripts. Commands will follow this layout (more details in [usage](#usage)):
 ```bash
