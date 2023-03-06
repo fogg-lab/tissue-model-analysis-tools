@@ -25,7 +25,7 @@ config['metadata'] = {
 }
 
 config[PKG_NAME] = {
-    'base_dir': Path('~') / PKG_NAME
+    'base_dir': str(Path('~') / PKG_NAME)
 }
 
 with open(CFG_FILE, 'w', encoding='utf-8') as config_file:
