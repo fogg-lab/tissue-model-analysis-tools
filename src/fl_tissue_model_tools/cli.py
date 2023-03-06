@@ -119,7 +119,8 @@ def main():
         if args.command_args == ['-h']:
             print(f'Getting options for: {args.command}')
         else:
-            print(f'Executing: {command}')
+            command_printout = ' '.join(command)
+            print(f'Executing: {command_printout}')
         subprocess.run(command, check=True)
 
 if __name__ == '__main__':
