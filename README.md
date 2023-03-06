@@ -64,6 +64,7 @@ tissue-model-analysis-tools [SUBCOMMAND] [OPTIONS]
 4. Configure base directory to store data, scripts, and script configuration files:
 
 ```bash
+# example
 tmat configure "C:\Users\Quinn\Desktop\some_folder_name"
 ```
 
