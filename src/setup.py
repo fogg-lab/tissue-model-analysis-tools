@@ -7,14 +7,14 @@ import numpy as np
 SETUP_CFG = configparser.ConfigParser()
 SETUP_CFG.read(Path(__file__).resolve().parent / 'setup.cfg')
 PKG_NAME = SETUP_CFG['metadata']['name']
-ENTRY_POINT_FUNCTION = f'{PKG_NAME}.cli:main'
-CFG_FILE = os.path.join(PKG_NAME, f'package.cfg')
+ENTRYPOINT_FUNCTION = f'{PKG_NAME}.cli:main'
 ENTRYPOINT_COMMANDS = [
     'tissue-model-analysis-tools',
     'tmat',
     PKG_NAME,
     PKG_NAME.replace('_', '-')
 ]
+CFG_FILE = Path(__file__).resolve().parent / PKG_NAME / 'package.cfg'
 
 config = configparser.ConfigParser()
 
@@ -51,6 +51,6 @@ setup(
         language='c++'
     )],
     entry_points={
-        'console_scripts': [f'{command}={ENTRY_POINT_FUNCTION}' for command in ENTRYPOINT_COMMANDS]
+        'console_scripts': [f'{command}={ENTRYPOINT_FUNCTION}' for command in ENTRYPOINT_COMMANDS]
     }
 )
