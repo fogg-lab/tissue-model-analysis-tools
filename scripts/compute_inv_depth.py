@@ -15,7 +15,7 @@ from fl_tissue_model_tools import models, data_prep, defs
 from fl_tissue_model_tools import script_util as su
 from fl_tissue_model_tools import zstacks as zs
 
-DEFAULT_CONFIG_PATH = str(defs.SCRIPT_CONFIG_DIR) / "default_invasion_depth_computation.json"
+DEFAULT_CONFIG_PATH = str(defs.SCRIPT_CONFIG_DIR / "default_invasion_depth_computation.json")
 
 
 def main():
