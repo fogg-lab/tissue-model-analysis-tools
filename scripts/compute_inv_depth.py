@@ -136,7 +136,7 @@ def main():
             print("Saving results...")
         output_file = pd.DataFrame({"img_name": [Path(zp).name for zp in zpaths],
                         "inv_prob": yhatp.squeeze(), "inv_label": yhat.squeeze()})
-        out_csv_path = str(args.out_root / "invasion_depth_predictions.csv")
+        out_csv_path = os.path.join(args.out_root, "invasion_depth_predictions.csv")
         output_file.to_csv(out_csv_path, index=False)
         if verbose:
             print("... Results saved.")
