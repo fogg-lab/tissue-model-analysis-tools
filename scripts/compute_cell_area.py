@@ -13,7 +13,7 @@ from fl_tissue_model_tools import preprocessing as prep
 from fl_tissue_model_tools import analysis as an
 from fl_tissue_model_tools import script_util as su
 
-DEFAULT_CONFIG_PATH = "../config/default_cell_area_computation.json"
+DEFAULT_CONFIG_PATH = str(defs.SCRIPT_CONFIG_DIR / "default_cell_area_computation.json")
 THRESH_SUBDIR = "thresholded"
 CALC_SUBDIR = "calculations"
 
@@ -49,8 +49,8 @@ def load_and_norm(img_path: str, dsize: int=250) -> npt.NDArray:
         Normalized image located at img_path.
 
     """
-    new_min, new_max = 0, defs.GS_MAX
-    old_min, old_max = 0, defs.TIF_MAX
+    new_min, new_max = 0, defs.MAX_UINT8
+    old_min, old_max = 0, defs.MAX_UINT16
     img = load_img(img_path, dsamp=True, dsize=dsize)
 
     return prep.min_max_(img, new_min, new_max, old_min, old_max)
@@ -115,7 +115,7 @@ def circ_mask_setup(img_shape: Tuple[int, int], pinhole_cut: int) -> \
     """
     img_center = (img_shape[0] // 2, img_shape[1] // 2)
     circ_rad = img_center[0] - (pinhole_cut)
-    circ_mask = prep.gen_circ_mask(img_center, circ_rad, img_shape, defs.GS_MAX)
+    circ_mask = prep.gen_circ_mask(img_center, circ_rad, img_shape, defs.MAX_UINT8)
     pinhole_idx = np.where(circ_mask > 0)
     circ_pix_area = np.sum(circ_mask > 0)
     return circ_mask, pinhole_idx, circ_pix_area
@@ -123,7 +123,7 @@ def circ_mask_setup(img_shape: Tuple[int, int], pinhole_cut: int) -> \
 
 def circ_mask_setup_auto(img: npt.NDArray, pinhole_buffer=0.04):
     """Generate circular mask for image based on detected well boundary."""
-    circ_mask = prep.gen_circ_mask_auto(img, pinhole_buffer, mask_val=defs.GS_MAX)
+    circ_mask = prep.gen_circ_mask_auto(img, pinhole_buffer, mask_val=defs.MAX_UINT8)
     pinhole_idx = np.where(circ_mask > 0)
     circ_pix_area = len(pinhole_idx[0])
     return circ_mask, pinhole_idx, circ_pix_area

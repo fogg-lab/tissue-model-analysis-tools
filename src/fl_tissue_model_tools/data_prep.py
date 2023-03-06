@@ -9,6 +9,8 @@ import cv2
 
 from numpy.random import RandomState
 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 from tensorflow.keras import utils
 from tensorflow.keras.applications import resnet50
 
@@ -35,39 +37,6 @@ def make_dir(path: str) -> None:
         os.makedirs(path)
 
 
-def save_class_imgs(
-    img_paths: Sequence[str], split_list: Sequence[int],
-    split_map: Dict[int, str], img_class: str, dset_path: str
-) -> None:
-    """Save images for a particular class according to train/test split.
-
-    Args:
-        img_paths: All image names (full path).
-        split_list: Array of split labels, for example
-            [0, 0, 1, 0, 1, ..., 1, 0]
-        split_map: Definition of `split_list` meanings (e.g.,
-            0: train, 1: test)
-        img_class: The class of the images to be saved. This will
-            be used according to the deep learning image classification
-            convention of using the last directory level as class label.
-            For example, for "Dog", "Cat", and "Bird", classification, dog
-            images would be stored as
-
-            Data/
-            |--Dog/
-            |  |--(dog image files)
-        dset_path: Root path for output labels. For classes `a`, `b`, and `c`
-            at `dir/subdir/<a,b,c>`, this parameter would be `dir/subdir`.
-
-    Returns:
-        None
-
-    """
-    for i, img_p, in enumerate(img_paths):
-        img_n = img_p.split("/")[-1]
-        shutil.copy(img_p, f"{dset_path}/{split_map[split_list[i]]}/{img_class}/{img_n}")
-
-
 def load_inv_depth_img(path: str, img_hw: Tuple[int, int]) -> npt.NDArray:
     """Load an invasion depth image and convert it to grayscale with 3 redundant channels.
 
@@ -80,7 +49,7 @@ def load_inv_depth_img(path: str, img_hw: Tuple[int, int]) -> npt.NDArray:
     """
     img = cv2.imread(path, cv2.IMREAD_ANYDEPTH)
     img = prep.min_max_(cv2.resize(img, img_hw, cv2.INTER_LANCZOS4).astype(np.float32),
-                        0, defs.GS_MAX, 0, defs.TIF_MAX)
+                        0, defs.MAX_UINT8, 0, defs.MAX_UINT16)
     img = np.repeat(img[:, :, np.newaxis], 3, axis=2)
     return img
 

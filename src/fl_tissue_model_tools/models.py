@@ -3,112 +3,30 @@ from operator import lt, gt
 from copy import deepcopy
 from pathlib import Path
 from typing import Sequence, Tuple
+from itertools import product
+import os
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 import numpy as np
 from numpy import typing as npt
-import tensorflow as tf
 import keras_tuner as kt
 from PIL import Image
+if not hasattr(Image, 'Resampling'):
+    Image.Resampling = Image
 
 import tensorflow.keras.backend as K
-from tensorflow.keras import Input, Model
+from tensorflow.keras import Input, Model, optimizers
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Conv2D
 from tensorflow.keras.layers import BatchNormalization, Activation, SeparableConv2D
 from tensorflow.keras.layers import MaxPooling2D, Conv2DTranspose, UpSampling2D, add
 from tensorflow.keras.applications import resnet50
 from tensorflow.keras.callbacks import History, ModelCheckpoint, EarlyStopping
 from tensorflow.keras.losses import Loss
-from tensorflow.keras.optimizers import Adam
 
-# Custom
-from fl_tissue_model_tools import data_prep
 from fl_tissue_model_tools.smooth_tiled_predictions import predict_img_with_smooth_windowing
 from fl_tissue_model_tools import defs
-
-
-def _check_consec_factor(x: Sequence[float], factor: float, reverse: bool=False) -> bool:
-    """Check that consecutive elements of `x` increase by a constant factor.
-
-    Args:
-        x: An ordered sequence of numbers.
-        factor: The factor by which elements of `x` should
-            change consecutively.
-        reverse: Whether to reverse `x` when assessing consecutive
-            factor change.
-
-    Returns:
-        Whether elements of `x` change consecutively by a factor of
-            `factor`.
-    """
-
-    res = True
-    if reverse:
-        x = list(reversed(x))
-    for i in range(1, len(x)):
-        res = res and (x[i] == x[i - 1] * factor)
-    return res
-
-
-def toggle_TL_freeze(tl_model: Model, base_model_name: str="base_model") -> None:
-    """Toggle the `trainable` property of a transfer learning model.
-
-    IMPORTANT: `tl_model` must be recompiled after changing this attribute.
-
-    Args:
-        tl_model: The transfer learning model.
-        base_model_name: The name of the base model that will have its
-            `trainable` property toggled.
-
-    """
-    base_model = tl_model.get_layer(base_model_name)
-    base_model.trainable = not base_model.trainable
-
-
-def mean_iou_coef(y: tf.Tensor, yhat: tf.Tensor, smooth: float=1.0,
-                  obs_axes: Tuple[int, ...]=(1, 2, 3), thresh: float=0.5):
-    """Compute mean intersection over union coefficient.
-
-    Args:
-        y: True labels.
-        yhat: Predicted labels.
-        smooth: Accounts for case of zero union.
-        obs_axes: Axes to collapse when computing IoU.
-        thresh: Threshold that decides classification. Value of > 0.5
-            will yield a more "picky" classification.
-    Returns:
-        mean IoU coefficient for batch.
-
-    """
-    y = K.cast(y, "float32")
-    yhat = K.cast(yhat, "float32")
-    # Set yhat > thresh to 1, 0 otherwise.
-    yhat = K.cast(K.cast(K.greater(K.clip(yhat, 0, 1), thresh), "uint32"), "float32")
-    intersection = K.sum(y * yhat, axis=obs_axes)
-    union = K.sum(y, axis=obs_axes) + K.sum(yhat, axis=obs_axes) - intersection
-    mean_iou = K.mean((intersection + smooth) / (union + smooth), axis=0)
-    return mean_iou
-
-
-def mean_iou_coef_factory(smooth: int=1, obs_axes: Tuple[int, ...]=(1, 2, 3),
-                          thresh: float=0.5):
-    """Returns a an instance of the `iou_coef` function with extra parameters filled in.
-
-    Allows user to use `Keras` metrics tracking without defining a lambda function.
-    Returns an instance of the `iou_coef` function with the parameters below filled
-    in with the values desired by the user.
-
-    Args:
-        smooth: Accounts for case of zero union.
-        obs_axes: Axes to collapse when computing IoU.
-        thresh: Threshold that decides classification. Value of > 0.5
-            will yield a more "picky" classification.
-    """
-
-    def fn(y, yhat):
-        return mean_iou_coef(y, yhat, smooth=smooth, obs_axes=obs_axes,
-                             thresh=thresh)
-    fn.__name__ = "mean_iou_coef"
-    return fn
-
+from fl_tissue_model_tools import models_util as mu
 
 def build_ResNet50_TL(
     n_outputs: int, img_shape: Tuple[int, int],
@@ -186,7 +104,7 @@ def build_UNetXception(
     # Validate filter counts
     filter_counts = sorted(filter_counts)
 
-    assert _check_consec_factor(filter_counts, factor=2), ("Filter depths do not "
+    assert mu.check_consec_factor(filter_counts, factor=2), ("Filter depths do not "
                                                            "increase consecutively "
                                                            "by a factor of 2.")
 
@@ -382,7 +300,7 @@ class ResNet50TLHyperModel(kt.HyperModel):
         )
 
         ### Optimizer (frozen) ###
-        frozen_opt = Adam(
+        frozen_opt = optimizers.Adam(
             learning_rate=frozen_lr, beta_1=self.adam_beta_1, beta_2=self.adam_beta_2
         )
 
@@ -401,6 +319,7 @@ class ResNet50TLHyperModel(kt.HyperModel):
             History: Model training history for the model trained using a given
                 hyperparameter configuration.
         """
+
         ### Callbacks ###
         frozen_es_callback = EarlyStopping(
             monitor=self.es_criterion,
@@ -408,6 +327,7 @@ class ResNet50TLHyperModel(kt.HyperModel):
             min_delta=self.es_min_delta,
             patience=self.es_patience
         )
+
         frozen_mcp_callback = ModelCheckpoint(
             filepath=self.mcp_best_frozen_weights_path,
             monitor=self.mcp_criterion,
@@ -415,6 +335,7 @@ class ResNet50TLHyperModel(kt.HyperModel):
             save_best_only=True,
             save_weights_only=True
         )
+
         fine_tune_es_callback = EarlyStopping(
             monitor=self.es_criterion,
             mode=self.es_mode,
@@ -435,8 +356,8 @@ class ResNet50TLHyperModel(kt.HyperModel):
         kt_callbacks = kwargs.pop("callbacks")
 
         ### Optimizer (fine tune) ###
-        fine_tune_opt = Adam(
-            learning_rate=fine_tune_lr, beta_1=self.adam_beta_1, beta_2=self.adam_beta_2)
+        fine_tune_opt = optimizers.Adam(learning_rate=fine_tune_lr, beta_1=self.adam_beta_1,
+                                        beta_2=self.adam_beta_2)
 
         ### Fitting ###
         # Fit with frozen base model
@@ -447,7 +368,7 @@ class ResNet50TLHyperModel(kt.HyperModel):
         model.load_weights(self.mcp_best_frozen_weights_path)
 
         # Fit fine tuned full model
-        toggle_TL_freeze(model, self.base_model_name)
+        mu.toggle_TL_freeze(model, self.base_model_name)
         model.compile(fine_tune_opt, self.loss, weighted_metrics=self.weighted_metrics)
 
         return model.fit(
@@ -462,12 +383,14 @@ class UNetXceptionGridSearch():
         self,
         save_dir: str,
         filter_counts_options: Sequence[Tuple[int, int, int, int]],
+        optimizer_cfg_options: Sequence[dict],
         n_outputs: int,
         img_shape: Tuple[int, int],
-        optimizer, loss, channels: int=1,
+        loss,
+        channels: int=1,
         output_act: str="sigmoid",
-        callbacks=[],
-        metrics=None
+        callbacks=None,
+        metrics=None,
     ) -> None:
         """Create wrapper class for handling grid search for UNet model.
 
@@ -477,7 +400,7 @@ class UNetXceptionGridSearch():
                 be optimized.
             n_outputs: Number of output units.
             img_shape: Shape (h, w) of input images.
-            optimizer: Optimizer to use for training.
+            optimizer_cfg: Optimizer configuration serialized with tf.keras.optimizers.serialize.
             loss: Loss to use for training.
             channels: Number of channels. Assumed to be grayscale (i.e., 1).
             output_act: Output activation for last layer. Sigmoid is best for
@@ -489,6 +412,7 @@ class UNetXceptionGridSearch():
                 "val_[metric]", only [metric] needs to be included.
         """
         self.best_filter_counts = []
+        self.best_optimizer_cfg = {}
         self.best_score = np.NaN
         self.best_score_idx = 0
         self.filter_counts_options = filter_counts_options
@@ -497,13 +421,14 @@ class UNetXceptionGridSearch():
         self.img_shape = img_shape
         self.channels = channels
         self.output_act = output_act
-        self.optimizer = optimizer
+        self.optimizer_cfg_options = optimizer_cfg_options
         self.loss = loss
-        self.callbacks = callbacks
+        self.callbacks = callbacks if callbacks is not None else []
         self.metrics = metrics
         self.histories = []
 
-        data_prep.make_dir(self.save_dir)
+        Path(self.save_dir).mkdir(parents=True, exist_ok=True)
+
 
     def search(self, objective: str, comparison: str, *args, search_verbose: bool=True,
                 **kwargs) -> None:
@@ -532,9 +457,13 @@ class UNetXceptionGridSearch():
 
         # iterate through the input list of filter counts,
         # fit a unet with each, and save the best
-        for i, fc in enumerate(self.filter_counts_options):
+        hp_gen = product(self.filter_counts_options, range(len(self.optimizer_cfg_options)))
+        for i, (fc, optim_cfg_idx) in enumerate(hp_gen):
+            optimizer_cfg = self.optimizer_cfg_options[optim_cfg_idx]
             if search_verbose:
                 print(f"Testing filter counts: {fc}")
+                print(f"Optimizer index: {optim_cfg_idx}")
+            K.clear_session()
             best_weights_file = f"{self.save_dir}/best_weights_config_{i}.h5"
             cp_callback = ModelCheckpoint(
                 best_weights_file, save_best_only=True, save_weights_only=True, monitor="loss"
@@ -543,8 +472,14 @@ class UNetXceptionGridSearch():
                 self.n_outputs, self.img_shape, channels=self.channels,
                 filter_counts=fc, output_act=self.output_act
             )
-            model.compile(optimizer=self.optimizer, loss=self.loss, metrics=self.metrics)
-            h = model.fit(callbacks=self.callbacks + [cp_callback],*args, **kwargs)
+
+            # get optimizer
+            optimizer = optimizers.deserialize(optimizer_cfg)
+
+            # compile model
+            model.compile(optimizer=optimizer, loss=self.loss, metrics=self.metrics)
+            callbacks = self.callbacks + [cp_callback]
+            h = model.fit(callbacks=callbacks, *args, **kwargs)
             self.histories.append(h)
 
             cur_best_score = get_best(h.history[objective])
@@ -559,20 +494,36 @@ class UNetXceptionGridSearch():
                 if search_verbose:
                     print(
                         f"Current best ({cur_best_score}) is an improvement over "
-                        "previous best ({self.best_score})."
+                        f"previous best ({self.best_score})."
                     )
                 self.best_score = cur_best_score
                 self.best_filter_counts = deepcopy(fc)
+
+                self.best_optimizer_cfg = deepcopy(optimizer_cfg)
+
                 self.best_score_idx = i
                 if search_verbose:
-                    print(f"Current best hyper parameters: {self.best_filter_counts}")
+                    print("Current best hyper parameters:\n")
+                    print(f"  Best filter counts: {self.best_filter_counts}")
+                    print(f"  Best optimizer: {self.best_optimizer_cfg}")
                     print(f"Current best objective value observed: {self.best_score}")
                 # TODO: save hyperparams for best model
+
                 with open(f"{self.save_dir}/best_model_hps.json", "w") as fp:
+                    best_optim_cfg = deepcopy(self.best_optimizer_cfg)
+                    try:
+                        best_optim_cfg_str = json.dumps(best_optim_cfg)
+                    except TypeError:  # learning rate schedule may need to be serialized
+                        serialized_lr = optimizers.serialize(best_optim_cfg['config']['learning_rate'])
+                        best_optim_cfg['config']['learning_rate'] = serialized_lr
+                        best_optim_cfg_str = json.dumps(best_optim_cfg)
                     hp_meta = {
                         "search_objective": objective,
                         "best_score": self.best_score,
-                        "best_hps": {"filter_counts": self.best_filter_counts},
+                        "best_hps": {
+                            "filter_counts": self.best_filter_counts,
+                            "optimizer_cfg": best_optim_cfg_str
+                        },
                         "best_weights_file": best_weights_file
                     }
                     json.dump(hp_meta, fp)
@@ -595,7 +546,8 @@ class UNetXceptionGridSearch():
             filter_counts=self.best_filter_counts, output_act=self.output_act
         )
         model.load_weights(f"{self.save_dir}/best_weights_config_{self.best_score_idx}.h5")
-        model.compile(optimizer=self.optimizer, loss=self.loss, metrics=self.metrics)
+        optimizer = optimizers.deserialize(self.best_optimizer_cfg)
+        model.compile(optimizer=optimizer, loss=self.loss, metrics=self.metrics)
         return model
 
 
@@ -613,31 +565,29 @@ class UNetXceptionPatchSegmentor():
         )
         self.model.load_weights(checkpoint_file)
 
-    def predict(self, x: npt.NDArray, threshold: float = 0.5) -> npt.NDArray:
+    def predict(self, x: npt.NDArray, auto_resample=True) -> npt.NDArray:
         x = x.astype(np.float32)
-        og_shape = x.shape
-        target_shape = (round(og_shape[0] * self.ds_ratio), round(og_shape[1] * self.ds_ratio))
-        if og_shape != target_shape:
-            x = Image.fromarray(x).resize(target_shape, resample=Image.LANCZOS)
+        original_shape = x.shape
+        target_shape = tuple(np.round(np.multiply(original_shape[:2], self.ds_ratio)).astype(int))
+        do_resampling = original_shape != target_shape and auto_resample
+        if do_resampling:
+            x = Image.fromarray(x).resize(target_shape, resample=Image.Resampling.LANCZOS)
             x = np.array(x)
+
         x = (x - self.norm_mean) / self.norm_std
 
-        full_pred = predict_img_with_smooth_windowing(
+        pred = predict_img_with_smooth_windowing(
             x,
             window_size=self.patch_size,
             subdivisions=2,  # Minimal amount of overlap for windowing. Must be an even number.
             pred_func=self.model.predict
         )
 
-        pred_thresh = (full_pred > threshold).astype(np.uint8)
+        if do_resampling:
+            pred = Image.fromarray(pred).resize(original_shape, resample=Image.Resampling.NEAREST)
+            pred = np.array(pred)
 
-        if og_shape != target_shape:
-            full_pred = Image.fromarray(full_pred).resize(og_shape, resample=Image.LANCZOS)
-            full_pred = np.array(full_pred)
-            pred_thresh = Image.fromarray(pred_thresh).resize(og_shape, resample=Image.NEAREST)
-            pred_thresh = np.array(pred_thresh)
-
-        return full_pred, pred_thresh
+        return pred
 
 
 def get_unet_patch_segmentor_from_cfg(cfg_json: str) -> UNetXceptionPatchSegmentor:
@@ -653,7 +603,7 @@ def get_unet_patch_segmentor_from_cfg(cfg_json: str) -> UNetXceptionPatchSegment
     with open(cfg_json, "r") as fp:
         cfg = json.load(fp)
 
-    models_dir = Path(defs.SCRIPT_REL_MODEL_TRAINING_PATH)
+    models_dir = Path(defs.MODEL_TRAINING_DIR)
     checkpoint_file = models_dir / "binary_segmentation" / "checkpoints" / cfg["checkpoint_file"]
 
     segmentor = UNetXceptionPatchSegmentor(
@@ -667,51 +617,3 @@ def get_unet_patch_segmentor_from_cfg(cfg_json: str) -> UNetXceptionPatchSegment
     )
 
     return segmentor
-
-
-def save_unet_patch_segmentor_cfg(cfg: dict):
-    """Save a UNetXceptionPatchSegmentor config to a json file.
-    Args:
-        cfg: Config dictionary.
-
-    """
-    models_dir = Path(defs.SCRIPT_REL_MODEL_TRAINING_PATH)
-    save_dir = models_dir / "binary_segmentation" / "configs"
-
-    required_keys = ["patch_size", "checkpoint_file", "filter_counts"]
-    optional_keys = ["ds_ratio", "norm_mean", "norm_std", "channels"]
-    for key in required_keys:
-        if cfg.get(key) is None:
-            raise ValueError(f"Missing required config parameter: {key}")
-    for key in optional_keys:
-        if cfg.get(key) is None:
-            print("Warning: Missing optional config parameter: {key}")
-    for key in cfg.keys():
-        if key not in required_keys and key not in optional_keys:
-            raise ValueError(f"Invalid config parameter: {key}")
-
-    exp_num = get_last_exp_num() + 1
-
-    save_path = save_dir / f"unet_patch_segmentor_{exp_num}.json"
-
-    with open(save_path, "w") as fp:
-        json.dump(cfg, fp, indent=4)
-
-
-def get_last_exp_num() -> int:
-    """Get the last experiment number for a UNetXceptionPatchSegmentor config.
-
-    Returns:
-        The last experiment number.
-
-    """
-    models_dir = Path(defs.SCRIPT_REL_MODEL_TRAINING_PATH)
-    save_dir = models_dir / "binary_segmentation" / "configs"
-
-    exp_num = 0
-    for file in save_dir.glob("*.json"):
-        fname = file.name
-        if fname.startswith("unet_patch_segmentor_"):
-            exp_num = max(exp_num, int(fname.split("_")[-1].split(".")[0]))
-
-    return exp_num
