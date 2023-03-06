@@ -18,7 +18,9 @@ dependencies:
   - python=3.10
   - scikit-learn
   - scikit-image
+  - scipy
   - setuptools
   - pip:
     - keras-tuner
     - tensorflow
+    - tf-models-official

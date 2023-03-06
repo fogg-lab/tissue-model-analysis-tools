@@ -530,7 +530,6 @@ class MorseGraph:
         return np.array(interp_verts)
 
 
-
     @staticmethod
     def __random_color(i: int):
         """ Convert an int to a random color """

@@ -4,40 +4,9 @@ from typing import Tuple, Callable
 from PIL import Image
 import numpy as np
 import numpy.typing as npt
-from skimage import measure, morphology
-from scipy.spatial import KDTree
+from skimage import measure, morphology, filters
 import networkx as nx
 import cv2
-
-def combine_im_with_mask_dist_transform(
-    img: npt.NDArray, mask: npt.NDArray, blend_exponent: float = 1
-) -> npt.NDArray[float]:
-    """Highlight centerlines of mask components in image using distance transform.
-    Args:
-        img: The image.
-        mask: The binary mask.
-        blend_exponent: The exponent applied to transformed mask before blending with the image.
-                        For example, a value of 1.5 will highlight centerlines more prominently,
-                        while a value of 0.5 will retain more detail of the original image.
-    Returns:
-        The image blended with the transformed mask.
-    """
-    img = np.copy(img)
-    mask = np.copy(mask)
-    mask = (mask / np.max(mask)).astype(np.uint8)
-    dist_to_border = cv2.distanceTransform(mask, cv2.DIST_L2, 5)
-    skeleton = morphology.skeletonize(mask).astype(np.uint8)
-    skel_coords = np.argwhere(skeleton)
-    skeleton = KDTree(skel_coords)
-    mask_coords = np.argwhere(mask)
-    mask_distances_to_skeleton, _ = skeleton.query(mask_coords)
-    dist_to_skeleton = np.zeros(mask.shape)
-    dist_to_skeleton[mask_coords[:, 0], mask_coords[:, 1]] = mask_distances_to_skeleton
-    dist_transformed = 1 - (dist_to_skeleton / (dist_to_skeleton + dist_to_border))
-    dist_transformed = np.nan_to_num(dist_transformed)
-    dist_transformed = np.power(dist_transformed, blend_exponent)
-
-    return dist_transformed * img
 
 
 def get_elastic_dual_transform(
@@ -61,6 +30,7 @@ def get_elastic_dual_transform(
         magnitude = rs.randint(magnitude_range[0], magnitude_range[1]+1)
 
         image, mask = elastic_distortion([image, mask], grid_width, grid_height, magnitude, rs)
+
         # apply median blur to mask
         mask = cv2.medianBlur(mask, 5)
 
@@ -87,27 +57,26 @@ def elastic_distortion(images, grid_width=None, grid_height=None, magnitude=8, r
     extra_dim = [False] * len(images)
     redundant_dims = [False] * len(images)
     dtypes = [img.dtype for img in images]
+    max_vals = [img.max() for img in images]
 
     # Convert numpy arrays to PIL images
     for i, img in enumerate(images):
-        mode = "L" if img.dtype == np.uint8 or np.max(img) <= 255 else "I"
         if img.ndim == 3 and img.shape[2] > 1:
             redundant_dims[i] = True
             img = img[:, :, 0]
         elif img.ndim == 3:
             extra_dim[i] = True
-        if dtypes[i] != np.uint8:
-            dtype = np.uint8 if np.max(img) <= 255 else np.uint16
-            img = img.astype(dtype)
-        images[i] = Image.fromarray(np.squeeze(img), mode=mode)
+
+        img = img.astype(np.float32)
+        images[i] = Image.fromarray(np.squeeze(img), mode="F")
 
     width, height = images[0].size
 
     horizontal_tiles = grid_width
     vertical_tiles = grid_height
 
-    width_of_square = int(floor(width / float(horizontal_tiles)))
-    height_of_square = int(floor(height / float(vertical_tiles)))
+    width_of_square = floor(width / float(horizontal_tiles))
+    height_of_square = floor(height / float(vertical_tiles))
 
     width_of_last_square = width - (width_of_square * (horizontal_tiles - 1))
     height_of_last_square = height - (height_of_square * (vertical_tiles - 1))
@@ -116,26 +85,17 @@ def elastic_distortion(images, grid_width=None, grid_height=None, magnitude=8, r
 
     for vertical_tile in range(vertical_tiles):
         for horizontal_tile in range(horizontal_tiles):
-            if vertical_tile == (vertical_tiles - 1) and horizontal_tile == (horizontal_tiles - 1):
-                dimensions.append([horizontal_tile * width_of_square,
-                                    vertical_tile * height_of_square,
-                                    width_of_last_square + (horizontal_tile * width_of_square),
-                                    height_of_last_square + (height_of_square * vertical_tile)])
-            elif vertical_tile == (vertical_tiles - 1):
-                dimensions.append([horizontal_tile * width_of_square,
-                                    vertical_tile * height_of_square,
-                                    width_of_square + (horizontal_tile * width_of_square),
-                                    height_of_last_square + (height_of_square * vertical_tile)])
-            elif horizontal_tile == (horizontal_tiles - 1):
-                dimensions.append([horizontal_tile * width_of_square,
-                                    vertical_tile * height_of_square,
-                                    width_of_last_square + (horizontal_tile * width_of_square),
-                                    height_of_square + (height_of_square * vertical_tile)])
+            dimensions_1 = horizontal_tile * width_of_square
+            dimensions_2 = vertical_tile * height_of_square
+            if horizontal_tile == (horizontal_tiles - 1):
+                dimensions_3 = width_of_last_square + dimensions_1
             else:
-                dimensions.append([horizontal_tile * width_of_square,
-                                    vertical_tile * height_of_square,
-                                    width_of_square + (horizontal_tile * width_of_square),
-                                    height_of_square + (height_of_square * vertical_tile)])
+                dimensions_3 = width_of_square + dimensions_1
+            if vertical_tile == (vertical_tiles - 1):
+                dimensions_4 = height_of_last_square + (height_of_square * vertical_tile)
+            else:
+                dimensions_4 = height_of_square + (height_of_square * vertical_tile)
+            dimensions.append([dimensions_1, dimensions_2, dimensions_3, dimensions_4])
 
     last_column = []
     for i in range(vertical_tiles):
@@ -153,40 +113,22 @@ def elastic_distortion(images, grid_width=None, grid_height=None, magnitude=8, r
         if i not in last_row and i not in last_column:
             polygon_indices.append([i, i + 1, i + horizontal_tiles, i + 1 + horizontal_tiles])
 
+    polygons = np.array(polygons)
+
     for a, b, c, d in polygon_indices:
         dx = rs.randint(-magnitude, magnitude)
         dy = rs.randint(-magnitude, magnitude)
-
-        x1, y1, x2, y2, x3, y3, x4, y4 = polygons[a]
-        polygons[a] = [x1, y1,
-                        x2, y2,
-                        x3 + dx, y3 + dy,
-                        x4, y4]
-
-        x1, y1, x2, y2, x3, y3, x4, y4 = polygons[b]
-        polygons[b] = [x1, y1,
-                        x2 + dx, y2 + dy,
-                        x3, y3,
-                        x4, y4]
-
-        x1, y1, x2, y2, x3, y3, x4, y4 = polygons[c]
-        polygons[c] = [x1, y1,
-                        x2, y2,
-                        x3, y3,
-                        x4 + dx, y4 + dy]
-
-        x1, y1, x2, y2, x3, y3, x4, y4 = polygons[d]
-        polygons[d] = [x1 + dx, y1 + dy,
-                        x2, y2,
-                        x3, y3,
-                        x4, y4]
+        polygons[a][4:6] += (dx, dy)
+        polygons[b][2:4] += (dx, dy)
+        polygons[c][6:8] += (dx, dy)
+        polygons[d][0:2] += (dx, dy)
 
     generated_mesh = []
     for i, dim in enumerate(dimensions):
         generated_mesh.append([dim, polygons[i]])
 
     def do_transform(image):
-        return image.transform(image.size, Image.MESH, generated_mesh, resample=Image.BICUBIC)
+        return image.transform(image.size, Image.MESH, generated_mesh, resample=Image.Resampling.BICUBIC)
 
     augmented_images = []
 
@@ -195,11 +137,16 @@ def elastic_distortion(images, grid_width=None, grid_height=None, magnitude=8, r
 
     for i, augmented_img in enumerate(augmented_images):
         # Convert PIL image back to numpy array
-        augmented_images[i] = np.asarray(augmented_img).astype(dtypes[i])
+        augmented_img = np.asarray(augmented_img)
         if extra_dim[i]:
-            augmented_images[i] = np.expand_dims(augmented_images[i], axis=2)
+            augmented_img = np.expand_dims(augmented_img, axis=2)
         elif redundant_dims[i]:
-            augmented_images[i] = np.repeat(augmented_images[i][:, :, np.newaxis], 3, axis=2)
+            augmented_img = np.repeat(augmented_img[:, :, np.newaxis], 3, axis=2)
+        # clip to original range and restore dtype
+        augmented_img = np.clip(augmented_img, 0, max_vals[i])
+        if np.issubdtype(dtypes[i], np.integer):
+            augmented_img = np.round(augmented_img)
+        augmented_images[i] = augmented_img.astype(dtypes[i])
 
     return augmented_images
 
@@ -325,10 +272,15 @@ def filter_branch_seg_mask(mask: npt.NDArray) -> npt.NDArray:
     Args:
         mask (npt.NDArray): Segmentation mask to filter
     Returns:
-        Tuple[npt.NDArray, nx.Graph]: Filtered mask and nx graph
+        npt.NDArray: Filtered segmentation mask
     """
 
-    mask = np.copy(mask)
+    # median filter
+    mask = filters.median(mask, morphology.disk(5))
+
+    labeled_components = measure.label(mask, connectivity=2)
+    region_props = measure.regionprops(labeled_components)
+    region_circularities = [4 * np.pi * r.area / r.perimeter**2 for r in region_props]
 
     seg_skel=morphology.skeletonize(mask)
     G = nx_graph_from_binary_skeleton(seg_skel)
@@ -339,18 +291,22 @@ def filter_branch_seg_mask(mask: npt.NDArray) -> npt.NDArray:
     remove_nodes_1_per_cc = []
     remove_nodes_all = set()
 
+    def get_node_cc_label(node):
+        node_coords = G.graph['physical_pos'][node]
+        return labeled_components[node_coords[0]][node_coords[1]]
+
     for cc in components:
-        if not cc.intersection(fork_nodes):
-            cc_node_sample = next(iter(cc))
+        cc_node_sample = next(iter(cc))
+        node_cc_label = get_node_cc_label(cc_node_sample)
+        circularity = region_circularities[node_cc_label-1]
+        if not cc.intersection(fork_nodes) or circularity > 0.8:
             remove_nodes_1_per_cc.append(cc_node_sample)
             remove_nodes_all.update(cc)
 
-    labeled_components = measure.label(mask, connectivity=2)
     removed_components = set()
 
     for node in remove_nodes_1_per_cc:
-        node_coords=G.graph['physical_pos'][node]
-        node_cc_label = labeled_components[node_coords[0]][node_coords[1]]
+        node_cc_label = get_node_cc_label(node)
         mask[labeled_components==node_cc_label] = 0
         removed_components.add(node_cc_label)
 
