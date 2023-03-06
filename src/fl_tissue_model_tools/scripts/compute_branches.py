@@ -11,10 +11,8 @@ import networkx as nx
 from sklearn.mixture import GaussianMixture
 from skimage.exposure import rescale_intensity
 
-from fl_tissue_model_tools import helper
+from fl_tissue_model_tools import helper, models, models_util, defs
 from fl_tissue_model_tools import script_util as su
-from fl_tissue_model_tools import models
-from fl_tissue_model_tools import defs
 from fl_tissue_model_tools import preprocessing as prep
 from fl_tissue_model_tools.transforms import filter_branch_seg_mask
 from fl_tissue_model_tools.topology import MorseGraph
@@ -191,7 +189,7 @@ def main():
         sys.exit()
 
     if use_latest_model_cfg:
-        last_exp = models.get_last_exp_num()
+        last_exp = models_util.get_last_exp_num()
         model_cfg_dir = defs.MODEL_TRAINING_DIR / "binary_segmentation" / "configs"
         model_cfg_path = str(model_cfg_dir / f"unet_patch_segmentor_{last_exp}.json")
 
