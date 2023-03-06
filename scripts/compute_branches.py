@@ -200,7 +200,7 @@ def main():
     ### Verify input and output directories ###
     input_dir = Path(args.in_root)
     if not input_dir.exists():
-        print(f"{su.SFM.failure}Input directory {args.input_dir} does not exist.")
+        print(f"{su.SFM.failure}Input directory {args.in_root} does not exist.")
         sys.exit()
 
     output_dir = Path(args.out_root)
