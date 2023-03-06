@@ -15,7 +15,7 @@ ENTRYPOINT_COMMANDS = [
     PKG_NAME,
     PKG_NAME.replace('_', '-')
 ]
-CFG_FILE = PKG_NAME / 'package.cfg'
+CFG_FILE = Path(PKG_NAME) / 'package.cfg'
 PROJECT_ROOT = Path('.').resolve().parent
 
 config = configparser.ConfigParser()
