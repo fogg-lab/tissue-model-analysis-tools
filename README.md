@@ -51,7 +51,7 @@ pip install -e .
 If you didn't clone the repo, run this command:
 ```bash
 pip install -I 'fl_tissue_model_tools @ git+https://github.com/fogg-lab/tissue-model-analysis-tools.git@packaging#subdirectory=src'
-# pip install 'fl_tissue_model_tools @ git+https://github.com/fogg-lab/tissue-model-analysis-tools.git#subdirectory=src'
+# pip install -I 'fl_tissue_model_tools @ git+https://github.com/fogg-lab/tissue-model-analysis-tools.git#subdirectory=src'
 ```
 
 ## TODO: before pulling this into main, remove the first command in the code block above, uncomment the second command, and remove this here line
