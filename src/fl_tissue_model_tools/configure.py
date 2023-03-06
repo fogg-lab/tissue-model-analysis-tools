@@ -35,20 +35,20 @@ SCRIPTS = [
     'compute_zproj.py'
 ]
 
+MODEL_CFG_FILES = [
+    'invasion_depth_best_hp.json',
+    'invasion_depth_hp_space.json',
+    'invasion_depth_training_values.json',
+]
+
 CFG_SUBDIR = 'config'
 SCRIPTS_SUBDIR = 'scripts'
-
-BASE_DIR_SUBDIRS = [
-    CFG_SUBDIR,
-    SCRIPTS_SUBDIR,
-    'model_training',
-    'output'
-]
+MODEL_SUBDIR = 'model_training'
 
 USER_HOME = Path.home().resolve()
 
 def configure(target_base_dir: str=''):
-    '''Create or move the base directory for config files, scripts, data, and output.'''
+    '''Create or move the base directory for config files, scripts, and data.'''
 
     if (re.search("^[A-Z]:", target_base_dir)
             and ('\\' not in target_base_dir)
@@ -103,7 +103,7 @@ def configure(target_base_dir: str=''):
             print(f'Cannot create directory {target_base_dir}: Permission denied')
             sys.exit(1)
 
-    for subdir in BASE_DIR_SUBDIRS:
+    for subdir in [CFG_SUBDIR, SCRIPTS_SUBDIR, MODEL_SUBDIR]:
         subdir_path = Path(target_base_dir) / subdir
         if not subdir_path.exists():
             print(f'Creating {subdir} directory')
@@ -111,7 +111,8 @@ def configure(target_base_dir: str=''):
 
     # Copy config files and scripts to target_base_dir
     for src_dir, dest_dir, filenames in [(defs.PKG_CONFIG_DIR, CFG_SUBDIR, CFG_FILES),
-                                         (defs.PKG_SCRIPTS_DIR, SCRIPTS_SUBDIR, SCRIPTS)]:
+                                         (defs.PKG_SCRIPTS_DIR, SCRIPTS_SUBDIR, SCRIPTS),
+                                         (defs.PKG_MODEL_DIR, MODEL_SUBDIR, MODEL_CFG_FILES)]:
         for filename in filenames:
             src_path = src_dir / filename
             dest_path = Path(target_base_dir) / dest_dir / filename
