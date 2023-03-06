@@ -32,8 +32,6 @@ def get_dev_directories(dev_paths_file: str) -> DevDirs:
 
     [line 3] full/path/to/root/figures/dir
 
-    [line 4] blank line
-
     Args:
         dev_paths_file: Full path to a file which defines the location
             of each `DevDir` field.

@@ -55,7 +55,6 @@ Ensure that a file called dev_paths.txt is located in the root project directory
 root/path/for/storing/data      # top-level directory of data to be analyzed
 root/path/for/storing/analysis  # top-level directory of analysis output
 root/path/for/storing/figures   # top-level directory of figure and visualization output
-# blank line
 ```
 
 See `dev_paths_example.txt` for an example file.
