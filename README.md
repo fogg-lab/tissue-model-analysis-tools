@@ -198,7 +198,8 @@ For a description of `input_root_path` directory structure, see [Z Projection](#
 #### Branches (quantify vessel formation)
 **Basic usage:**
 ```bash
-tmat compute_branches -v [input_root_path] [output_root_path]
+# the -i flag saves intermediate results in the visualizations folder of the output directory
+tmat compute_branches -v -i [input_root_path] [output_root_path]
 ```
 
 **Advanced usage:**
