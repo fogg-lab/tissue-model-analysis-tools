@@ -51,7 +51,13 @@ setup(
     name=PKG_NAME,
     version='0.1.0',
     author='Fogg Lab',
-    packages=[PKG_NAME],
+    packages=[
+        PKG_NAME,
+        f'{PKG_NAME}.scripts',
+        f'{PKG_NAME}.config',
+        f'{PKG_NAME}.model_training',
+        f'{PKG_NAME}.figures'
+    ],
     package_data={PKG_NAME: [str(CFG_FILE)]},
     include_package_data=True,
     url='https://github.com/fogg-lab/tissue-model-analysis-tools',
