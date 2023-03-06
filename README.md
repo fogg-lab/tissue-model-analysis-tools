@@ -100,7 +100,7 @@ Four command-line tools which handle the following operations:
 
 To use these tools:
 
-1. Ensure `conda` environment is active & all setup procedures have been followed (see [Install `fl_tissue_model_tools` Package](#install-fltissuemodeltools-package) )
+1. Ensure `conda` environment is active & all setup procedures have been followed (see [Install `fl_tissue_model_tools` Package](#install-fl_tissue_model_tools-package) )
 2. Within a terminal window, execute the commandline tools via (see sections below for details)
 ```bash
 # non-interactive
