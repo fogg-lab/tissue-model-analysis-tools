@@ -70,7 +70,7 @@ def main():
             print('If you entered a path with spaces, enclose the path in quotes'
                   ' or prepend each space with a backslash (\\) to escape it.')
             sys.exit(1)
-        if args.command_args and args.command_args[0] in '-h', '--help':
+        if args.command_args and args.command_args[0] in ['-h', '--help']:
             print('Usage: configure [base_dir]')
         elif args.command_args:
             configure(args.command_args[0])
