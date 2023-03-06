@@ -18,6 +18,8 @@ def main():
 
     cmdline_args = sys.argv[1:]
 
+    print(f'cmdline_args = {cmdline_args}')
+
     if len(cmdline_args) > 0:
         parser.add_argument('command', type=str, choices=commands, default=None,
                             help='Command to run')
@@ -61,17 +63,19 @@ def main():
 
         args.command = commands[command_num - 1]
 
-    if not args.command_args:
+    if not args.command_args and args.command != 'configure':
         args.command_args = input('Arguments, if any (or -h to list options): ').split()
 
     if args.command == 'configure':
         if len(args.command_args) > 1:
-            print('Too many arguments for the configure command')
+            print('Error: Too many arguments for the configure command.')
+            print('If you entered a path with spaces, enclose the path in quotes'
+                  ' or prepend each space with a backslash (\\) to escape it.')
             sys.exit(1)
         if args.command_args and args.command_args[0] == '-h':
-            configure(print_help=True)
+            print('Usage: configure [base_dir]')
         elif args.command_args:
-            configure(base_dir=args.command_args[0])
+            configure(args.command_args[0])
         else:
             configure()
         return
