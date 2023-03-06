@@ -6,7 +6,7 @@ from platform import python_version_tuple
 import numpy as np
 
 SETUP_CFG = configparser.ConfigParser()
-SETUP_CFG.read(Path(__file__).resolve().parent / 'setup.cfg')
+SETUP_CFG.read('setup.cfg')
 PKG_NAME = SETUP_CFG['metadata']['name']
 ENTRYPOINT_FUNCTION = f'{PKG_NAME}.cli:main'
 ENTRYPOINT_COMMANDS = [
@@ -15,7 +15,8 @@ ENTRYPOINT_COMMANDS = [
     PKG_NAME,
     PKG_NAME.replace('_', '-')
 ]
-CFG_FILE = Path(__file__).resolve().parent / PKG_NAME / 'package.cfg'
+CFG_FILE = PKG_NAME / 'package.cfg'
+PROJECT_ROOT = Path('.').resolve().parent
 
 config = configparser.ConfigParser()
 
@@ -52,19 +53,18 @@ setup(
     version='0.1.0',
     author='Fogg Lab',
     packages=[
-        PKG_NAME,
-        f'{PKG_NAME}.scripts',
-        f'{PKG_NAME}.figures'
+        PKG_NAME
     ],
     package_data={
         PKG_NAME: [
             str(CFG_FILE),
-            'config/*.json',
-            'model_training/*.json',
-            'model_training/best_ensemble/*.h5',
-            'model_training/best_ensemble/*.csv',
-            'model_training/binary_segmentation/checkpoints/*.h5',
-            'model_training/binary_segmentation/configs/*.json',
+            str(PROJECT_ROOT / 'config' / '*.json'),
+            str(PROJECT_ROOT / 'model_training' / '*.json'),
+            str(PROJECT_ROOT / 'model_training' / 'best_ensemble' / '*.h5'),
+            str(PROJECT_ROOT / 'model_training' / 'best_ensemble' / '*.csv'),
+            str(PROJECT_ROOT / 'model_training' / 'binary_segmentation' / 'checkpoints' / '*.h5'),
+            str(PROJECT_ROOT / 'model_training' / 'binary_segmentation' / 'configs' / '*.json'),
+            str(PROJECT_ROOT / 'scripts' / '*.py'),
         ]
     },
     include_package_data=True,
