@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-
+from pathlib import Path
+from fl_tissue_model_tools import defs
 
 @dataclass
 class DevDirs:
@@ -19,28 +20,11 @@ class DevDirs:
     figures_dir: str
 
 
-def get_dev_directories(dev_paths_file: str) -> DevDirs:
-    """Get directories for creating a `DevDirs` object.
-
-    Assumes that a file of the correct format will be located
-    at `dev_paths_file`. The `dev_paths_file` should be formatted
-    according as follows:
-
-    [line 1] full/path/to/root/data/dir
-
-    [line 2] full/path/to/root/analysis/dir
-
-    [line 3] full/path/to/root/figures/dir
-
-    Args:
-        dev_paths_file: Full path to a file which defines the location
-            of each `DevDir` field.
-
-    Returns:
-        A `DevDirs` object with each field filled in using the values
-            in `dev_paths_file`.
-
-    """
-    with open(dev_paths_file) as file:
-        dirs = [l.strip() for l in file.readlines()]
-    return DevDirs(data_dir=dirs[0], analysis_dir=dirs[1], figures_dir=dirs[2])
+def get_dev_directories() -> DevDirs:
+    """Get directories for creating a `DevDirs` object."""
+    dev_dirs = DevDirs(
+        data_dir=defs.BASE_DIR / 'data',
+        analysis_dir=defs.BASE_DIR / 'analysis',
+        figures_dir=defs.BASE_DIR / 'figures'
+    )
+    return dev_dirs
