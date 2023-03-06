@@ -87,10 +87,21 @@ tmat
 ---
 
 #### Uninstall `fl_tissue_model_tools` package
-1. Execute
-
+Execute
 ```bash
 pip uninstall fl_tissue_model_tools
+```
+
+---
+
+#### Update `fl_tissue_model_tools` package
+Execute
+```bash
+tmat update
+```
+Or, to update existing scripts and config files without confirmation, execute:
+```bash
+tmat update -f
 ```
 
 #### Jupyter + `fl_tissue_model_tools`
