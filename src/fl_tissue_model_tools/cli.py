@@ -8,12 +8,33 @@ from fl_tissue_model_tools import defs
 from fl_tissue_model_tools.configure import configure
 from fl_tissue_model_tools.update_package import update_package
 
+USAGE = '''tissue-model-analysis-tools [SUBCOMMAND] [OPTIONS]
+Shorthand: tmat [SUBCOMMAND] [OPTIONS]
+
+If no subcommand is given, the interactive mode will be used. For example, run: tmat
+
+Available subcommands:
+    configure: Set the location of the base directory for scripts and model training data.
+    update: Update the package from GitHub.
+    [SCRIPT_NAME]: Run a script from the scripts directory. Do not include the .py extension.
+
+Get available options:
+    -h, --help: Show this help message and exit.
+    [SUBCOMMAND] -h: Show help (including available options) for a particular subcommand.
+
+Examples:
+    tmat configure -h
+    tmat configure "C:\\Users\\Quinn\\Desktop\\some_folder_name"
+    tmat update
+    tmat compute_inv_depth -h
+    tmat compute_zproj -v "C:\\Users\\Quinn\\input_folder_name" "C:\\Users\\Quinn\\out_folder_name"
+'''
 
 def main():
     commands = ['configure'] + [Path(script).stem for script in glob(str(defs.SCRIPT_DIR / '*.py'))]
 
     # Arguments are the command and any arguments for the command
-    parser = argparse.ArgumentParser(description='Description the command-line interface')
+    parser = argparse.ArgumentParser(description='Tissue model image analysis tools', usage=USAGE)
 
     if len(sys.argv[1:]) > 0:
         parser.add_argument('command', type=str, choices=commands+['update'], default=None,
