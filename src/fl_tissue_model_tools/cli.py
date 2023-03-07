@@ -33,6 +33,14 @@ Examples:
 def main():
     commands = ['configure'] + [Path(script).stem for script in glob(str(defs.SCRIPT_DIR / '*.py'))]
 
+    def print_usage_and_exit():
+        print(USAGE)
+        sys.exit(1)
+
+    # for '-h' or '--help', print the usage and exit
+    if len(sys.argv) > 2 and sys.argv[1] in ['-h', '--help']:
+        print_usage_and_exit()
+
     # Arguments are the command and any arguments for the command
     parser = argparse.ArgumentParser(description='Tissue model image analysis tools',
                                      usage=USAGE, add_help=False)
