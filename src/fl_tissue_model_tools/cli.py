@@ -34,11 +34,11 @@ def main():
     commands = ['configure'] + [Path(script).stem for script in glob(str(defs.SCRIPT_DIR / '*.py'))]
 
     # Arguments are the command and any arguments for the command
-    parser = argparse.ArgumentParser(description='Tissue model image analysis tools', usage=USAGE)
+    parser = argparse.ArgumentParser(description='Tissue model image analysis tools',
+                                     usage=USAGE, add_help=False)
 
     if len(sys.argv[1:]) > 0:
-        parser.add_argument('command', type=str, choices=commands+['update'], default=None,
-                            help='Command to run')
+        parser.add_argument('command', type=str, choices=commands+['update'], default=None)
 
     parser.add_argument('command_args', nargs=argparse.REMAINDER,
                         help='Arguments for the command')
