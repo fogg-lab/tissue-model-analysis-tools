@@ -15,7 +15,7 @@
 
 ### Quick setup
 
-Run these commands on the command line:
+Run these commands in your terminal:
 ```bash
 conda env update -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/environment.yml
 conda activate tissue-model-analysis
