@@ -38,7 +38,7 @@ def main():
         sys.exit(1)
 
     # for '-h' or '--help', print the usage and exit
-    if len(sys.argv) > 2 and sys.argv[1] in ['-h', '--help']:
+    if len(sys.argv) > 1 and sys.argv[1] in ['-h', '--help']:
         print_usage_and_exit()
 
     # Arguments are the command and any arguments for the command
