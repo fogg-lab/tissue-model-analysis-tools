@@ -8,7 +8,7 @@ from fl_tissue_model_tools import defs
 from fl_tissue_model_tools.configure import configure
 from fl_tissue_model_tools.update_package import update_package
 
-USAGE = '''tissue-model-analysis-tools [SUBCOMMAND] [OPTIONS]
+USAGE = '''Usage: tissue-model-analysis-tools [SUBCOMMAND] [OPTIONS]
 Shorthand: tmat [SUBCOMMAND] [OPTIONS]
 
 If no subcommand is given, the interactive mode will be used. For example, run: tmat
