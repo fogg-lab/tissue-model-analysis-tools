@@ -11,7 +11,7 @@ dependencies:
   - matplotlib
   - networkx
   - opencv
-  - python=3.10
+  - python>=3.8
   - scikit-learn
   - scipy
   - setuptools
