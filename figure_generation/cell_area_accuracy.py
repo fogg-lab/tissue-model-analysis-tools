@@ -26,6 +26,7 @@ plt.scatter(df.x, standardized_residuals)
 plt.xlabel('Predicted Values for Cell Area (%)')
 plt.ylabel('Standardized Residuals')
 plt.axhline(y=0, color='black', linestyle='--', linewidth=1)
+plt.tight_layout()
 plt.show()
 
 print(df['x'][70])
