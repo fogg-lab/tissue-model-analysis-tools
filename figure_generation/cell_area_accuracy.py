@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import statsmodels.api as sm
 
+caption = "Figure 8: Standardized Residuals displaying the accuracy of cell coverage predictions. The predicted values were software outputs, while the observed values were manually inspected."
+
 fig = plt.figure(figsize=(10,6))
 plt.rcParams.update({'font.size': 22})
 
@@ -23,11 +25,8 @@ standardized_residuals = influence.resid_studentized_internal
 
 # Plot the graph
 plt.scatter(df.x, standardized_residuals)
-plt.xlabel('Predicted Values for Cell Area (%)')
+plt.xlabel('Predicted Values for Cell Area (%)\n\n'+caption, wrap=True)
 plt.ylabel('Standardized Residuals')
 plt.axhline(y=0, color='black', linestyle='--', linewidth=1)
 plt.tight_layout()
 plt.show()
-
-print(df['x'][70])
-print(df['y'][70])

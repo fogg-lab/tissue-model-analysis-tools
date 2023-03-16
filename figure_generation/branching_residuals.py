@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 import statsmodels.api as sm
 import pandas as pd
 
+caption = "Figure 6: Standardized Residuals displaying the accuracy of the semantic binary segmentation model. The predicted values were model outputs, while the observed values were manually inspected."
+
 fig = plt.figure(figsize=(10, 6))
 plt.rcParams.update({'font.size': 22})
 
@@ -25,8 +27,10 @@ model = sm.OLS(y, x).fit()
 influence = model.get_influence()
 standardized_residuals = influence.resid_studentized_internal
 plt.scatter(df.x, standardized_residuals)
-plt.xlabel('Predicted Values for Average Branch Length (μm)')
+
+plt.xlabel('Predicted Values for Average Branch Length (μm)\n\n'+caption, wrap=True)
 plt.ylabel('Standardized Residuals')
 plt.axhline(y=0, color='black', linestyle='--', linewidth=1)
 plt.tight_layout()
+
 plt.show()
