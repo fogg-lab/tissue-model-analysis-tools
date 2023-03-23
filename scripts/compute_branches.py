@@ -207,6 +207,10 @@ def main():
     if not output_dir.exists():
         output_dir.mkdir(parents=True)
 
+    # Save config to output directory
+    with open(output_dir / "config.json", "w", encoding="utf8") as f:
+        json.dump(config, f, indent=4)
+
     ### Get image paths ###
     img_paths = helper.get_img_paths(input_dir)
 
