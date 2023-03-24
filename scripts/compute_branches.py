@@ -159,8 +159,6 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
 
 
 def main():
-    '''Computes cell area and saves to output directory.'''
-
     ### Parse arguments ###
     arg_defaults = {
         "default_config_path": DEFAULT_CONFIG_PATH,
