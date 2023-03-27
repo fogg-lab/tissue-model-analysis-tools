@@ -7,7 +7,7 @@ import csv
 import numpy as np
 import cv2
 from matplotlib import pyplot as plt
-import networkx as nx
+from networkx.exception import NetworkXPointlessConcept as nxPointlessConceptException
 from sklearn.mixture import GaussianMixture
 from skimage.exposure import rescale_intensity
 
@@ -120,7 +120,7 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
         morse_graph = MorseGraph(pred, thresholds=morse_thresholds,
                                  smoothing_window=graph_smoothing_window,
                                  min_branch_length=min_branch_length)
-    except nx.exception.NetworkXPointlessConcept:
+    except nxPointlessConceptException:
         print(f"No branches found for {img_path.stem}.")
         return
 
