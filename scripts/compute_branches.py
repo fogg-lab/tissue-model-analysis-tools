@@ -38,7 +38,7 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
     '''
 
     well_width_microns = config.get("well_width_microns", 1000.0)
-    detect_well_edge = config.get("detect_well_edge", False)
+    detect_well_edge = config.get("detect_well_edge", True)
     pinhole_buffer = config.get("pinhole_buffer", 0.04)
     morse_thresholds = config.get("graph_thresh_1", 1), config.get("graph_thresh_2", 4)
     graph_smoothing_window = config.get("graph_smoothing_window", 15)
