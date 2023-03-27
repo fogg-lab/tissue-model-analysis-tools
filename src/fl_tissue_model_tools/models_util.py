@@ -12,6 +12,7 @@ import dask as d
 
 import tensorflow as tf
 import tensorflow.keras.backend as K
+from tensorflow.keras.utils import Sequence as KerasSequence
 from tensorflow.keras import Model, optimizers
 from tensorflow.keras.optimizers.schedules import LearningRateSchedule
 
@@ -216,7 +217,7 @@ def load_x(batch_img_paths):
     return np.array(x)
 
 
-class BinaryMaskSequence(Sequence):
+class BinaryMaskSequence(KerasSequence):
     """Helper to iterate over the data"""
 
     def __init__(self, batch_size, img_paths, seg_paths, random_state,
