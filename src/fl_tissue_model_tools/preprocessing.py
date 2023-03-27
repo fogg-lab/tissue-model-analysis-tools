@@ -58,8 +58,11 @@ def gen_circ_mask(
     # Create the mask
     circ_mask = distance_from_center <= radius
 
-    if mask_val is not None:
-        circ_mask = circ_mask.astype(np.uint8) * mask_val
+    # Apply the mask value
+    if isinstance(mask_val, bool):
+        circ_mask = circ_mask if mask_val else ~circ_mask
+    else:
+        circ_mask = circ_mask * mask_val
 
     return circ_mask
 
