@@ -60,22 +60,50 @@ def main():
         print(f'{defs.PKG_NAME} configured successfully.')
         return
 
+    def in_args(query_args, actual_args):
+        # Check if any of the given args from a list are in the actual list of arguments
+        for arg_name in query_args:
+            if arg_name in actual_args:
+                return True
+        return False
+
+    def get_flag_value(flag_name, flag_alias, args):
+        # Get the value of a flag (e.g. '--local') from a list of arguments
+        flag_index = args.index(flag_name) if flag_name in args else args.index(flag_alias)
+        if flag_index == len(args) - 1:
+            print(f'Error: No value given for {flag_name} flag.')
+            sys.exit(1)
+        return args[flag_index + 1]
+
     if args.command == 'update':
         force = False
-        if len(args.command_args) == 1:
-            if args.command_args[0] in ['--help', '-h']:
-                print('Update the package from GitHub.')
-                print('Usage: update [--help] [--force]')
-                print('  --help, -h: Show this help message and exit')
-                print('  --force, -f: Replace scripts and config files without confirmation')
-                return
-            elif args.command_args[0] in ['--force', '-f']:
-                force = True
-        elif len(args.command_args) > 1:
-            print('Error: Too many arguments for the update command (expected between 0 and 1). '
-                  'Use --help to list options.')
+        if '--help' in args.command_args or '-h' in args.command_args:
+            print('Update the package from GitHub.')
+            print('Usage: update [--help] [--force] [--local SRC_DIR] [--branch BRANCH_NAME]')
+            print('  --help, -h: Show this help message and exit.')
+            print('  --force, -f: Replace scripts and config files without confirmation.')
+            print('  --local, -l: Update the package from a local src directory.')
+            print('  --branch, -b: Update the package from a specific branch.')
+            if len(args.command_args) > 1:
+                print('Warning: Too many arguments with --help option (they are ignored).')
             return
-        update_package()
+
+        force =  in_args(['--force', '-f'], args.command_args)
+        local_update = in_args(['--local', '-l'], args.command_args)
+        branch_update = in_args(['--branch', '-b'], args.command_args)
+
+        if local_update and branch_update:
+            print('Error: Cannot use both --local and --branch')
+            sys.exit(1)
+
+        if local_update:
+            src_dir = get_flag_value('--local', '-l', args.command_args)
+            update_package(src_dir=src_dir)
+        elif branch_update:
+            branch_name = get_flag_value('--branch', '-b', args.command_args)
+            update_package(branch_name=branch_name)
+        else:
+            update_package()
         configure(replace_subdirs=True, force_replace=force)
         return
 
