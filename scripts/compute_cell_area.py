@@ -113,7 +113,7 @@ def circ_mask_setup(img_shape: Tuple[int, int], pinhole_cut: int) -> \
         (Circular mask, indices within pinhole, area of circular mask).
 
     """
-    img_center = (img_shape[0] // 2, img_shape[1] // 2)
+    img_center = (img_shape[1] // 2, img_shape[0] // 2)
     circ_rad = img_center[0] - (pinhole_cut)
     circ_mask = prep.gen_circ_mask(img_center, circ_rad, img_shape, defs.MAX_UINT8)
     pinhole_idx = np.where(circ_mask > 0)

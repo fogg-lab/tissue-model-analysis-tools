@@ -83,7 +83,11 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
     )
 
     parser.add_argument("-i", "--save-intermediates", action="store_true", help=(
-        "Save intermediate images generated during branching analysis.")
+        "Save all intermediate images and visualizations generated during branching analysis.")
+    )
+
+    parser.add_argument("-g", "--save-graphics", action="store_true", help=(
+        "Save visualizations: original image, segmentation mask, and morse tree plot.")
     )
 
     parser.add_argument("-v", "--verbose", action="store_true", help=(
