@@ -1,9 +1,9 @@
 {
-    "patch_size": 256,
-    "checkpoint_file": "checkpoint-1.h5",
+    "patch_size": 320,
+    "checkpoint_file": "checkpoint_1",
     "filter_counts": [64, 128, 256, 512],
-    "ds_ratio": 0.5,
-    "norm_mean": 70.255,
+    "ds_ratio": 0.625,
+    "norm_mean": 18109.349,
     "norm_std": 62.805,
     "channels": 1
 }

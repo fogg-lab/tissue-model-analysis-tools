@@ -7,7 +7,7 @@ import csv
 import numpy as np
 import cv2
 from matplotlib import pyplot as plt
-import networkx as nx
+from networkx.exception import NetworkXPointlessConcept as nxPointlessConceptException
 from sklearn.mixture import GaussianMixture
 from skimage.exposure import rescale_intensity
 
@@ -38,7 +38,7 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
     '''
 
     well_width_microns = config.get("well_width_microns", 1000.0)
-    detect_well_edge = config.get("detect_well_edge", False)
+    detect_well_edge = config.get("detect_well_edge", True)
     pinhole_buffer = config.get("pinhole_buffer", 0.04)
     morse_thresholds = config.get("graph_thresh_1", 1), config.get("graph_thresh_2", 4)
     graph_smoothing_window = config.get("graph_smoothing_window", 15)
@@ -120,7 +120,7 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
         morse_graph = MorseGraph(pred, thresholds=morse_thresholds,
                                  smoothing_window=graph_smoothing_window,
                                  min_branch_length=min_branch_length)
-    except nx.exception.NetworkXPointlessConcept:
+    except nxPointlessConceptException:
         print(f"No branches found for {img_path.stem}.")
         return
 
@@ -159,8 +159,6 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
 
 
 def main():
-    '''Computes cell area and saves to output directory.'''
-
     ### Parse arguments ###
     arg_defaults = {
         "default_config_path": DEFAULT_CONFIG_PATH,
@@ -206,6 +204,10 @@ def main():
     output_dir = Path(args.out_root)
     if not output_dir.exists():
         output_dir.mkdir(parents=True)
+
+    # Save config to output directory
+    with open(output_dir / "config.json", "w", encoding="utf8") as f:
+        json.dump(config, f, indent=4)
 
     ### Get image paths ###
     img_paths = helper.get_img_paths(input_dir)
