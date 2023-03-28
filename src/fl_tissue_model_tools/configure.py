@@ -30,7 +30,7 @@ MODEL_SUBDIR = 'model_training'
 
 USER_HOME = Path.home().resolve()
 
-def configure(target_base_dir: str='', replace_subdirs=False, force_replace=False):
+def configure(target_base_dir: str='', replace_subdirs=True, force_replace=False):
     '''Create or move the base directory for config files, scripts, and data.'''
 
     if (re.search("^[A-Z]:", target_base_dir)
