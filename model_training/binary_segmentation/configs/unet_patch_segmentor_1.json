@@ -4,6 +4,6 @@
     "filter_counts": [64, 128, 256, 512],
     "ds_ratio": 0.625,
     "norm_mean": 18109.349,
-    "norm_std": 62.805,
+    "norm_std": 16091.225,
     "channels": 1
 }
