@@ -28,7 +28,7 @@ def save_vis(img, save_dir, filename):
 
 
 def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output_dir: Path,
-                config: dict, save_intermediates: bool) -> None:
+                config: dict, save_intermediates: bool, save_graphics: bool) -> None:
     '''Measure branches in image and save results to output directory.
 
     Args:
@@ -55,7 +55,7 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
     target_shape = tuple(np.round(np.multiply(img.shape[:2], model.ds_ratio)).astype(int))
     img = cv2.resize(img, target_shape, interpolation=cv2.INTER_LANCZOS4)
 
-    if save_intermediates:
+    if save_intermediates or save_graphics:
         vis_dir = output_dir / "visualizations" / img_path.stem
         vis_dir.mkdir(parents=True, exist_ok=True)
         save_vis(img, vis_dir, "original.png")
@@ -93,12 +93,14 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
     seg_mask = filter_branch_seg_mask(seg_mask).astype(float)
 
     if save_intermediates:
-        save_path = str(vis_dir / "filtered.png")
-        cv2.imwrite(save_path, np.round(seg_mask*255).astype(np.uint8))
+        save_vis(seg_mask, vis_dir, "filtered.png")
 
     # smooth the circular mask and segmentation mask
     circ_mask = cv2.GaussianBlur(circ_mask, (5, 5), 0)
     seg_mask = cv2.GaussianBlur(seg_mask, (5,5), 0)
+
+    if save_graphics:
+        save_vis(seg_mask * circ_mask, vis_dir, "seg_mask.png")
 
     # apply circular mask and segmentation mask to prediction
     pred = pred * circ_mask * seg_mask
@@ -124,7 +126,7 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
         print(f"No branches found for {img_path.stem}.")
         return
 
-    if save_intermediates:
+    if save_intermediates or save_graphics:
         save_path = str(vis_dir / "barcode.png")
         plt.figure(figsize=(6, 6))
         plt.margins(0)
@@ -227,7 +229,7 @@ def main():
 
     ### Analyze images ###
     for img_path in img_paths:
-        analyze_img(Path(img_path), model, output_dir, config, args.save_intermediates)
+        analyze_img(Path(img_path), model, output_dir, config, args.save_intermediates, args.save_graphics)
 
 
 if __name__ == "__main__":
