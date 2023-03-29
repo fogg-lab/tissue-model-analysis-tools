@@ -7,9 +7,14 @@ import numpy.typing as npt
 from numpy.random import RandomState
 import dask as d
 from sklearn.mixture import GaussianMixture
-from skimage import filters, feature
+from skimage.filters import median as median_filter
+from skimage.morphology import disk
+from skimage.feature import canny
+from skimage.draw import ellipse
 from scipy.ndimage import generate_binary_structure
 from scipy.spatial import ConvexHull, Delaunay
+from skimage.exposure import equalize_adapthist
+from skimage.measure import EllipseModel
 
 from . import defs
 from .gwdt_impl import gwdt_impl
@@ -164,7 +169,7 @@ def find_circle(hull: npt.NDArray, radius_bounds: Tuple[int,int], center_x_bound
 
 def gen_circ_mask_auto(
     img: npt.NDArray, pinhole_buffer=0.04, mask_val: Number=True
-) -> npt.NDArray:
+) -> npt.NDArray[np.uint8]:
     """Generate a 2D circular well mask automatically from an image.
     Args:
         img: Image to generate the mask from.
@@ -178,8 +183,9 @@ def gen_circ_mask_auto(
     img_ds = cv2.resize(img, [*ds_hw, *img.shape[2:]], interpolation=cv2.INTER_LANCZOS4)
 
     # Median filter and get edges
-    img_ds = filters.median(img_ds, footprint=np.ones((3, 3)))
-    edges = feature.canny(img_ds, sigma=1)
+    img_ds = median_filter(img_ds, disk(3))
+    img_ds = equalize_adapthist(img_ds)
+    edges = canny(img_ds, sigma=1)
 
     # Get convex hull of edges
     edge_coords = np.argwhere(edges)
@@ -187,7 +193,7 @@ def gen_circ_mask_auto(
     well_mask = create_convex_hull_mask(edges.shape, hull)
     for _ in range(3):
         well_mask = cv2.dilate(well_mask, np.ones((3, 3)))
-        well_mask = filters.median(well_mask, footprint=np.ones((3, 3)))
+        well_mask = median_filter(well_mask, footprint=np.ones((3, 3)))
 
     # Search for a circle mask that fits to the convex hull with maximum IOU
     # To save time we'll downsample the hull mask (e.g. to 64x64), fit a circle to it,
@@ -221,16 +227,35 @@ def gen_circ_mask_auto(
                                             (min_center_x, max_center_x),
                                             (min_center_y, max_center_y))
 
-    # scale the radius and center to the original image size
-    mask_center = np.round(np.multiply(mask_center, 1 / ds_ratio)).astype(int)
-    mask_radius = round(mask_radius / ds_ratio)
-
     # reduce the mask radius by 5% to correct for earlier dilation
     mask_radius = round(mask_radius * 0.95)
     # reduce the mask radius further to account for pinhole buffer
     mask_radius = round(mask_radius * (1 - pinhole_buffer * 2))
 
-    return gen_circ_mask(mask_center, mask_radius, img.shape, mask_val)
+    # adjust well mask
+    well_mask = gen_circ_mask(mask_center, mask_radius, well_mask.shape, mask_val)
+
+    # remove edges outside of the well mask
+    edges[~well_mask] = False
+
+    # remove edges that are within 7/8 of the radius to the center
+    rr, cc = np.nonzero(edges)
+    dists = np.sqrt((rr - mask_center[1])**2 + (cc - mask_center[0])**2)
+    edges[rr[dists < mask_radius * 0.875], cc[dists < mask_radius * 0.875]] = 0
+
+    # fit ellipse to remaining edges
+    rr, cc = np.nonzero(edges)
+    xy = np.array([cc, rr]).T
+    well_ellipse = EllipseModel()
+    well_ellipse.estimate(xy)
+
+    # Replace the well mask with the ellipse at the original resolution
+    xc, yc, a, b, _ = np.multiply(well_ellipse.params, 1/ds_ratio)
+    rr, cc = ellipse(round(yc), round(xc), round(a), round(b), shape=img.shape[:2])
+    well_mask = np.zeros(img.shape[:2], dtype=np.uint8)
+    well_mask[rr, cc] = mask_val
+
+    return well_mask
 
 
 def apply_mask(img: npt.NDArray, mask: npt.NDArray) -> npt.NDArray:
