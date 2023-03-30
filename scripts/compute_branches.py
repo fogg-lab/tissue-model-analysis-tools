@@ -111,8 +111,6 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
     pred = rescale_intensity(pred, out_range=(0, 255))
     pred = pred.astype(np.double)
 
-    print(f"\npred.min,pred.max = {pred.min()}, {pred.max()}")
-
     if save_intermediates:
         save_vis(pred, vis_dir, "contrast.png")
 
