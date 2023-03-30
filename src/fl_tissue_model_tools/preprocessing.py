@@ -13,7 +13,7 @@ from skimage.feature import canny
 from skimage.draw import ellipse
 from scipy.ndimage import generate_binary_structure
 from scipy.spatial import ConvexHull, Delaunay
-from skimage.exposure import equalize_adapthist
+from skimage.exposure import rescale_intensity, equalize_adapthist
 from skimage.measure import EllipseModel
 
 from . import defs
@@ -184,6 +184,7 @@ def gen_circ_mask_auto(
 
     # Median filter and get edges
     img_ds = median_filter(img_ds, disk(3))
+    img_ds = rescale_intensity(img_ds.astype(float), out_range=(0, 1))
     img_ds = equalize_adapthist(img_ds)
     edges = canny(img_ds, sigma=1)
 
