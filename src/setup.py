@@ -87,12 +87,6 @@ setup(
     ],
     ext_modules=[
         Extension(
-            name=f'{PKG_NAME}.gwdt_impl',
-            sources=[os.path.join(PKG_NAME, 'gwdt_impl.pyx')],
-            include_dirs=[np.get_include()],
-            language='c++'
-        ),
-        Extension(
             name="pydmtgraph.dmtgraph",
             sources=["pydmtgraph/src/pydmtgraph/dmtgraph/DMTGraph.cpp"],
             library_dirs=library_dirs,
