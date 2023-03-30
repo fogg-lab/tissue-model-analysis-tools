@@ -266,7 +266,9 @@ def apply_mask(img: npt.NDArray, mask: npt.NDArray) -> npt.NDArray:
     Returns:
         Masked image.
     """
-    return cv2.bitwise_and(img, img, mask=mask)
+    masked_img = np.copy(img)
+    masked_img[mask == 0] = 0
+    return masked_img
 
 
 def bin_thresh(

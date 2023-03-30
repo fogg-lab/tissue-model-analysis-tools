@@ -8,8 +8,9 @@ import numpy as np
 import cv2
 from matplotlib import pyplot as plt
 from networkx.exception import NetworkXPointlessConcept as nxPointlessConceptException
-from sklearn.mixture import GaussianMixture
 from skimage.exposure import rescale_intensity
+from scipy.ndimage import distance_transform_edt
+from skimage.morphology import medial_axis
 
 from fl_tissue_model_tools import helper, models, models_util, defs
 from fl_tissue_model_tools import script_util as su
@@ -58,7 +59,7 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
     if save_intermediates or save_graphics:
         vis_dir = output_dir / "visualizations" / img_path.stem
         vis_dir.mkdir(parents=True, exist_ok=True)
-        save_vis(img, vis_dir, "original.png")
+        save_vis(img, vis_dir, "original_image.png")
 
     print("Applying circular mask to image...")
     if detect_well_edge:
@@ -76,45 +77,25 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
 
     if save_intermediates:
         save_vis(pred, vis_dir, "prediction.png")
-
-    # Compute gray-weighted distance transform of pixel-wise class probabilities
-
-    pixels = pred[circ_mask==1][:, np.newaxis]
-    gm = GaussianMixture(n_components=2)
-    gm = gm.fit(pixels)
-    foreground_threshold = 0.5#gm.means_.max()
-
-    pred = prep.dt_gray_weighted(pred, foreground_threshold)
-
-    if save_intermediates:
-        save_vis(pred, vis_dir, "dt_gray_weighted.png")
+        save_vis(circ_mask, vis_dir, "well_mask.png")
 
     # filter out non-branching structures from segmentation mask
-    seg_mask = filter_branch_seg_mask(seg_mask).astype(float)
+    seg_mask = filter_branch_seg_mask(seg_mask * circ_mask).astype(float)
 
+    # Enhance centerlines
+    skel, dist = medial_axis(seg_mask, return_distance=True)
+    centerline_dt = distance_transform_edt(np.logical_not(skel))
+    relative_dt = dist / (dist + centerline_dt)
+
+    pred = pred * relative_dt
+
+    if save_intermediates or save_graphics:
+        save_vis(seg_mask, vis_dir, "segmentation_mask.png")
     if save_intermediates:
-        save_vis(seg_mask, vis_dir, "filtered.png")
-
-    # smooth the circular mask and segmentation mask
-    circ_mask = cv2.GaussianBlur(circ_mask, (5, 5), 0)
-    seg_mask = cv2.GaussianBlur(seg_mask, (5,5), 0)
-
-    if save_graphics:
-        save_vis(seg_mask * circ_mask, vis_dir, "seg_mask.png")
-
-    # apply circular mask and segmentation mask to prediction
-    pred = pred * circ_mask * seg_mask
-
-    if save_intermediates:
-        save_vis(pred, vis_dir, "masked.png")
+        save_vis(pred, vis_dir, "distance_transform.png")
 
     pred = rescale_intensity(pred, out_range=(0, 255))
     pred = pred.astype(np.double)
-
-    print(f"\npred.min,pred.max = {pred.min()}, {pred.max()}")
-
-    if save_intermediates:
-        save_vis(pred, vis_dir, "contrast.png")
 
     print("\nComputing graph and barcode...")
 
