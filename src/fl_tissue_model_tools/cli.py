@@ -77,15 +77,13 @@ def main():
 
     if args.command == 'update':
         force = False
-        if '--help' in args.command_args or '-h' in args.command_args:
+        if in_args(['--help', '-h'], args.command_args):
             print('Update the package from GitHub.')
             print('Usage: update [--help] [--force] [--local SRC_DIR] [--branch BRANCH_NAME]')
             print('  --help, -h: Show this help message and exit.')
             print('  --force, -f: Replace scripts and config files without confirmation.')
             print('  --local, -l: Update the package from a local src directory.')
             print('  --branch, -b: Update the package from a specific branch.')
-            if len(args.command_args) > 1:
-                print('Warning: Too many arguments with --help option (they are ignored).')
             return
 
         force =  in_args(['--force', '-f'], args.command_args)
@@ -104,7 +102,8 @@ def main():
             update_package(branch_name=branch_name)
         else:
             update_package()
-        configure(replace_subdirs=True, force_replace=force)
+        configure_cmd = 'tmat configure' if force else 'tmat configure --force'
+        subprocess.run(configure_cmd, shell=True, check=True)
         return
 
     if args.command is None:
@@ -138,18 +137,21 @@ def main():
         args.command_args = input('Arguments, if any (or -h to list options): ').split()
 
     if args.command == 'configure':
-        if len(args.command_args) > 1:
-            print('Error: Too many arguments for the configure command (expected between 0 and 1).'
-                  ' Use --help to list options.')
-            print('If you entered a path with spaces, enclose the path in quotes'
-                  ' or prepend each space with a backslash (\\) to escape it.')
+        if in_args(['--help', '-h'], args.command_args):
+            print('Set the base directory for the package.')
+            print('Usage: configure [--help] [--force] [BASE_DIR]')
+            print('  --help, -h: Show this help message and exit.')
+            print('  --force, -f: Replace scripts and config files without confirmation.')
+            print('  BASE_DIR: The base directory for the package.')
+            return
+        force =  in_args(['--force', '-f'], args.command_args)
+        other_args = [arg for arg in args.command_args if arg not in ['--force', '-f']]
+        if len(other_args) > 1:
+            print('Error: Too many arguments. Run \'tmat configure --help\' for more information.')
+            print('If the base directory has spaces in the path, enclose it with quotes.')
             sys.exit(1)
-        if args.command_args and args.command_args[0] in ['-h', '--help']:
-            print('Usage: configure [base_dir]')
-        elif args.command_args:
-            configure(args.command_args[0])
-        else:
-            configure()
+        target_base_dir = other_args[0] if other_args else ''
+        configure(target_base_dir=target_base_dir, replace_subdirs_auto=force)
         return
 
     # Make sure the base directory and its subdirectories exist

@@ -6,6 +6,7 @@ SUBDIR = 'src'
 
 def update_package(src_dir=None, branch_name=None):
     """Update the package from GitHub."""
+    subprocess.run(f'pip uninstall -y {PKG_NAME}', shell=True, check=True)
     if src_dir is not None:
         cmd = f'pip install -I -e {src_dir}'
     elif branch_name is not None:
