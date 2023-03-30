@@ -168,7 +168,7 @@ def find_circle(hull: npt.NDArray, radius_bounds: Tuple[int,int], center_x_bound
 
 
 def gen_circ_mask_auto(
-    img: npt.NDArray, pinhole_buffer=0.04, mask_val: Number=True
+    img: npt.NDArray, pinhole_buffer=0.04, mask_val: np.uint8=1
 ) -> npt.NDArray[np.uint8]:
     """Generate a 2D circular well mask automatically from an image.
     Args:
@@ -406,8 +406,7 @@ def dt_gray_weighted(img: npt.NDArray, threshold: int, structure: Optional[npt.N
     for idx in range(d.shape[1]):
         accumulator = 0
         for idx2 in range(d.shape[0]):
-            accumulator += padded_img.strides[idx2] * d[idx2, idx] /\
-                           padded_img.dtype.itemsize
+            accumulator += padded_img.strides[idx2] * d[idx2, idx] / padded_img.dtype.itemsize
         if accumulator != 0:
             stride.append(accumulator)
     strides = np.array(stride, np.int64)
