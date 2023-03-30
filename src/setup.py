@@ -5,6 +5,7 @@ import configparser
 from setuptools import setup, Extension
 from platform import python_version_tuple
 import numpy as np
+from glob import glob
 
 SETUP_CFG = configparser.ConfigParser()
 SETUP_CFG.read('setup.cfg')
@@ -59,25 +60,24 @@ else:
     library_dirs = None
     include_dirs = None
 
+
+def package_files(directory):
+    paths = []
+    for (path, directories, filenames) in os.walk(directory):
+        for filename in filenames:
+            paths.append(os.path.join('..', path, filename))
+    return paths
+
+extra_files = [str(CFG_FILE)]
+for dir_name in ['scripts', 'model_training', 'config']:
+    extra_files.extend(package_files(PKG_ROOT / dir_name))
+
 setup(
     name=PKG_NAME,
     version='0.1.0',
     author='Fogg Lab',
-    packages=[
-        PKG_NAME
-    ],
-    package_data={
-        PKG_NAME: [
-            str(CFG_FILE),
-            str(PKG_ROOT / 'config' / '*.json'),
-            str(PKG_ROOT / 'model_training' / '*.json'),
-            str(PKG_ROOT / 'model_training' / 'best_ensemble' / '*.h5'),
-            str(PKG_ROOT / 'model_training' / 'best_ensemble' / '*.csv'),
-            str(PKG_ROOT / 'model_training' / 'binary_segmentation' / 'checkpoints' / '*.h5'),
-            str(PKG_ROOT / 'model_training' / 'binary_segmentation' / 'configs' / '*.json'),
-            str(PKG_ROOT / 'scripts' / '*.py'),
-        ]
-    },
+    packages=[PKG_NAME],
+    package_data={PKG_NAME: extra_files},
     include_package_data=True,
     url='https://github.com/fogg-lab/tissue-model-analysis-tools',
     license='MIT',
