@@ -184,9 +184,18 @@ def gen_circ_mask_auto(
 
     # Median filter and get edges
     img_ds = median_filter(img_ds, disk(3))
-    img_ds = rescale_intensity(img_ds.astype(float), out_range=(0, 1))
+    img_ds = rescale_intensity(img_ds, out_range=(0, 1))
     img_ds = equalize_adapthist(img_ds)
     edges = canny(img_ds, sigma=1)
+
+    # If there are no edges, return a mask with a fixed size and position
+    def get_fixed_mask():
+        avg_side_len = np.mean(img.shape[:2])
+        radius = (1 - pinhole_buffer * 2) * avg_side_len / 2
+        center = img.shape[1] / 2, img.shape[0] / 2
+        return gen_circ_mask(center, radius, img.shape[:2], mask_val=mask_val)
+    if np.sum(edges) == 0:
+        return get_fixed_mask()
 
     # Get convex hull of edges
     edge_coords = np.argwhere(edges)
@@ -244,11 +253,17 @@ def gen_circ_mask_auto(
     dists = np.sqrt((rr - mask_center[1])**2 + (cc - mask_center[0])**2)
     edges[rr[dists < mask_radius * 0.875], cc[dists < mask_radius * 0.875]] = 0
 
+    if np.sum(edges) == 0:
+        return get_fixed_mask()
+
     # fit ellipse to remaining edges
     rr, cc = np.nonzero(edges)
     xy = np.array([cc, rr]).T
     well_ellipse = EllipseModel()
     well_ellipse.estimate(xy)
+
+    if well_ellipse.params is None:
+        return get_fixed_mask()
 
     # Replace the well mask with the ellipse at the original resolution
     xc, yc, a, b, _ = np.multiply(well_ellipse.params, 1/ds_ratio)
