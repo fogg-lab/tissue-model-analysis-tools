@@ -19,8 +19,8 @@ from pathlib import Path
 import shutil
 import sys
 import re
-from glob import glob
 import configparser
+from glob import glob
 
 from fl_tissue_model_tools import defs
 
@@ -30,7 +30,7 @@ MODEL_SUBDIR = 'model_training'
 
 USER_HOME = Path.home().resolve()
 
-def configure(target_base_dir: str='', replace_subdirs=True, force_replace=False):
+def configure(target_base_dir: str='', replace_subdirs_auto=False):
     '''Create or move the base directory for config files, scripts, and data.'''
 
     if (re.search("^[A-Z]:", target_base_dir)
@@ -57,7 +57,7 @@ def configure(target_base_dir: str='', replace_subdirs=True, force_replace=False
 
     if target_base_dir == '':
         print(f'\nEnter the preferred base directory location for {defs.PKG_NAME}.')
-        print(f'If it does not exist, it will be created. Leave empty to use the default.')
+        print('If it does not exist, it will be created. Leave empty to use the default.')
         target_base_dir = input(f'Base directory [{default_base_dir}]: ') or default_base_dir
         print('')
 
@@ -91,13 +91,13 @@ def configure(target_base_dir: str='', replace_subdirs=True, force_replace=False
                               (defs.PKG_SCRIPTS_DIR, SCRIPTS_SUBDIR),
                               (defs.PKG_MODEL_DIR, MODEL_SUBDIR)]:
         dest_dir_path = Path(target_base_dir) / dest_dir
-        if replace_subdirs or not dest_dir_path.exists():
-            if replace_subdirs and dest_dir_path.exists() and not force_replace:
+        if replace_subdirs_auto or not dest_dir_path.exists():
+            if dest_dir_path.exists() and not not replace_subdirs_auto:
                 do_replace = input(f'Overwrite package files in {dest_dir} directory? [y/n]: ')
                 if do_replace.lower() != 'y':
                     print(f'Skipping {dest_dir}...')
                     continue
-            print(f'Creating {dest_dir} directory')
+            print(f'Creating {dest_dir} directory\n')
             shutil.copytree(src_dir, dest_dir_path, dirs_exist_ok=True)
         else:
             print(f'{dest_dir} directory already exists - skipping')
