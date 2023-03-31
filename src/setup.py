@@ -71,12 +71,14 @@ extra_files = [str(cfg_file)]
 for dir_name in ['scripts', 'model_training', 'config']:
     extra_files.extend(package_files(pkg_root / dir_name))
 
+exclude_packages = ['pydmtgraph.notebooks', 'pydmtgraph.figures', 'pydmtgraph.data']
+
 setup(
     name=pkg_name,
     version='0.1.0',
     author='Fogg Lab',
     # pkg_name and 'packages' without __init__.py using find_namespace_packages here:
-    packages=find_namespace_packages(),
+    packages=find_namespace_packages(exclude=exclude_packages),
     package_data={pkg_name: extra_files},
     include_package_data=True,
     url='https://github.com/fogg-lab/tissue-model-analysis-tools',
