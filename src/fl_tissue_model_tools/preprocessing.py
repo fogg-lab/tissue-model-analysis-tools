@@ -17,7 +17,6 @@ from skimage.exposure import rescale_intensity, equalize_adapthist
 from skimage.measure import EllipseModel
 
 from . import defs
-from .gwdt_impl import gwdt_impl
 
 
 def min_max_(
@@ -392,53 +391,6 @@ def sdt_blur(
     proc_img -= cv2.distanceTransform(np.logical_not(mask).astype(np.uint8),
                                       dist_metric, 5)
     return blur(proc_img, blur_itr, k_size, gs=False)
-
-
-def dt_gray_weighted(img: npt.NDArray, threshold: int, structure: Optional[npt.NDArray] = None):
-    """Gray-weighted distance transform
-    From https://github.com/chunglabmit/gwdt/blob/master/gwdt/gwdt.py (MIT License)
-
-    This algorithm finds the weighted manhattan distance from the background
-    to every foreground point. The distance is the smallest sum of image values
-    along a path. Path steps are taken in directions indicated by the structure.
-
-    Args:
-        img: Image to be transformed.
-        threshold: Threshold value for foreground.
-        structure: Structuring element used for the distance transform.
-    Returns:
-        npt.NDArray: Gray-weighted distance transform of the image.
-    """
-
-    if structure is None:
-        structure = generate_binary_structure(img.ndim, 1)
-
-    foreground_img = img - threshold
-    foreground_img[foreground_img < 0] = 0
-
-    pad_size = [(_//2, _//2) for _ in structure.shape]
-    padded_img = np.pad(img, pad_size).astype(np.float32)
-    d = np.mgrid[tuple([slice(-ps[0], ps[1]+1) for ps in pad_size])]
-    d = d[:, structure]
-    stride = []
-    for idx in range(d.shape[1]):
-        accumulator = 0
-        for idx2 in range(d.shape[0]):
-            accumulator += padded_img.strides[idx2] * d[idx2, idx] / padded_img.dtype.itemsize
-        if accumulator != 0:
-            stride.append(accumulator)
-    strides = np.array(stride, np.int64)
-    marks = np.zeros(padded_img.shape, np.uint8)
-    # MARK_ALIVE = 1
-    # MARK_FAR = 3
-    # so False * 2 + 1 = MARK_ALIVE and
-    #    True * 2 + 1 = MARK_FAR
-    mark_slices = [slice(ps[0], s-ps[1])
-                   for ps, s in zip(pad_size, padded_img.shape)]
-    marks[tuple(mark_slices)] = (img > 0) * 2 + 1
-    output = np.zeros(padded_img.shape, np.float32)
-    gwdt_impl(padded_img.ravel(), output.ravel(), strides, marks.ravel())
-    return output[tuple(mark_slices)]
 
 
 def blur(
