@@ -9,7 +9,7 @@
 
 *Create the conda environment and install the fl_tissue_model_tools package*
 
-### Prerequisite: [conda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html)
+### Prerequisite: The [conda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html) package manager
 
 **Tip**: Enable [libmamba solver](https://www.anaconda.com/blog/a-faster-conda-for-a-growing-community) to create the conda environment faster. Or use [mambaforge](https://github.com/conda-forge/miniforge#mambaforge).
 
