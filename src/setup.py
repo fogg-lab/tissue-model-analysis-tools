@@ -4,8 +4,6 @@ import shutil
 import configparser
 from setuptools import setup, Extension, find_namespace_packages
 from platform import python_version_tuple
-import numpy as np
-from glob import glob
 
 SETUP_CFG = configparser.ConfigParser()
 SETUP_CFG.read('setup.cfg')
@@ -77,7 +75,7 @@ setup(
     version='0.1.0',
     author='Fogg Lab',
     # PKG_NAME and 'packages' without __init__.py using find_namespace_packages here:
-    packages=[PKG_NAME, *find_namespace_packages()],
+    packages=[PKG_NAME, 'pydmtgraph.src.pydmtgraph.dmtgraph', *find_namespace_packages()],
     package_data={PKG_NAME: extra_files},
     include_package_data=True,
     url='https://github.com/fogg-lab/tissue-model-analysis-tools',
