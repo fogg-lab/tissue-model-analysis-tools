@@ -11,7 +11,7 @@
 
 ### Prerequisite: [conda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html)
 
-**Tip**: Enable [libmamba solver](https://www.anaconda.com/blog/a-faster-conda-for-a-growing-community) to create the conda environment faster.
+**Tip**: Enable [libmamba solver](https://www.anaconda.com/blog/a-faster-conda-for-a-growing-community) to create the conda environment faster. Or use [mambaforge](https://github.com/conda-forge/miniforge#mambaforge).
 
 ### Quick setup
 
