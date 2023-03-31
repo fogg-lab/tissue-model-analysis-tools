@@ -13,11 +13,10 @@ from skimage.feature import canny
 from skimage.draw import ellipse
 from scipy.ndimage import generate_binary_structure
 from scipy.spatial import ConvexHull, Delaunay
-from skimage.exposure import equalize_adapthist
+from skimage.exposure import rescale_intensity, equalize_adapthist
 from skimage.measure import EllipseModel
 
 from . import defs
-from .gwdt_impl import gwdt_impl
 
 
 def min_max_(
@@ -168,7 +167,7 @@ def find_circle(hull: npt.NDArray, radius_bounds: Tuple[int,int], center_x_bound
 
 
 def gen_circ_mask_auto(
-    img: npt.NDArray, pinhole_buffer=0.04, mask_val: Number=True
+    img: npt.NDArray, pinhole_buffer=0.04, mask_val: np.uint8=1
 ) -> npt.NDArray[np.uint8]:
     """Generate a 2D circular well mask automatically from an image.
     Args:
@@ -184,8 +183,18 @@ def gen_circ_mask_auto(
 
     # Median filter and get edges
     img_ds = median_filter(img_ds, disk(3))
+    img_ds = rescale_intensity(img_ds, out_range=(0, 1))
     img_ds = equalize_adapthist(img_ds)
     edges = canny(img_ds, sigma=1)
+
+    # If there are no edges, return a mask with a fixed size and position
+    def get_fixed_mask():
+        avg_side_len = np.mean(img.shape[:2])
+        radius = (1 - pinhole_buffer * 2) * avg_side_len / 2
+        center = img.shape[1] / 2, img.shape[0] / 2
+        return gen_circ_mask(center, radius, img.shape[:2], mask_val=mask_val)
+    if np.sum(edges) == 0:
+        return get_fixed_mask()
 
     # Get convex hull of edges
     edge_coords = np.argwhere(edges)
@@ -243,11 +252,17 @@ def gen_circ_mask_auto(
     dists = np.sqrt((rr - mask_center[1])**2 + (cc - mask_center[0])**2)
     edges[rr[dists < mask_radius * 0.875], cc[dists < mask_radius * 0.875]] = 0
 
+    if np.sum(edges) == 0:
+        return get_fixed_mask()
+
     # fit ellipse to remaining edges
     rr, cc = np.nonzero(edges)
     xy = np.array([cc, rr]).T
     well_ellipse = EllipseModel()
     well_ellipse.estimate(xy)
+
+    if well_ellipse.params is None:
+        return get_fixed_mask()
 
     # Replace the well mask with the ellipse at the original resolution
     xc, yc, a, b, _ = np.multiply(well_ellipse.params, 1/ds_ratio)
@@ -266,7 +281,9 @@ def apply_mask(img: npt.NDArray, mask: npt.NDArray) -> npt.NDArray:
     Returns:
         Masked image.
     """
-    return cv2.bitwise_and(img, img, mask=mask)
+    masked_img = np.copy(img)
+    masked_img[mask == 0] = 0
+    return masked_img
 
 
 def bin_thresh(
@@ -374,54 +391,6 @@ def sdt_blur(
     proc_img -= cv2.distanceTransform(np.logical_not(mask).astype(np.uint8),
                                       dist_metric, 5)
     return blur(proc_img, blur_itr, k_size, gs=False)
-
-
-def dt_gray_weighted(img: npt.NDArray, threshold: int, structure: Optional[npt.NDArray] = None):
-    """Gray-weighted distance transform
-    From https://github.com/chunglabmit/gwdt/blob/master/gwdt/gwdt.py (MIT License)
-
-    This algorithm finds the weighted manhattan distance from the background
-    to every foreground point. The distance is the smallest sum of image values
-    along a path. Path steps are taken in directions indicated by the structure.
-
-    Args:
-        img: Image to be transformed.
-        threshold: Threshold value for foreground.
-        structure: Structuring element used for the distance transform.
-    Returns:
-        npt.NDArray: Gray-weighted distance transform of the image.
-    """
-
-    if structure is None:
-        structure = generate_binary_structure(img.ndim, 1)
-
-    foreground_img = img - threshold
-    foreground_img[foreground_img < 0] = 0
-
-    pad_size = [(_//2, _//2) for _ in structure.shape]
-    padded_img = np.pad(img, pad_size).astype(np.float32)
-    d = np.mgrid[tuple([slice(-ps[0], ps[1]+1) for ps in pad_size])]
-    d = d[:, structure]
-    stride = []
-    for idx in range(d.shape[1]):
-        accumulator = 0
-        for idx2 in range(d.shape[0]):
-            accumulator += padded_img.strides[idx2] * d[idx2, idx] /\
-                           padded_img.dtype.itemsize
-        if accumulator != 0:
-            stride.append(accumulator)
-    strides = np.array(stride, np.int64)
-    marks = np.zeros(padded_img.shape, np.uint8)
-    # MARK_ALIVE = 1
-    # MARK_FAR = 3
-    # so False * 2 + 1 = MARK_ALIVE and
-    #    True * 2 + 1 = MARK_FAR
-    mark_slices = [slice(ps[0], s-ps[1])
-                   for ps, s in zip(pad_size, padded_img.shape)]
-    marks[tuple(mark_slices)] = (img > 0) * 2 + 1
-    output = np.zeros(padded_img.shape, np.float32)
-    gwdt_impl(padded_img.ravel(), output.ravel(), strides, marks.ravel())
-    return output[tuple(mark_slices)]
 
 
 def blur(
