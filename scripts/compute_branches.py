@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 import json
 import csv
+from time import perf_counter_ns
 
 import numpy as np
 import cv2
@@ -11,6 +12,7 @@ from networkx.exception import NetworkXPointlessConcept as nxPointlessConceptExc
 from skimage.exposure import rescale_intensity
 from scipy.ndimage import distance_transform_edt
 from skimage.morphology import medial_axis
+from skimage.feature import canny
 
 from fl_tissue_model_tools import helper, models, models_util, defs
 from fl_tissue_model_tools import script_util as su
@@ -106,6 +108,12 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
     except nxPointlessConceptException:
         print(f"No branches found for {img_path.stem}.")
         return
+
+    # Filter out branches that are positioned along the edge of the well
+    well_edge = canny(circ_mask.astype(np.float32), sigma=1)
+
+    min_dist_from_edge = 0.05 * min(img.shape[:2])
+    morse_graph.remove_branches_near_mask(well_edge, min_dist=min_dist_from_edge)
 
     if save_intermediates or save_graphics:
         save_path = str(vis_dir / "barcode.png")
