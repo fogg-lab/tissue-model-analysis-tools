@@ -1,15 +1,14 @@
 from typing import Tuple
 import math
-import subprocess
-import pickle
-import os
+from numbers import Number
+from time import perf_counter_ns
 
 import numpy as np
 import numpy.typing as npt
 import networkx as nx
 from matplotlib.collections import LineCollection
 import matplotlib.pyplot as plt
-import cv2
+from scipy.spatial import KDTree
 from cv2 import cvtColor, COLOR_HSV2BGR
 
 from pydmtgraph.dmtgraph import DMTGraph
@@ -18,7 +17,7 @@ from pydmtgraph.dmtgraph import DMTGraph
 class MorseGraph:
     """Morse skeleton of an image represented as a forest. Each tree is a connected component."""
 
-    def __init__(self, img: npt.NDArray, thresholds: Tuple[float, float]=(1,4),
+    def __init__(self, img: npt.NDArray, thresholds: Tuple[Number, Number]=(1,4),
                  min_branch_length: int=15, smoothing_window: int=15):
         self.barcode = None
         self._leaves = None
@@ -130,6 +129,34 @@ class MorseGraph:
 
         if not ax_provided:
             plt.show()
+
+
+    def remove_branches_near_mask(self, mask: npt.NDArray, min_dist: Number):
+        """Remove branches that are too close to any nonzero (or True) pixel in the mask.
+        The distance is measured from the median of the branch's vertices.
+        Args:
+            mask (npt.NDArray): 2d boolean array or 2d array of 0s and 1s.
+            min_dist (int): Minimum distance from the mask for a branch to be kept.
+        """
+        branches_nodes = [[e[0] for e in b] + [b[-1][1]] for b in self._branches]
+        branches_nodes_pos = [[self._vertices[v] for v in b] for b in branches_nodes]
+        branches_pos = np.array([np.median(b, axis=0) for b in branches_nodes_pos])
+        if mask.dtype != bool:
+            mask = mask.astype(bool)
+        mask_pos = np.array(np.where(mask)).T
+
+        # find distances to the closest mask pixel for each branch
+        tree = KDTree(mask_pos)
+        distances, _ = tree.query(branches_pos, k=1)
+
+        # remove branches that are too close to the mask
+        branches_del = np.argwhere(distances < min_dist).flatten()
+        edges_del = [e for b in self._branches for i, e in enumerate(b) if i in branches_del]
+        self._branches = [b for i, b in enumerate(self._branches) if i not in branches_del]
+        self.barcode = [bar for i, bar in enumerate(self.barcode) if i not in branches_del]
+        self._G.remove_edges_from(edges_del)
+        self._edges_and_colors = None
+        self._barcode_and_colors = None
 
 
     ### Private methods ###
@@ -393,8 +420,7 @@ class MorseGraph:
     ### Utilities ###
 
     @staticmethod
-    def __compute_nx_graph(im: npt.NDArray[np.double],
-                         threshold1: float=0.5, threshold2: float=0.0):
+    def __compute_nx_graph(im: npt.NDArray, threshold1: Number=0.5, threshold2: Number=0.0):
         """Fit a Morse skeleton to the image `im`.
             Args:
                 im (npt.NDArray[np.float64]): Grayscale image
@@ -408,23 +434,10 @@ class MorseGraph:
         """
 
         # Compute the Morse skeleton
-        # Slice a bounding box of the connected component to speed up computation
-        #dmtG = DMTGraph(im)
-        #verts, edges = dmtG.computeGraph(threshold1, threshold2)
-
-        # spawn subprocess to compute the graph as temporary workaround for memory leak in DMTGraph
-        cur_file_path = os.path.dirname(os.path.abspath(__file__))
-        subprocess_path = os.path.join(cur_file_path, 'compute_graph_proc.py')
-        rand_id=np.random.randint(0,1000000)
-        fname=cur_file_path + '/tmp'+str(rand_id)
-        #with tempfile.NamedTemporaryFile() as f:
-        cv2.imwrite(fname+'.png', im)
-        cmd = ['python', subprocess_path, fname+'.png', str(threshold1), str(threshold2), fname + '.pkl']
-        subprocess.check_call(cmd)
-        with open(fname + '.pkl', 'rb') as f2:
-            verts, edges = pickle.load(f2)
-        os.remove(fname+'.png')
-        os.remove(fname+'.pkl')
+        if im.dtype != np.double:
+            im = im.astype(np.double)
+        dmtG = DMTGraph(im)
+        verts, edges = dmtG.computeGraph(threshold1, threshold2)
 
         G = MorseGraph.__convert_to_networkx_graph(edges)
 
