@@ -3,7 +3,6 @@ import sys
 from pathlib import Path
 import json
 import csv
-from time import perf_counter_ns
 
 import numpy as np
 import cv2
