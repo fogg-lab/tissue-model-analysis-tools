@@ -123,7 +123,7 @@ def circ_mask_setup(img_shape: Tuple[int, int], pinhole_cut: int) -> \
 
 def circ_mask_setup_auto(img: npt.NDArray, pinhole_buffer=0.04):
     """Generate circular mask for image based on detected well boundary."""
-    circ_mask = prep.gen_circ_mask_auto(img, pinhole_buffer, mask_val=defs.MAX_UINT8)
+    circ_mask = prep.gen_well_mask_auto(img, pinhole_buffer, mask_val=defs.MAX_UINT8)
     pinhole_idx = np.where(circ_mask > 0)
     circ_pix_area = len(pinhole_idx[0])
     return circ_mask, pinhole_idx, circ_pix_area
