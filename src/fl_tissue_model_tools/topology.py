@@ -1,14 +1,14 @@
 from typing import Tuple
 import math
 from numbers import Number
-from time import perf_counter_ns
+from itertools import zip_longest
+#from time import perf_counter_ns
 
 import numpy as np
 import numpy.typing as npt
 import networkx as nx
 from matplotlib.collections import LineCollection
 import matplotlib.pyplot as plt
-from scipy.spatial import KDTree
 from cv2 import cvtColor, COLOR_HSV2BGR
 
 from pydmtgraph.dmtgraph import DMTGraph
@@ -18,7 +18,13 @@ class MorseGraph:
     """Morse skeleton of an image represented as a forest. Each tree is a connected component."""
 
     def __init__(self, img: npt.NDArray, thresholds: Tuple[Number, Number]=(1,4),
-                 min_branch_length: int=15, smoothing_window: int=15):
+                 min_branch_length: int=15, smoothing_window: int=15,
+                 pruning_mask: npt.NDArray=None):
+        self.smoothing_window = smoothing_window
+        self.thresholds = thresholds
+        self.min_branch_length = min_branch_length
+        self.pruning_mask = pruning_mask
+        self._shape = img.shape[:2]
         self.barcode = None
         self._leaves = None
         self._branches = None
@@ -32,8 +38,7 @@ class MorseGraph:
         self.__compute_graph(img, thresholds)
         self.__get_branch_labels()
         self.__compute_branches_and_barcode()
-        self.__smooth_graph(smoothing_window)
-        self.__filter_graph(min_branch_length)
+        self.__filter_graph()
 
 
     ### Public methods ###
@@ -49,6 +54,8 @@ class MorseGraph:
         """Return the average bar length of a barcode."""
         bar_lengths = self.__barcode_interval_lengths()
         bar_sum = np.sum(bar_lengths)
+        if bar_sum == 0:
+            return 0
         return bar_sum / len(bar_lengths)
 
 
@@ -74,13 +81,19 @@ class MorseGraph:
         # if no axis is provided, fetch the current axis
         ax_provided = ax is not None
         ax = ax if ax_provided else plt.gca()
-        # sort bars in ascending order by birth time
-        return_first_element = lambda pair : pair[0] # only use first element of tuple to sort
-        self._barcode_and_colors.sort(reverse=True, key=return_first_element)
-        # prepare args for bar plot
-        heights = [*range(len(self._barcode_and_colors))]
-        barcode, colors = zip(*self._barcode_and_colors)
-        births, widths = zip(*[(bar[0], bar[1] - bar[0]) for bar in barcode])
+        if self._barcode_and_colors:
+            # sort bars in ascending order by birth time
+            return_first_element = lambda pair : pair[0] # only use first element of tuple to sort
+            self._barcode_and_colors.sort(reverse=True, key=return_first_element)
+            # prepare args for bar plot
+            heights = [*range(len(self._barcode_and_colors))]
+            barcode, colors = zip(*self._barcode_and_colors)
+            births, widths = zip(*[(bar[0], bar[1] - bar[0]) for bar in barcode])
+        else:
+            heights = []
+            widths = []
+            births = []
+            colors = []
         # plot the barcode
         ax.barh(heights, widths, left=births, color=colors, **kwargs)
         ax.set_yticks([])
@@ -112,51 +125,22 @@ class MorseGraph:
         # if no axis is provided, fetch the current axis
         ax_provided = ax is not None
         ax = ax if ax_provided else plt.gca()
-        # prepare the edges to be plotted
-        edges, colors = zip(*self._edges_and_colors)
-        # add alpha channel to colors (fixed at 1.0)
-        colors = [(*c, 1.0) for c in colors]
 
-        #if 'linewidth' not in kwargs and 'linewidths' not in kwargs:
-            #kwargs['linewidth'] = np.max([xlim, ylim]) / 100.0
+        if self._edges_and_colors:
+            # prepare the edges to be plotted
+            edges, colors = zip(*self._edges_and_colors)
+            # add alpha channel to colors (fixed at 1.0)
+            colors = [(*c, 1.0) for c in colors]
 
-        edges_collection = LineCollection(edges, colors=colors, **kwargs)
-        # plot the tree
-        ax.add_collection(edges_collection)
+            edges_collection = LineCollection(edges, colors=colors, **kwargs)
+            # plot the tree
+            ax.add_collection(edges_collection)
 
         ax.set_axis_off()
         ax.autoscale()
 
         if not ax_provided:
             plt.show()
-
-
-    def remove_branches_near_mask(self, mask: npt.NDArray, min_dist: Number):
-        """Remove branches that are too close to any nonzero (or True) pixel in the mask.
-        The distance is measured from the median of the branch's vertices.
-        Args:
-            mask (npt.NDArray): 2d boolean array or 2d array of 0s and 1s.
-            min_dist (int): Minimum distance from the mask for a branch to be kept.
-        """
-        branches_nodes = [[e[0] for e in b] + [b[-1][1]] for b in self._branches]
-        branches_nodes_pos = [[self._vertices[v] for v in b] for b in branches_nodes]
-        branches_pos = np.array([np.median(b, axis=0) for b in branches_nodes_pos])
-        if mask.dtype != bool:
-            mask = mask.astype(bool)
-        mask_pos = np.array(np.where(mask)).T
-
-        # find distances to the closest mask pixel for each branch
-        tree = KDTree(mask_pos)
-        distances, _ = tree.query(branches_pos, k=1)
-
-        # remove branches that are too close to the mask
-        branches_del = np.argwhere(distances < min_dist).flatten()
-        edges_del = [e for b in self._branches for i, e in enumerate(b) if i in branches_del]
-        self._branches = [b for i, b in enumerate(self._branches) if i not in branches_del]
-        self.barcode = [bar for i, bar in enumerate(self.barcode) if i not in branches_del]
-        self._G.remove_edges_from(edges_del)
-        self._edges_and_colors = None
-        self._barcode_and_colors = None
 
 
     ### Private methods ###
@@ -174,46 +158,16 @@ class MorseGraph:
 
         G, vertices = self.__compute_nx_graph(img, *thresholds)
 
-        # Make G a forest
+        # Smooth vertices in the graph
+        vertices = self.__smooth_graph(G, vertices, self.smoothing_window)
 
-        forest = nx.Graph()
+        # Remove segments of vertices inside the pruning mask
+        G = self.__trim_graph(G, vertices, self.min_branch_length, self._shape,
+                              self.pruning_mask)
 
-        parent = {n: None for n in G.nodes()}
-        dist_to_root = {}   # each node's distance to the root of its tree
+        # Compute minimum spanning forest of the graph
+        self._G, self._parent, self._dist_to_root = self.__get_forest(G, vertices)
 
-        graph_components = [G.subgraph(c) for c in nx.connected_components(G)]
-
-        skipped_vertices = set()
-
-        for g in graph_components:
-            root, max_degree = max(g.degree, key=lambda x: x[1])
-            if max_degree <= 2:
-                skipped_vertices.update(g.nodes())
-                continue    # skip connected components that are just one branch
-            # create a dict where each vertex points to its parent in the tree.
-            # we set parents with a bfs starting at the root.
-            # we also use the bfs to compute distance to root.
-            parent[root] = root
-            dist_to_root[root] = 0
-            unvisited_vertices = [root]
-            while unvisited_vertices:
-                v = unvisited_vertices.pop(0)
-                for n in G.neighbors(v):
-                    if parent[n] is None:
-                        forest.add_edge(v, n)
-                        parent[n] = v
-                        dist_to_root[n] = dist_to_root[v] + self.__edge_len(vertices, v, n)
-                        unvisited_vertices.append(n)
-
-        # check that the parents were set properly
-        assert all([parent[n] is not None for n in G.nodes if n not in skipped_vertices])
-
-        # check that the forest is a forest
-        assert nx.is_forest(forest)
-
-        self._parent = parent
-        self._dist_to_root = dist_to_root
-        self._G = forest
         self._vertices = vertices
 
 
@@ -272,9 +226,6 @@ class MorseGraph:
             ValueError: If the graph is not a forest.
         """
 
-        if not nx.is_forest(self._G):
-            raise ValueError("Graph must be a forest")
-
         branches = []
         barcode = []
         verts = self._vertices
@@ -310,45 +261,50 @@ class MorseGraph:
         self.barcode = barcode
 
 
-    def __smooth_graph(self, window_size):
-        """ Smooth a graph using sliding window smoothing.
+    def __smooth_graph(self, G, vertices, window_size):
+        """ Smooth a graph's vertex positions using sliding window smoothing.
             Args:
+                G (nx.Graph): Graph to smooth vertices of.
+                vertices (np.ndarray): Array of vertex positions.
                 window_size (int): Size of the window to use for smoothing.
-            Side effects:
-                self._vertices is updated with the smoothed vertex positions.
+            Returns:
+                np.ndarray: Smoothed vertex positions.
         """
 
         if window_size <= 1:
             return
 
-        vertices = self._vertices
+        vertices = vertices.copy()
 
-        # We fix the position of all leaves and merge points between two branches
-        fixed_verts = {v for v in self._G.nodes if self._G.degree[v] != 2}
-        # the smoothed graph will have the same edges as the input graph
-        # but different vertex positions
-        new_vertices = vertices.copy()
-        for branch in self._branches:
-            # verify that edges in branch are consecutive
-            # this should be true as this is how compute_branches_and_barcode works
-            assert all([ branch[i][1] == branch[i+1][0] for i in range(len(branch)-1) ])
-            branch_vertices = np.array( [branch[i][0] for i in range(len(branch))]+[branch[-1][1]] )
-            # A branch may have fixed points besides its endpoints,
-            # for example, when another branch is attached to the middle of the branch.
-            # We therefore decompose the branch into the segments
-            # connecting fixed points and smooth each of these segments.
-            branch_fixed_vertices = [ i for i, vertex in enumerate(branch_vertices) if vertex in fixed_verts ]
-            for i in range(len(branch_fixed_vertices)-1):
-                segment_start, segment_end = branch_fixed_vertices[i], branch_fixed_vertices[i+1]
-                segment_vertices = branch_vertices[segment_start:segment_end+1]
-                smoothed_verts = self.__moving_average_fixed_ends(vertices[segment_vertices], window_size)
-                new_vertices[segment_vertices] = smoothed_verts
+        # Fix the position of all leaves and junctions
+        fixed_verts = {v for v in G.nodes if G.degree[v] != 2}
+        visited = set()     # visited vertices
 
-        self._vertices = new_vertices
+        for fixed_vert_start in fixed_verts:
+            for segment_base_vert in G.neighbors(fixed_vert_start):
+                branch_vert = segment_base_vert
+                if branch_vert in visited:
+                    continue
+                segment_vertices = [fixed_vert_start, branch_vert]
+                branch_verts_visited = set()
+                while G.degree[branch_vert] == 2:
+                    neighbors = list(G.neighbors(branch_vert))
+                    next_vert = neighbors[0] if neighbors[0] != branch_vert else neighbors[1]
+                    if next_vert in branch_verts_visited:
+                        break
+                    branch_vert = next_vert
+                    branch_verts_visited.add(branch_vert)
+                    segment_vertices.append(branch_vert)
+                segment_vertices_pos = vertices[segment_vertices]
+                smoothed_verts = self.__moving_average_fixed_ends(segment_vertices_pos, window_size)
+                vertices[segment_vertices] = smoothed_verts
+                visited.update([segment_vertices[0], segment_vertices[-1]])
+
+        return vertices
 
 
-    def __filter_graph(self, min_branch_length):
-        """ Remove all branches from a tree that are less than length min_branch_lengths.
+    def __filter_graph(self):
+        """ Remove all branches from the graph that are shorted min_branch_length.
 
         Args:
             min_branch_length (int):
@@ -359,29 +315,29 @@ class MorseGraph:
             filtered_branches (E' x 2 numpy array of ints):
                 updated to array of all edges in branches longer than min_branch_length
             self.barcode: updated to the barcode of filtered graph
-            self._G: updated to the filtered graph (removes edges not in filtered_branches)
         """
 
         filtered_branches = []
         filtered_barcode = []
-        filtered_edges = set()
+        edges_to_remove = []
 
         for branch, bar in zip(self._branches, self.barcode):
             birth, death = bar
-            if death - birth > min_branch_length:
+            if death - birth >= self.min_branch_length:
                 filtered_branches.append(branch)
                 filtered_barcode.append(bar)
-                filtered_edges.update([tuple(e) for e in branch])
+            else:
+                edges_to_remove.extend(branch)
 
         self._branches = filtered_branches
-
-        edges_to_remove = [e for e in self._G.edges if e not in filtered_edges]
-        self._G.remove_edges_from(edges_to_remove)
         self.barcode = filtered_barcode
+        self._G.remove_edges_from(edges_to_remove)
+        self._G.remove_nodes_from(list(nx.isolates(self._G)))
 
-
-    def __barcode_interval_lengths(self) -> float:
+    def __barcode_interval_lengths(self) -> np.ndarray:
         """Get persistence interval lengths in the barcode."""
+        if not self.barcode:
+            return np.array([])
         barcode = np.array(self.barcode)
         bar_lengths = barcode[:, 1] - barcode[:, 0]
         bar_lengths = bar_lengths[~np.isinf(bar_lengths)]
@@ -437,6 +393,7 @@ class MorseGraph:
         if im.dtype != np.double:
             im = im.astype(np.double)
         dmtG = DMTGraph(im)
+        #print(f"Thresholding at {threshold1} and {threshold2}")
         verts, edges = dmtG.computeGraph(threshold1, threshold2)
 
         G = MorseGraph.__convert_to_networkx_graph(edges)
@@ -567,6 +524,139 @@ class MorseGraph:
 
 
     @staticmethod
+    def __get_forest(G: nx.Graph, verts: np.ndarray) -> Tuple[nx.Graph, dict, dict]:
+        """ Get a minimum spanning forest of the graph `G`, node parents,
+            and node distances to the root node of each tree.
+        Args:
+            G: Graph to get the minimum spanning forest of.
+            verts: Vertices of the graph.
+        Returns:
+            Tuple[nx.Graph, dict, dict]: The minimum spanning forest of `G`,
+                node parents, and node distances to the root node of each tree.
+        """
+
+        forest = nx.Graph()
+        parent = {n: None for n in G.nodes()}
+        dist_to_root = {}   # each node's distance to the root of its tree
+
+        skipped_vertices = set()
+
+        for g in [G.subgraph(c) for c in nx.connected_components(G)]:
+            root, max_degree = max(g.degree, key=lambda x: x[1])
+            if max_degree <= 2:
+                skipped_vertices.update(g.nodes())
+                continue   # skip isolated branches
+            # create a dict where each vertex points to its parent in the tree.
+            # we set parents with a bfs starting at the root.
+            # we also use the bfs to compute distance to root.
+            parent[root] = root
+            dist_to_root[root] = 0
+            unvisited_vertices = [root]
+            while unvisited_vertices:
+                v = unvisited_vertices.pop(0)
+                for n in g.neighbors(v):
+                    if parent[n] is None:
+                        forest.add_edge(v, n)
+                        parent[n] = v
+                        dist_to_root[n] = dist_to_root[v] + MorseGraph.__edge_len(verts, v, n)
+                        unvisited_vertices.append(n)
+
+        # check that the parents were set properly
+        # assert all([parent[n] is not None for n in G.nodes if n not in skipped_vertices])
+
+        # check that the resulting graph is a forest
+        # assert nx.is_forest(forest)
+
+        return forest, parent, dist_to_root
+
+
+    @staticmethod
     def __edge_len(verts, v1_idx, v2_idx):
         """ Compute the Euclidean distance between two vertices """
         return np.linalg.norm(verts[v1_idx] - verts[v2_idx])
+
+
+    @staticmethod
+    def __trim_graph(G: nx.Graph(), vertices: npt.NDArray, min_branch_length: int,
+                     shape: Tuple[int,int], pruning_mask: npt.NDArray = None) -> nx.Graph():
+        """Remove branches that are too short or are positioned inside the pruning mask.
+        Args:
+            G: Graph to trim.
+            vertices: Physical positions of the graph nodes.
+            pruning_mask: Mask of regions to prune.
+        Returns:
+            nx.Graph: Pruned graph.
+        """
+
+        # TODO: use vectorized operations on G.to_numpy_array() instead of loops
+
+        #start = perf_counter_ns()
+
+        G = G.copy()
+
+        if pruning_mask is None:
+            pruning_mask = np.zeros(shape, dtype=bool)
+        elif pruning_mask.dtype != bool:
+            pruning_mask = pruning_mask > 0
+
+        def get_segment_length(segment):
+            # segment is an edge-connected sequence of nodes that aren't junctions
+            edge_lengths = [MorseGraph.__edge_len(vertices, n1, n2) for n1, n2 in G.edges(segment)]
+            return sum(edge_lengths)
+
+        # Remove segments that are too short or are positioned inside the mask.
+        # Pass 1: Prune offshoots and isolated segments, starting from leaves.
+        # Pass 2: Prune other segments, starting from junctions.
+        # After each pass, also remove isolated nodes in the graph.
+        # These two passes are repeated until there are no more segments to prune.
+
+        pass_num = 1
+        pruning_complete = False
+
+        while not pruning_complete:
+
+            junctions = {n for n in G.nodes if G.degree[n] > 2}
+            base_nodes = {n for n in G.nodes if G.degree[n] == 1} if pass_num == 1 else junctions
+            unmarked_nodes = {n for n in G.nodes if n not in junctions}
+            segments = []
+            short_segments = []
+
+            while base_nodes:
+                starting_node = base_nodes.pop()
+                neighbors = {n for n in G.neighbors(starting_node) if n in unmarked_nodes}
+                while neighbors:
+                    node = neighbors.pop()
+                    segment = [node]
+                    while (neighbor := [n for n in G.neighbors(node) if n in unmarked_nodes]):
+                        node=neighbor[0]
+                        segment.append(node)
+                        unmarked_nodes.remove(node)
+                    # if one of the segment's endpoints is a leaf, consider removal based on length
+                    segment_has_leaf = G.degree[segment[0]] == 1 or G.degree[segment[-1]] == 1
+                    if segment_has_leaf and get_segment_length(segment) < min_branch_length:
+                        short_segments.append(segment)
+                    else:
+                        segments.append(segment)
+
+            if segments:
+                segment_pos = [np.round(np.median(vertices[s], axis=0)).astype(int)
+                               for s in segments]
+                segments_remove_idx = np.argwhere(pruning_mask[tuple(zip(*segment_pos))]).flatten()
+                segments_to_remove = [segments[i] for i in segments_remove_idx]
+            else:
+                segments_to_remove = []
+            segments_to_remove.extend(short_segments)
+
+            for segment in segments_to_remove:
+                G.remove_edges_from(set(G.edges(segment)))
+                G.remove_nodes_from(segment)
+
+            G.remove_nodes_from(list(nx.isolates(G)))
+
+            pruning_complete = pass_num == 2 and not segments_to_remove
+            pass_num = 2 if pass_num == 1 else 1
+
+        #end = perf_counter_ns()
+        #print(f"Pruning took {round((end - start) / 1e6)} ms")
+
+        return G

@@ -1,10 +1,9 @@
 {
     "well_width_microns": 1000.0,
-    "detect_well_edge": true,
     "model_cfg_path": "",
     "use_latest_model_cfg": true,
-    "graph_thresh_1": 1,
+    "graph_thresh_1": 2,
     "graph_thresh_2": 4,
-    "graph_smoothing_window": 15,
-    "min_branch_length": 15
+    "graph_smoothing_window": 10,
+    "min_branch_length": 10
 }
