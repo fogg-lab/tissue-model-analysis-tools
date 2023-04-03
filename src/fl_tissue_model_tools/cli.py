@@ -102,7 +102,7 @@ def main():
             update_package(branch_name=branch_name)
         else:
             update_package()
-        configure_cmd = 'tmat configure' if force else 'tmat configure --force'
+        configure_cmd = 'tmat configure --force' if force else 'tmat configure'
         subprocess.run(configure_cmd, shell=True, check=True)
         return
 
