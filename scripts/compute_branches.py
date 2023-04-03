@@ -9,9 +9,8 @@ import cv2
 from matplotlib import pyplot as plt
 from networkx.exception import NetworkXPointlessConcept as nxPointlessConceptException
 from skimage.exposure import rescale_intensity
-from scipy.ndimage import distance_transform_edt
 from skimage.morphology import medial_axis
-from skimage.feature import canny
+from scipy.ndimage import distance_transform_edt
 
 from fl_tissue_model_tools import helper, models, models_util, defs
 from fl_tissue_model_tools import script_util as su
@@ -42,9 +41,9 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
     well_width_microns = config.get("well_width_microns", 1000.0)
     detect_well_edge = config.get("detect_well_edge", True)
     pinhole_buffer = config.get("pinhole_buffer", 0.04)
-    morse_thresholds = config.get("graph_thresh_1", 1), config.get("graph_thresh_2", 4)
-    graph_smoothing_window = config.get("graph_smoothing_window", 15)
-    min_branch_length = config.get("min_branch_length", 15)
+    morse_thresholds = config.get("graph_thresh_1", 2), config.get("graph_thresh_2", 4)
+    graph_smoothing_window = config.get("graph_smoothing_window", 10)
+    min_branch_length = config.get("min_branch_length", 10)
 
     print('')
     print("=========================================")
@@ -63,12 +62,12 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
         save_vis(img, vis_dir, "original_image.png")
 
     print("Applying circular mask to image...")
-    if detect_well_edge:
-        circ_mask = prep.gen_circ_mask_auto(img, pinhole_buffer=pinhole_buffer)
-    else:
-        center = (img.shape[1]//2, img.shape[0]//2)
-        radius = round((1 - pinhole_buffer) * min(img.shape) / 2)
-        circ_mask = prep.gen_circ_mask(center, radius, img.shape, 1).astype(float)
+
+    # Create circular mask around the well and a smaller, inverted mask for pruning
+    center, radius = prep.get_well_mask_circle_params(img, pinhole_buffer, auto=detect_well_edge)
+    well_mask = prep.gen_circ_mask(center, radius, img.shape[:2])
+    pruning_mask = prep.gen_circ_mask(center, round(radius * 0.9), img.shape[:2])
+    pruning_mask = np.logical_not(pruning_mask)
 
     print("")
     print("Segmenting image...")
@@ -78,10 +77,10 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
 
     if save_intermediates:
         save_vis(pred, vis_dir, "prediction.png")
-        save_vis(circ_mask, vis_dir, "well_mask.png")
+        save_vis(well_mask, vis_dir, "well_mask.png")
 
     # filter out non-branching structures from segmentation mask
-    seg_mask = filter_branch_seg_mask(seg_mask * circ_mask).astype(float)
+    seg_mask = filter_branch_seg_mask(seg_mask * well_mask).astype(float)
 
     # Enhance centerlines
     skel, dist = medial_axis(seg_mask, return_distance=True)
@@ -103,16 +102,11 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
     try:
         morse_graph = MorseGraph(pred, thresholds=morse_thresholds,
                                  smoothing_window=graph_smoothing_window,
-                                 min_branch_length=min_branch_length)
+                                 min_branch_length=min_branch_length,
+                                 pruning_mask=pruning_mask)
     except nxPointlessConceptException:
         print(f"No branches found for {img_path.stem}.")
         return
-
-    # Filter out branches that are positioned along the edge of the well
-    well_edge = canny(circ_mask.astype(np.float32), sigma=1)
-
-    min_dist_from_edge = 0.05 * min(img.shape[:2])
-    morse_graph.remove_branches_near_mask(well_edge, min_dist=min_dist_from_edge)
 
     if save_intermediates or save_graphics:
         save_path = str(vis_dir / "barcode.png")
@@ -136,8 +130,8 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
     avg_branch_length = morse_graph.get_average_branch_length()
     total_num_branches = len(morse_graph.barcode)
 
-    total_branch_length = pixels_to_microns(total_branch_length, img.shape[0], well_width_microns)
-    avg_branch_length = pixels_to_microns(avg_branch_length, img.shape[0], well_width_microns)
+    total_branch_length = pixels_to_microns(total_branch_length, img.shape[1], well_width_microns)
+    avg_branch_length = pixels_to_microns(avg_branch_length, img.shape[1], well_width_microns)
 
     # Write results to csv file
     fields = [img_path.stem, total_num_branches, total_branch_length, avg_branch_length]
