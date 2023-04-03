@@ -2,6 +2,7 @@
     "well_width_microns": 1000.0,
     "model_cfg_path": "",
     "use_latest_model_cfg": true,
+    "detect_well_edge": true,
     "graph_thresh_1": 2,
     "graph_thresh_2": 4,
     "graph_smoothing_window": 10,
