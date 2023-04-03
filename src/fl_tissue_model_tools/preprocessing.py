@@ -1,5 +1,5 @@
 from typing import Sequence, Any, Tuple, Dict, List, Callable, Optional
-from numbers import Number
+from numbers import Number, Integral
 from itertools import product
 import cv2
 import numpy as np
@@ -10,11 +10,8 @@ from sklearn.mixture import GaussianMixture
 from skimage.filters import median as median_filter
 from skimage.morphology import disk
 from skimage.feature import canny
-from skimage.draw import ellipse
-from scipy.ndimage import generate_binary_structure
 from scipy.spatial import ConvexHull, Delaunay
 from skimage.exposure import rescale_intensity, equalize_adapthist
-from skimage.measure import EllipseModel
 
 from . import defs
 
@@ -40,33 +37,20 @@ def min_max_(
     return img_norm
 
 
-def gen_circ_mask(
-    center: Tuple[int, int], radius: float, shape: Tuple[int, int], mask_val: Number=True
-) -> npt.NDArray:
+def gen_circ_mask(center: Tuple[int, int], radius: float, shape: Tuple[int, int],
+                  mask_val: Integral=1) -> npt.NDArray:
     """Generate a circular mask.
     Args:
-        center: Center (x, y) coordinates of the circle.
+        center: Center coordinates (column, row) of the circle.
         radius: Radius of the circle.
         shape: The shape, (height, width), of the mask.
-        mask_val: The value to give pixels in the circle. By default, the mask is a boolean array.
+        mask_val (int): Value in the range [0,255] to give pixels in the circle.
     Returns:
         npt.NDArray: The circular mask.
     """
 
-    # Create coordinate grids for the mask
-    y_grid, x_grid = np.ogrid[:shape[0], :shape[1]]
-
-    # Calculate euclidean distance from center for each pixel
-    distance_from_center = np.sqrt((x_grid - center[0])**2 + (y_grid-center[1])**2)
-
-    # Create the mask
-    circ_mask = distance_from_center <= radius
-
-    # Apply the mask value
-    if isinstance(mask_val, bool):
-        circ_mask = circ_mask if mask_val else ~circ_mask
-    else:
-        circ_mask = circ_mask * mask_val
+    circ_mask = np.zeros(shape, dtype=np.uint8)
+    cv2.circle(circ_mask, center, radius, mask_val, -1)
 
     return circ_mask
 
@@ -93,34 +77,41 @@ def create_convex_hull_mask(array_shape: Tuple[int, int], hull: ConvexHull) -> n
     return mask
 
 
-def score_circle(hull: npt.NDArray, center: Tuple, radius: int):
-    """Score a circle based on how well it fits to the convex hull.
+def score_circle(edges: npt.NDArray, hull: npt.NDArray, center: Tuple, radius: int):
+    """Score a circle based on how well it fits to the outer edges.
     Args:
-        hull (npt.NDArray): Mask of the convex hull.
+        edges (np.ndarray): Mask of the canny edges of the image.
+        hull (npt.NDArray): Mask of the convex hull around the edges.
         center (Tuple): Center of the circle (x, y).
         radius (int): Radius of the circle.
     """
 
-    # Calculate IOU between the circle and the convex hull
     circle_mask = gen_circ_mask(center, radius, hull.shape)
-    iou = np.sum(circle_mask & hull) / np.sum(circle_mask | hull)
 
-    return iou
+    # Mask must be completely inside the convex hull
+    if np.sum(circle_mask & ~hull) > 0:
+        return 0
+
+    score = np.sum(edges & circle_mask)
+
+    return score
 
 
-def find_circle(hull: npt.NDArray, radius_bounds: Tuple[int,int], center_x_bounds: Tuple[int,int],
-                center_y_bounds: Tuple[int,int], values_per_search_iteration: int = 12
-) -> Tuple[Tuple[int, int], int]:
+def find_circle(edges: npt.NDArray, hull: npt.NDArray, radius_bounds: Tuple[int,int],
+                center_x_bounds: Tuple[int,int], center_y_bounds: Tuple[int,int]
+               ) -> Tuple[Tuple[int, int], int]:
     """Find the best circle that fits to the convex hull.
     Args:
+        edges: Mask of the canny edges of the image.
         hull: Mask of the convex hull to fit the circle to.
         radius_bounds: min, max of the circle radius.
         center_x_bounds: min, max of the circle center on the horizontal axis.
         center_y_bounds: min, max of the circle center on the vertical axis.
         values_per_search_iteration: Number of values of each parameter to try in each iteration.
     Returns:
-        The center (x, y) coordinates and the radius of the best circle.
+        The center (col, row) coordinates and the radius of the best circle.
     """
+
     best_circle_score = 0
 
     hull = hull.astype(bool)
@@ -135,11 +126,11 @@ def find_circle(hull: npt.NDArray, radius_bounds: Tuple[int,int], center_x_bound
     min_rad, max_rad = radius_bounds
 
     tried_params = set()    # avoid re-evaluating the same circle parameters
-    n_vals = values_per_search_iteration
 
-    while not (max_center_x - min_center_x == 0
-               and max_center_y - min_center_y == 0
-               and max_rad - min_rad == 0):
+    # values to try for each parameter in each iteration
+    n_vals = 15
+
+    while max_center_x != min_center_x or max_center_y != min_center_y or max_rad != min_rad:
         # try up to n_vals evenly spaced values from the search space for each parameter
         center_x_vals = np.unique(np.linspace(min_center_x, max_center_x, n_vals, dtype=int))
         center_y_vals = np.unique(np.linspace(min_center_y, max_center_y, n_vals, dtype=int))
@@ -149,7 +140,7 @@ def find_circle(hull: npt.NDArray, radius_bounds: Tuple[int,int], center_x_bound
             if circle_params in tried_params:
                 continue
             tried_params.add(circle_params)
-            circle_score = score_circle(hull, (center_x, center_y), radius)
+            circle_score = score_circle(edges, hull, (center_x, center_y), radius)
             if circle_score > best_circle_score:
                 best_circle_score = circle_score
                 best_center_x, best_center_y = center_x, center_y
@@ -166,19 +157,29 @@ def find_circle(hull: npt.NDArray, radius_bounds: Tuple[int,int], center_x_bound
     return (best_center_x, best_center_y), best_radius
 
 
-def gen_circ_mask_auto(
-    img: npt.NDArray, pinhole_buffer=0.04, mask_val: np.uint8=1
-) -> npt.NDArray[np.uint8]:
-    """Generate a 2D circular well mask automatically from an image.
+def get_well_mask_circle_params(img: npt.NDArray, pinhole_buffer: float=0.04,
+                                auto=True) -> npt.NDArray:
+    """Get the parameters of a circular mask to use for the image.
     Args:
-        img: Image to generate the mask from.
-        pinhole_buffer: Buffer around the pinhole as a proportion of the image width.
-        mask_val: Value to use for the mask.
+        img (np.ndarray): Image to generate the mask for.
+        pinhole_buffer (float): Buffer around the pinhole as a proportion of the image width.
+        auto (bool): Whether to automatically find the best circle to fit to the outer edges.
+    Returns:
+        tuple: The center center coordinates (col, row) and the radius of the circle.
     """
 
+    # Return fixed circular mask parameters if not fitting a circle to the outer edges
+    def get_fixed_circ_mask():
+        avg_side_len = np.mean(img.shape[:2])
+        radius = (1 - pinhole_buffer * 2) * avg_side_len / 2
+        center = img.shape[1] / 2, img.shape[0] / 2
+        return (*center, radius, radius, 0)
+    if not auto:
+        return get_fixed_circ_mask()
+
     # Downsample image while maintaining aspect ratio (the smallest side is resized to 256)
-    ds_ratio = 256 / min(img.shape[:2])
-    ds_hw = np.round(np.multiply(img.shape, ds_ratio)).astype(int)
+    ds_factor = 256 / min(img.shape[:2])
+    ds_hw = np.round(np.multiply(img.shape, ds_factor)).astype(int)
     img_ds = cv2.resize(img, [*ds_hw, *img.shape[2:]], interpolation=cv2.INTER_LANCZOS4)
 
     # Median filter and get edges
@@ -187,14 +188,9 @@ def gen_circ_mask_auto(
     img_ds = equalize_adapthist(img_ds)
     edges = canny(img_ds, sigma=1)
 
-    # If there are no edges, return a mask with a fixed size and position
-    def get_fixed_mask():
-        avg_side_len = np.mean(img.shape[:2])
-        radius = (1 - pinhole_buffer * 2) * avg_side_len / 2
-        center = img.shape[1] / 2, img.shape[0] / 2
-        return gen_circ_mask(center, radius, img.shape[:2], mask_val=mask_val)
+    # If there are no edges, return fixed mask
     if np.sum(edges) == 0:
-        return get_fixed_mask()
+        return get_fixed_circ_mask()
 
     # Get convex hull of edges
     edge_coords = np.argwhere(edges)
@@ -204,26 +200,25 @@ def gen_circ_mask_auto(
         well_mask = cv2.dilate(well_mask, np.ones((3, 3)))
         well_mask = median_filter(well_mask, footprint=np.ones((3, 3)))
 
-    # Search for a circle mask that fits to the convex hull with maximum IOU
-    # To save time we'll downsample the hull mask (e.g. to 64x64), fit a circle to it,
-    # upsample, and then look for a circle mask in a smaller initial search space
+    # Find a circular mask that fits inside the convex hull
+    # To save time we'll downsample the hull mask, fit a circle in it, rescale the parameters,
+    # then look for a circle at the full size in a smaller initial search space
 
     hull_ds_shape = np.round(np.multiply(well_mask.shape, 0.25)).astype(int)
-    hull_ds = cv2.resize(well_mask, hull_ds_shape, interpolation=cv2.INTER_NEAREST)
+    hull = cv2.resize(well_mask, hull_ds_shape, interpolation=cv2.INTER_NEAREST)
+    edges_ds = cv2.resize(edges.astype(np.uint8), hull.shape, interpolation=cv2.INTER_NEAREST)
 
-    min_radius = round(np.mean(hull_ds.shape) * 0.48)
-    max_radius = round(np.mean(hull_ds.shape) * 0.68)
-    min_center_x = round(hull_ds.shape[1] * 0.25)
-    max_center_x = round(hull_ds.shape[1] * 0.75)
-    min_center_y = round(hull_ds.shape[0] * 0.25)
-    max_center_y = round(hull_ds.shape[0] * 0.75)
+    min_radius = round(np.mean(hull.shape) * 0.45)
+    max_radius = round(np.mean(hull.shape) * 0.68)
+    min_center_y, min_center_x = np.round(np.multiply(hull.shape, 0.25)).astype(int)
+    max_center_y, max_center_x = np.round(np.multiply(hull.shape, 0.75)).astype(int)
 
-    hull_ds_center, hull_ds_radius = find_circle(hull_ds, (min_radius, max_radius),
-                                                 (min_center_x, max_center_x),
-                                                 (min_center_y, max_center_y))
+    hull_center, hull_radius = find_circle(edges_ds, hull, (min_radius, max_radius),
+                                           (min_center_x, max_center_x),
+                                           (min_center_y, max_center_y))
 
-    hull_center = np.multiply(hull_ds_center, 4)
-    hull_radius = hull_ds_radius * 4
+    hull_center = np.multiply(hull_center, 4)
+    hull_radius = hull_radius * 4
 
     min_radius = max(min_radius * 4 - 1, hull_radius - 3)
     max_radius = min(max_radius * 4 + 1, hull_radius + 3)
@@ -232,43 +227,37 @@ def gen_circ_mask_auto(
     min_center_y = max(min_center_y * 4 - 1, hull_center[1] - 3)
     max_center_y = min(max_center_y * 4 + 1, hull_center[1] + 3)
 
-    mask_center, mask_radius = find_circle(well_mask, (min_radius, max_radius),
-                                            (min_center_x, max_center_x),
-                                            (min_center_y, max_center_y))
+    mask_center, mask_radius = find_circle(edges, well_mask, (min_radius, max_radius),
+                                           (min_center_x, max_center_x),
+                                           (min_center_y, max_center_y))
 
+    # rescale the mask center and radius to the full size image
+    mask_center = np.round(np.divide(mask_center, ds_factor)).astype(int)
+    mask_radius = mask_radius / ds_factor
     # reduce the mask radius by 5% to correct for earlier dilation
-    mask_radius = round(mask_radius * 0.95)
+    mask_radius = mask_radius * 0.95
     # reduce the mask radius further to account for pinhole buffer
     mask_radius = round(mask_radius * (1 - pinhole_buffer * 2))
 
-    # adjust well mask
-    well_mask = gen_circ_mask(mask_center, mask_radius, well_mask.shape, mask_val)
+    return mask_center, mask_radius
 
-    # remove edges outside of the well mask
-    edges[~well_mask] = False
 
-    # remove edges that are within 7/8 of the radius to the center
-    rr, cc = np.nonzero(edges)
-    dists = np.sqrt((rr - mask_center[1])**2 + (cc - mask_center[0])**2)
-    edges[rr[dists < mask_radius * 0.875], cc[dists < mask_radius * 0.875]] = 0
+def gen_well_mask_auto(img: npt.NDArray, pinhole_buffer: float=0.04,
+                       mask_val: Optional[Integral]=None) -> npt.NDArray:
+    """Generate a circular well mask for an image.
+    Args:
+        img: Image to generate the mask for.
+        pinhole_buffer: Buffer around the pinhole as a proportion of the image width.
+        mask_val (int): Value in the range [0,255] to give pixels in the circle.
+    Returns:
+        npt.NDArray: Mask.
+    """
 
-    if np.sum(edges) == 0:
-        return get_fixed_mask()
+    # Get circle parameters
+    center, radius = get_well_mask_circle_params(img, pinhole_buffer)
 
-    # fit ellipse to remaining edges
-    rr, cc = np.nonzero(edges)
-    xy = np.array([cc, rr]).T
-    well_ellipse = EllipseModel()
-    well_ellipse.estimate(xy)
-
-    if well_ellipse.params is None:
-        return get_fixed_mask()
-
-    # Replace the well mask with the ellipse at the original resolution
-    xc, yc, a, b, _ = np.multiply(well_ellipse.params, 1/ds_ratio)
-    rr, cc = ellipse(round(yc), round(xc), round(a), round(b), shape=img.shape[:2])
-    well_mask = np.zeros(img.shape[:2], dtype=np.uint8)
-    well_mask[rr, cc] = mask_val
+    # Generate mask
+    well_mask = gen_circ_mask(center, radius, img.shape, mask_val)
 
     return well_mask
 
