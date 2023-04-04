@@ -91,16 +91,17 @@ def configure(target_base_dir: str='', replace_subdirs_auto=False):
                               (defs.PKG_SCRIPTS_DIR, SCRIPTS_SUBDIR),
                               (defs.PKG_MODEL_DIR, MODEL_SUBDIR)]:
         dest_dir_path = Path(target_base_dir) / dest_dir
-        if replace_subdirs_auto or not dest_dir_path.exists():
-            if dest_dir_path.exists() and not not replace_subdirs_auto:
-                do_replace = input(f'Overwrite package files in {dest_dir} directory? [y/n]: ')
-                if do_replace.lower() != 'y':
-                    print(f'Skipping {dest_dir}...')
-                    continue
-            print(f'Creating {dest_dir} directory\n')
-            shutil.copytree(src_dir, dest_dir_path, dirs_exist_ok=True)
+        skip = False
+        if dest_dir_path.exists() and not replace_subdirs_auto:
+            overwrite_confirm = ''
+            while overwrite_confirm not in ['y', 'n']:
+                overwrite_confirm = input(f'Overwrite {dest_dir} directory? [y/n]: ').lower()
+            skip = overwrite_confirm == 'n'
+        if skip:
+            print(f'Skipping {dest_dir} directory...')
         else:
-            print(f'{dest_dir} directory already exists - skipping')
+            print(f'Creating {dest_dir} directory...')
+            shutil.copytree(src_dir, dest_dir_path, dirs_exist_ok=True)
 
     if target_base_dir != prev_base_dir:
         # Update package config file with new base_dir
