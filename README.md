@@ -9,7 +9,12 @@
 
 *Create the conda environment and install the fl_tissue_model_tools package*
 
-### Prerequisite: The [conda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html) package manager
+### Prerequisites:
+- [Conda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html) package manager
+- Build tools for your operating system
+   - Windows: [Build tools for visual studio](https://visualstudio.microsoft.com/downloads/?q=build+tools#build-tools-for-visual-studio-2022)
+   - Mac: Clang (run `xcode-select --install` in the terminal)
+   - Linux: g++ (likely already installed)
 
 **Tip**: Enable [libmamba solver](https://www.anaconda.com/blog/a-faster-conda-for-a-growing-community) to create the conda environment faster. Or use [mambaforge](https://github.com/conda-forge/miniforge#mambaforge).
 
