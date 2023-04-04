@@ -5,6 +5,6 @@
     "detect_well_edge": true,
     "graph_thresh_1": 2,
     "graph_thresh_2": 4,
-    "graph_smoothing_window": 10,
-    "min_branch_length": 10
+    "graph_smoothing_window": 15,
+    "min_branch_length": 15
 }
