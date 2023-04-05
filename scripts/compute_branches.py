@@ -136,7 +136,7 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
     # Write results to csv file
     fields = [img_path.stem, total_num_branches, total_branch_length, avg_branch_length]
     with open(output_dir / "branching_analysis.csv", "a", encoding="utf-16") as f:
-        writer = csv.writer(f)
+        writer = csv.writer(f, lineterminator='')
         writer.writerow(fields)
 
     print(f"Results saved to {output_dir / 'branching_analysis.csv'}.")
@@ -206,7 +206,7 @@ def main():
     ### Create output csv ###
     fields = ["Image", "Total # of branches", "Total branch length (µm)", "Average branch length (µm)"]
     with open(output_dir / "branching_analysis.csv", "w", encoding="utf-16") as f:
-        writer = csv.writer(f)
+        writer = csv.writer(f, lineterminator='')
         writer.writerow(fields)
 
     ### Analyze images ###
