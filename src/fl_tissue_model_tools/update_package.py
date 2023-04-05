@@ -6,7 +6,10 @@ SUBDIR = 'src'
 
 def update_package(src_dir=None, branch_name=None):
     """Update the package from GitHub."""
-    subprocess.run(f'pip uninstall -y {PKG_NAME}', shell=True, check=True)
+    try:
+        subprocess.run(f'pip uninstall -y {PKG_NAME}', shell=True, check=True)
+    except subprocess.CalledProcessError as exc:
+        pass    # Windows throws a "PermissionError" but still uninstalls the package
     if src_dir is not None:
         cmd = f'pip install -I -e {src_dir}'
     elif branch_name is not None:
