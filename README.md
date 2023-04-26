@@ -38,7 +38,7 @@ git clone --recurse-submodules https://github.com/fogg-lab/tissue-model-analysis
 ```
 
 #### Create conda environment
-Build a conda environment using the `environment.yml` file. If you have a CUDA-capable (NVIDIA) GPU and are on Linux or WSL, use `environment_gpu.yml` for GPU-accelerated training and inference.
+Build a conda environment using the `environment.yml` file.
 
 For more information on how to manage conda environments, see [environment management reference](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html).
 
