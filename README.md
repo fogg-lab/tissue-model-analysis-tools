@@ -13,7 +13,7 @@
 - [Conda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html) package manager
    - For devices with ARM processors (e.g. a MacBook with an M1 or M2 chip), install [Mambaforge](https://github.com/conda-forge/miniforge) instead of Miniconda or Anaconda
 - Build tools for your operating system
-   - Windows: [Build tools for visual studio](https://visualstudio.microsoft.com/downloads/?q=build+tools#build-tools-for-visual-studio-2022). At the installer, select "Desktop development with C++" with the following individual components (in the right-hand details pane) selected:
+   - Windows: [Build tools for visual studio](https://visualstudio.microsoft.com/downloads/?q=build+tools#build-tools-for-visual-studio-2022). At the installer, select "Desktop development with C++" with the following individual components (in the right-hand details pane) selected
       - MSVC C++ x64/86 build tools
       - Windows SDK
    - Mac: Clang (run `xcode-select --install` in the terminal)
@@ -36,7 +36,7 @@ tmat configure
 
 ### Detailed setup
 
-#### Optional: Clone repository
+#### Optional: Clone repository (for development)
 ```
 git clone --recurse-submodules https://github.com/fogg-lab/tissue-model-analysis-tools.git
 ```
