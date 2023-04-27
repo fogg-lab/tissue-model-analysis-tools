@@ -11,6 +11,7 @@
 
 ### Prerequisites:
 - [Conda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html) package manager
+   - For devices with ARM processors (e.g. a MacBook with an M1 or M2 chip), install [Mambaforge](https://github.com/conda-forge/miniforge) instead of Miniconda or Anaconda
 - Build tools for your operating system
    - Windows: [Build tools for visual studio](https://visualstudio.microsoft.com/downloads/?q=build+tools#build-tools-for-visual-studio-2022). At the installer, select "Desktop development with C++" with the following individual components (in the right-hand details pane) selected:
       - MSVC C++ x64/86 build tools
@@ -18,13 +19,17 @@
    - Mac: Clang (run `xcode-select --install` in the terminal)
    - Linux: g++ (likely already installed)
 
-**Tip**: Enable [libmamba solver](https://www.anaconda.com/blog/a-faster-conda-for-a-growing-community) to create the conda environment faster. Or use [mambaforge](https://github.com/conda-forge/miniforge#mambaforge).
+**Tip**:
+If you are using the generic environment.yml file (instead of one of the reproducible platform-specific environments), the legacy conda solver may take a very long time to solve the environment. To avoid this, you can enable [libmamba solver](https://www.anaconda.com/blog/a-faster-conda-for-a-growing-community) before running the setup.
 
 ### Quick setup
 
-Run these commands in your terminal:
+Run the following commands in a terminal.
+
 ```bash
-conda env update -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/environment.yml
+# Recommended: replace environment.yml with a platform-specific file such as environment_windows.yml or environment_linux.yml
+conda env update -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/conda_environments/environment.yml
+
 conda activate tissue-model-analysis
 pip install -I fl_tissue_model_tools@git+https://github.com/fogg-lab/tissue-model-analysis-tools.git#subdirectory=src
 tmat configure
@@ -44,7 +49,8 @@ For more information on how to manage conda environments, see [environment manag
 
 If you cloned the repo, `cd` to the project directory and run:
 ```bash
-conda env create -f environment.yml
+# Recommended: replace environment.yml with a platform-specific file such as environment_windows.yml or environment_linux.yml
+conda env create -f conda_environments/environment.yml
 ```
 
 If you didn't clone the repo, run:
