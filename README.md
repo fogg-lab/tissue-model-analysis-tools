@@ -29,7 +29,6 @@ Run the following commands in a terminal.
 ```bash
 # Recommended: replace environment.yml with a platform-specific file such as environment_windows.yml or environment_linux.yml
 conda env update -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/conda_environments/environment.yml
-
 conda activate tissue-model-analysis
 pip install -I fl_tissue_model_tools@git+https://github.com/fogg-lab/tissue-model-analysis-tools.git#subdirectory=src
 tmat configure
