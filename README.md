@@ -55,7 +55,7 @@ conda env create -f conda_environments/environment.yml
 
 If you didn't clone the repo, run:
 ```bash
-conda env create -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/environment.yml
+conda env create -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/conda_environments/environment.yml
 ```
 
 Next, activate the environment:
