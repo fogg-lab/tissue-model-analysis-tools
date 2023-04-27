@@ -54,6 +54,7 @@ conda env create -f conda_environments/environment.yml
 
 If you didn't clone the repo, run:
 ```bash
+# Recommended: replace environment.yml with a platform-specific file such as environment_windows.yml or environment_linux.yml
 conda env create -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/conda_environments/environment.yml
 ```
 
