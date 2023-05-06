@@ -1,6 +1,12 @@
-# fogg-lab-tissue-model-analysis-tools
+# Fogg Lab Tissue Model Analysis Tools
 
-**Run the interactive demo notebook in Google Colab:** https://colab.research.google.com/drive/1Znl6h-sNAf3ZGLRGCAUoF-rHvXGuUznU?usp=sharing
+A Python package for the high-throughput analysis of cancer and endothelial cell dynamics in hydrogels.
+
+**Try the [standalone interactive demo notebook](https://github.com/fogg-lab/tissue-model-analysis-tools/blob/main/notebooks/analysis_demo.ipynb) in Google Colab**
+
+<a target="_blank" href="https://colab.research.google.com/github/fogg-lab/tissue-model-analysis-tools/blob/main/notebooks/analysis_demo.ipynb">
+  <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
+</a>
 
 ## Table of Contents
 **[Setup](#setup)**<br>
