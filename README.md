@@ -1,5 +1,7 @@
 # fogg-lab-tissue-model-analysis-tools
 
+**Run the interactive demo notebook in Google Colab:** https://colab.research.google.com/drive/1Znl6h-sNAf3ZGLRGCAUoF-rHvXGuUznU?usp=sharing
+
 ## Table of Contents
 **[Setup](#setup)**<br>
 **[Capabilities](#capabilities)**<br>
