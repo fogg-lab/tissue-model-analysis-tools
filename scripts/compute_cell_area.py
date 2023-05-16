@@ -12,6 +12,7 @@ from fl_tissue_model_tools import defs
 from fl_tissue_model_tools import preprocessing as prep
 from fl_tissue_model_tools import analysis as an
 from fl_tissue_model_tools import script_util as su
+from fl_tissue_model_tools.well_mask_generation import generate_well_mask
 
 DEFAULT_CONFIG_PATH = str(defs.SCRIPT_CONFIG_DIR / "default_cell_area_computation.json")
 THRESH_SUBDIR = "thresholded"
@@ -57,7 +58,7 @@ def load_and_norm(img_path: str, dsize: int=250) -> npt.NDArray:
 
 
 def mask_and_threshold(
-    img: npt.NDArray, circ_mask: npt.NDArray, pinhole_idx: Tuple[npt.NDArray, npt.NDArray],
+    img: npt.NDArray, well_mask: npt.NDArray, well_idx: Tuple[npt.NDArray, npt.NDArray],
     sd_coef: float, rand_state: np.random.RandomState,
 ) -> npt.NDArray:
     """Apply circular mask to image and perform foreground thresholding on the
@@ -65,8 +66,8 @@ def mask_and_threshold(
 
     Args:
         img: Original image.
-        circ_mask: Circular mask.
-        pinhole_idx: Indices within circular mask.
+        well_mask: Mask of well.
+        well_idx: Indices within mask.
         sd_coef: Threshold pixels with less than sd_coef * foreground_mean.
         rand_state: RandomState object to allow for reproducability.
 
@@ -74,8 +75,8 @@ def mask_and_threshold(
         Thresholded images.
 
     """
-    masked = prep.apply_mask(img, circ_mask).astype(float)
-    masked_and_thresholded = prep.exec_threshold(masked, pinhole_idx, sd_coef, rand_state)
+    masked = prep.apply_mask(img, well_mask).astype(float)
+    masked_and_thresholded = prep.exec_threshold(masked, well_idx, sd_coef, rand_state)
 
     return masked_and_thresholded
 
@@ -99,39 +100,27 @@ def prep_images(img_paths: Sequence[str], dsamp_size: int) -> List[npt.NDArray]:
     return gs_ds_imgs
 
 
-def circ_mask_setup(img_shape: Tuple[int, int], pinhole_cut: int) -> \
-                    Tuple[npt.NDArray, Tuple[npt.NDArray, npt.NDArray], int]:
-    """Compute values needed to apply circular mask to images.
+def well_mask_setup(img: npt.NDArray, well_buffer=0.05):
+    """Generate a well mask for an image.
 
     Args:
-        img_shape: (H,W) of images.
-        pinhole_cut: Number of pixels shorter than image height/width that
-            circular mask radius will be. Larger pinhole_cut -> more of the
-            initial image will be trimmed.
+        img: Image to generate mask for.
+        well_buffer: Buffer to add around the well mask, as a fraction of
+            the well diameter. Defaults to 0.05.
 
     Returns:
-        (Circular mask, indices within pinhole, area of circular mask).
+        (Mask, mask coordinates, mask area).
 
     """
-    img_center = (img_shape[1] // 2, img_shape[0] // 2)
-    circ_rad = img_center[0] - (pinhole_cut)
-    circ_mask = prep.gen_circ_mask(img_center, circ_rad, img_shape, defs.MAX_UINT8)
-    pinhole_idx = np.where(circ_mask > 0)
-    circ_pix_area = np.sum(circ_mask > 0)
-    return circ_mask, pinhole_idx, circ_pix_area
-
-
-def circ_mask_setup_auto(img: npt.NDArray, pinhole_buffer=0.04):
-    """Generate circular mask for image based on detected well boundary."""
-    circ_mask = prep.gen_well_mask_auto(img, pinhole_buffer, mask_val=defs.MAX_UINT8)
-    pinhole_idx = np.where(circ_mask > 0)
-    circ_pix_area = len(pinhole_idx[0])
-    return circ_mask, pinhole_idx, circ_pix_area
+    well_mask = generate_well_mask(img, well_buffer, mask_val=defs.MAX_UINT8)
+    well_coords = np.where(well_mask > 0)
+    well_pix_area = len(well_coords[0])
+    return well_mask, well_coords, well_pix_area
 
 
 def threshold_images(
     imgs: List[npt.NDArray], circ_masks: List[npt.NDArray],
-    pinhole_idx: List[Tuple[npt.NDArray, npt.NDArray]], sd_coef: float,
+    well_idx: List[Tuple[npt.NDArray, npt.NDArray]], sd_coef: float,
     rand_state: np.random.RandomState
 ) -> List[npt.NDArray]:
     """Apply mask & threshold to all images.
@@ -139,7 +128,7 @@ def threshold_images(
     Args:
         imgs: Original images.
         circ_mask: Circular masks.
-        pinhole_idx: Indices within each circular mask.
+        well_idx: Indices within each circular mask.
         sd_coef: Threshold pixels with less than sd_coef * foreground_mean.
         rand_state: RandomState object to allow for reproducability.
 
@@ -148,7 +137,7 @@ def threshold_images(
 
     """
     gmm_thresh_all = d.compute(
-        [d.delayed(mask_and_threshold)(img, circ_masks[i], pinhole_idx[i], sd_coef, rand_state)
+        [d.delayed(mask_and_threshold)(img, circ_masks[i], well_idx[i], sd_coef, rand_state)
             for i, img in enumerate(imgs)]
     )[0]
     return gmm_thresh_all
@@ -218,10 +207,8 @@ def main():
     dsamp_size = config["dsamp_size"]
     sd_coef = config["sd_coef"]
     rs_seed = None if (config["rs_seed"] == "None") else config["rs_seed"]
-    detect_well_edge = config["detect_well_edge"]
     batch_size = config["batch_size"]
-    pinhole_buffer = config["pinhole_buffer"]
-    pinhole_cut = int(round(dsamp_size * pinhole_buffer))
+    well_buffer = config["well_buffer"]
 
     area_prop = []
     gmm_thresh_all = []
@@ -239,21 +226,15 @@ def main():
             print(f"{su.SFM.failure}{error}")
             sys.exit()
 
-        # Variables for image masking
-        if detect_well_edge:
-            circ_masks_with_info = [circ_mask_setup_auto(img, pinhole_buffer) for img in gs_ds_imgs]
-            circ_masks, pinhole_idx, circ_pix_areas = zip(*circ_masks_with_info)
-        else:
-            circ_mask, pinhole_idx, circ_pix_area = circ_mask_setup(gs_ds_imgs[0].shape, pinhole_cut)
-            circ_masks = [circ_mask] * len(gs_ds_imgs)
-            pinhole_idx = [pinhole_idx] * len(gs_ds_imgs)
-            circ_pix_areas = [circ_pix_area] * len(gs_ds_imgs)
+        # Well masking
+        well_masks_with_info = [circ_mask_setup(img, well_buffer) for img in gs_ds_imgs]
+        well_masks, well_idx, well_pix_areas = zip(*well_masks_with_info)
 
         # Threshold images
-        gmm_thresh = threshold_images(gs_ds_imgs, circ_masks, pinhole_idx, sd_coef, rand_state)
+        gmm_thresh = threshold_images(gs_ds_imgs, well_masks, well_idx, sd_coef, rand_state)
         gmm_thresh_all.extend(gmm_thresh)
         ### Compute areas ###
-        area_prop.extend(compute_areas(gmm_thresh, circ_pix_areas))
+        area_prop.extend(compute_areas(gmm_thresh, well_pix_areas))
 
     area_prop = np.array(area_prop)
 
