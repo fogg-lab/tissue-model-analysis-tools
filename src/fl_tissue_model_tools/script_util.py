@@ -345,8 +345,9 @@ def zproj_verify_input_dir(input_path: str, verbose: bool=False) -> Sequence[str
     """Verify appropriate contents of input data directory.
 
     Input directory should contain either:  
-     - One subdirectory per Z stack (required if there is more than 1 zstack).
-     - No subdirectorie, with all images in the zstack placed in the root of the input directory.
+     - One subdirectory per Z stack.
+     - No subdirectories, requires filenames for each z-stack to have the same unique
+       alphanumeric pattern at the beginning of the filename (e.g. A12_...).
     Each Zstack should contain all Z position images for that stack.
     Each image should have the pattern ...Z[pos]_... in its name (e.g. ...Z12_...).
 
@@ -373,7 +374,24 @@ def zproj_verify_input_dir(input_path: str, verbose: bool=False) -> Sequence[str
     zstack_paths = [fp for fp in glob(f"{input_path}/*") if os.path.isdir(fp)]
 
     if len(zstack_paths) == 0:
-        zstack_paths = [input_path]
+        zstack_prefixes = set()
+        for img_path in get_img_paths(input_path):
+            iname = Path(img_path).name
+            prefix = iname.split("_")[0]
+            prefix_valid = True
+            if not prefix or prefix[0] not in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+                prefix_valid = False
+            elif not prefix[1:].isdigit():
+                prefix_valid = False
+            if not prefix_valid:
+                raise FileNotFoundError(
+                    f"Image file{os.linesep}\t{iname}{os.linesep}does not have "
+                    "the expected pattern to denote Z stack. Files must have a "
+                    "unique uppercase alphanumeric prefix followed by an underscore. "
+                    "Ex: A12_..., Q001_..., W09_..., etc. "
+                )
+            zstack_prefixes.add(prefix)
+        zstack_paths = [os.path.join(input_path, prefix) for prefix in zstack_prefixes]
 
     if verbose:
         print(f"{'Z Stack ID':<40}{'No. Z Positions':>20}")
@@ -386,7 +404,9 @@ def zproj_verify_input_dir(input_path: str, verbose: bool=False) -> Sequence[str
             raise FileNotFoundError(f"No images found in: {os.linesep}\t{zsp}")
         for img_path in img_paths:
             iname = Path(img_path).name
-            pattern = re.search(zstacks.ZPOS_PATTERN, img_path)
+            # Strip zsp from iname in case zsp ends with a zstack prefix containing a Z
+            iname_without_zstack_prefix = iname.replace(Path(zsp).name, "")
+            pattern = re.search(zstacks.ZPOS_PATTERN, iname_without_zstack_prefix)
             if pattern is None:
                 raise FileNotFoundError(
                     f"Image file{os.linesep}\t{iname}{os.linesep} "

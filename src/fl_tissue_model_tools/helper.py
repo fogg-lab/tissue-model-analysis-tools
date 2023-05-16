@@ -14,7 +14,11 @@ def get_img_paths(directory: str) -> List[str]:
         A list of image paths.
     """
     unsupported_img_formats = {None, "rgb", "gif", "xbm"}
-    img_paths = [fp.replace("\\", "/") for fp in glob(f"{directory}/*") if osp.isfile(fp)]
+    # directory might be a prefix rather than a directory
+    if not osp.isdir(directory):
+        img_paths = [fp for fp in glob(f"{directory}*") if osp.isfile(fp)]
+    else:
+        img_paths = [fp for fp in glob(f"{directory}/*") if osp.isfile(fp)]
     img_paths = [fp for fp in img_paths if imghdr.what(fp) not in unsupported_img_formats]
     return img_paths
 
