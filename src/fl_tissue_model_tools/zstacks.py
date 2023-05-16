@@ -48,55 +48,6 @@ def _blur_and_lap(image: npt.NDArray, kernel_size: int=5) -> npt.NDArray:
     return cv2.Laplacian(blurred, cv2.CV_64F, ksize=kernel_size)
 
 
-def zstack_from_dir(z_stack_dir: str, descending: bool=True,
-                    get_zpos: Optional[Callable[[str], int]]=None
-                   ) -> Tuple[Sequence[str], npt.NDArray]:
-    """Return sorted (by z-position) z-stack image paths and z-stack.
-
-    IMPORTANT: To use the default `get_zpos` function, each z-position image
-    in a z-stack directory must include the letter 'Z', followed by the
-    z-position, followed by an underscore. That is, the file name must include:
-    `Z[position]_`. So, for `position`=10, the file name would include: `Z10_`.
-
-    The z-stack is a sequence of z-position images with a z-index associated
-    with them. For example, a 16 image z-stack would have images for indices
-    [0, 1, ..., 15]. The `z_stack_dir` should be laid out as follows
-    (the file/directory names used below are simply examples):
-
-    zstack_A/
-    |--Z1_A.tif
-    |--Z2_A.tif
-    ...
-    |--Z15_A.tif
-
-    Args:
-        z_stack_dir: Directory where z-stack images are located.
-        descending: Whether z-position index is numbered from top to bottom
-            or bottom to top. For example, descending means z-position 3 is
-            located _above_ z-position 2.
-        get_zpos: A function to sort the z-position images. Must take in a
-            z-position image name and return that image's z-position. The
-            z-position is used to sort the z-stack.
-
-    Returns:
-        A tuple containing (1) a list of the full paths to each z-poistion image
-        in the z-stack (sorted by z-position) and (2) the z-stack (a 3-D numpy
-        array) containing each z-position image.
-
-    """
-
-    # Get images in z-stack directory
-    z_paths = get_img_paths(z_stack_dir)
-
-    if get_zpos is None:
-        get_zpos = default_get_zpos
-
-    # Sort z-stack images by z-position
-    z_paths = sorted(z_paths, key = get_zpos, reverse = descending)
-
-    return z_paths, np.array([cv2.imread(img, cv2.IMREAD_ANYDEPTH) for img in z_paths])
-
-
 def zstack_paths_from_dir(z_stack_dir: str, descending: bool=True,
                         get_zpos: Optional[Callable[[str], int]]=None) -> Sequence[str]:
     """Get sorted z-stack image paths.
