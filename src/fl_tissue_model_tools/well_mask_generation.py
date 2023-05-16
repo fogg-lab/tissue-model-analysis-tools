@@ -35,7 +35,7 @@ def get_superellipse_hull(x, y, n, num_iters=10000):
 
     # Get the parameters to use for each iteration
     bounds = np.array([
-        (-np.pi/16, np.pi/16),   # theta
+        (-np.pi/20, np.pi/20),   # theta
         (0.67, 1.33),            # d
         (0.9, 1.1),              # s_a
         (0.9, 1.1),              # s_b
