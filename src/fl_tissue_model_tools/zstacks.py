@@ -14,9 +14,7 @@ import cv2
 from . import defs
 from .helper import get_img_paths
 
-
 ZPOS_PATTERN = "(z|Z)[0-9]+_"
-
 
 def default_get_zpos(z_path: str) -> int:
     """Use `ZPOS_PATTERN` to retrieve z-position from path string.
