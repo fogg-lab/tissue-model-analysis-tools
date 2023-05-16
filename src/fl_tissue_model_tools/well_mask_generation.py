@@ -10,7 +10,7 @@ from scipy.spatial import ConvexHull, Delaunay
 from scipy.special import gamma
 from skimage.exposure import rescale_intensity, equalize_adapthist
 from skimage.transform import rescale, resize
-
+from skimage.draw import disk as circle
 
 def get_superellipse_hull(x, y, n, num_iters=10000):
     """Find a superellipse that encloses the given points.
@@ -133,6 +133,7 @@ def auto_threshold_well(image: npt.NDArray) -> npt.NDArray:
     """
     # Blur/equalize image and invert it if the corners are lighter than the center
     im_blur = gaussian(image, sigma=3)
+    im_blur = rescale_intensity(im_blur.astype(np.float32), out_range=(-1, 1))
     im_blur = equalize_adapthist(im_blur)
     im_blur = rescale_intensity(im_blur, out_range=(0, 255)).astype(np.uint8)
     im_extrema = im_blur.min(), im_blur.max()
@@ -168,7 +169,6 @@ def auto_threshold_well(image: npt.NDArray) -> npt.NDArray:
     return im_thresh
 
 
-
 def generate_well_mask(image: npt.NDArray, well_buffer: float=0.05, mask_val: Integral=1,
                        return_superellipse_params: bool=False) -> npt.NDArray:
     """Generate a binary mask over the well in an image.
@@ -201,8 +201,22 @@ def generate_well_mask(image: npt.NDArray, well_buffer: float=0.05, mask_val: In
     im_thresh_border[:, 0] += im_thresh[:, 0]
     im_thresh_border[:, -1] += im_thresh[:, -1]
 
+    def get_circ_mask():
+        # Fall back to a circular mask if the convex hull fails (e.g. blank thresholded image)
+
+        circ_mask = np.zeros(image.shape, dtype=np.uint8)
+        center = image.shape[0] // 2, image.shape[1] // 2
+        radius = int(image.shape[0] * 0.5 * (1 - well_buffer))
+        rr, cc = circle((center[0], center[1]), radius, shape=image.shape)
+        circ_mask[rr, cc] = mask_val
+
+        return circ_mask
+
     border_points = np.argwhere(im_thresh_border)
-    hull = ConvexHull(border_points)
+    try:
+        hull = ConvexHull(border_points)
+    except ValueError:
+        return get_circ_mask()
     hull_vertices = border_points[hull.vertices]
 
     hull_verts_mask = np.zeros_like(im_thresh)
