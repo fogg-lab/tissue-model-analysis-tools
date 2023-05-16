@@ -77,7 +77,7 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
     print("")
     print("Segmenting image...")
 
-    pred = model.predict(img, auto_resample=False)
+    pred = model.predict(img * well_mask, auto_resample=False)
     seg_mask = pred > 0.5
 
     if save_intermediates:
