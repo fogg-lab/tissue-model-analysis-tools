@@ -227,7 +227,7 @@ def main():
             sys.exit()
 
         # Well masking
-        well_masks_with_info = [circ_mask_setup(img, well_buffer) for img in gs_ds_imgs]
+        well_masks_with_info = [well_mask_setup(img, well_buffer) for img in gs_ds_imgs]
         well_masks, well_idx, well_pix_areas = zip(*well_masks_with_info)
 
         # Threshold images
