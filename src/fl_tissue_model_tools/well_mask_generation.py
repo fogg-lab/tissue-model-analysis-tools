@@ -232,7 +232,7 @@ def generate_well_mask(image: npt.NDArray, well_buffer: float=0.05, mask_val: In
     perimeter = len(border_points)
     if perimeter / area < .045:
         # Well is more rectangular
-        n = 10
+        n = 8
     else:
         # Well is more circular
         n = 2
