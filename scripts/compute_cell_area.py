@@ -61,8 +61,7 @@ def mask_and_threshold(
     img: npt.NDArray, well_mask: npt.NDArray, well_idx: Tuple[npt.NDArray, npt.NDArray],
     sd_coef: float, rand_state: np.random.RandomState,
 ) -> npt.NDArray:
-    """Apply circular mask to image and perform foreground thresholding on the
-    masked image.
+    """Apply well mask to image and perform foreground thresholding on the masked image.
 
     Args:
         img: Original image.
@@ -119,7 +118,7 @@ def well_mask_setup(img: npt.NDArray, well_buffer=0.05):
 
 
 def threshold_images(
-    imgs: List[npt.NDArray], circ_masks: List[npt.NDArray],
+    imgs: List[npt.NDArray], well_masks: List[npt.NDArray],
     well_idx: List[Tuple[npt.NDArray, npt.NDArray]], sd_coef: float,
     rand_state: np.random.RandomState
 ) -> List[npt.NDArray]:
@@ -127,8 +126,8 @@ def threshold_images(
 
     Args:
         imgs: Original images.
-        circ_mask: Circular masks.
-        well_idx: Indices within each circular mask.
+        well_masks: Well masks.
+        well_idx: Indices within each well mask.
         sd_coef: Threshold pixels with less than sd_coef * foreground_mean.
         rand_state: RandomState object to allow for reproducability.
 
@@ -137,27 +136,27 @@ def threshold_images(
 
     """
     gmm_thresh_all = d.compute(
-        [d.delayed(mask_and_threshold)(img, circ_masks[i], well_idx[i], sd_coef, rand_state)
+        [d.delayed(mask_and_threshold)(img, well_masks[i], well_idx[i], sd_coef, rand_state)
             for i, img in enumerate(imgs)]
     )[0]
     return gmm_thresh_all
 
 
 def compute_areas(
-    imgs: List[npt.NDArray], circ_pix_area: List[int]
+    imgs: List[npt.NDArray], well_pix_area: List[int]
 ) -> npt.NDArray[float]:
     """Compute non-zero pixel area of thresholded images.
 
     Args:
         imgs: Thresholded images.
-        circ_pix_area: Pixel area of circular mask.
+        well_pix_area: Pixel area of well mask.
 
     Returns:
         Non-zero pixel areas of thresholded images.
 
     """
     area_prop = d.compute(
-        [d.delayed(an.compute_area_prop)(img, circ_pix_area[i]) for i, img in enumerate(imgs)]
+        [d.delayed(an.compute_area_prop)(img, well_pix_area[i]) for i, img in enumerate(imgs)]
     )[0]
     area_prop = np.array(area_prop)
     return area_prop
@@ -227,7 +226,7 @@ def main():
             sys.exit()
 
         # Well masking
-        well_masks_with_info = [circ_mask_setup(img, well_buffer) for img in gs_ds_imgs]
+        well_masks_with_info = [well_mask_setup(img, well_buffer) for img in gs_ds_imgs]
         well_masks, well_idx, well_pix_areas = zip(*well_masks_with_info)
 
         # Threshold images
