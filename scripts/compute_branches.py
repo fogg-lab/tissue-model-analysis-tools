@@ -9,15 +9,15 @@ import cv2
 from matplotlib import pyplot as plt
 from networkx.exception import NetworkXPointlessConcept as nxPointlessConceptException
 from skimage.exposure import rescale_intensity
-from skimage.morphology import medial_axis
+from skimage.morphology import medial_axis, disk, binary_erosion
 from scipy.ndimage import distance_transform_edt
 
 from fl_tissue_model_tools import helper, models, models_util, defs
 from fl_tissue_model_tools import script_util as su
-from fl_tissue_model_tools import preprocessing as prep
 from fl_tissue_model_tools.transforms import filter_branch_seg_mask
 from fl_tissue_model_tools.topology import MorseGraph
 from fl_tissue_model_tools.analysis import pixels_to_microns
+from fl_tissue_model_tools.well_mask_generation import generate_well_mask, gen_superellipse_mask
 
 
 DEFAULT_CONFIG_PATH = str(defs.SCRIPT_CONFIG_DIR / "default_branching_computation.json")
@@ -39,8 +39,7 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
     '''
 
     well_width_microns = config.get("well_width_microns", 1000.0)
-    detect_well_edge = config.get("detect_well_edge", True)
-    pinhole_buffer = config.get("pinhole_buffer", 0.04)
+    well_buffer = config.get("well_buffer", 0.05)
     morse_thresholds = config.get("graph_thresh_1", 2), config.get("graph_thresh_2", 4)
     graph_smoothing_window = config.get("graph_smoothing_window", 10)
     min_branch_length = config.get("min_branch_length", 10)
@@ -61,18 +60,24 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
         vis_dir.mkdir(parents=True, exist_ok=True)
         save_vis(img, vis_dir, "original_image.png")
 
-    print("Applying circular mask to image...")
+    print("Applying mask to image...")
 
-    # Create circular mask around the well and a smaller, inverted mask for pruning
-    center, radius = prep.get_well_mask_circle_params(img, pinhole_buffer, auto=detect_well_edge)
-    well_mask = prep.gen_circ_mask(center, radius, img.shape[:2])
-    pruning_mask = prep.gen_circ_mask(center, round(radius * 0.9), img.shape[:2])
+    # Create a mask over the well and a smaller, inverted mask for pruning
+    # The pruning mask is used to remove spurious branches detected near the well edge
+    well_mask = generate_well_mask(img, well_buffer, return_superellipse_params=True)
+    if isinstance(well_mask, tuple):
+        well_mask, t, d, s_a, s_b, c_x, c_y, n = well_mask
+        d = d * 0.9     # shrink superellipse for the pruning mask
+        pruning_mask = gen_superellipse_mask(t, d, s_a, s_b, c_x, c_y, n, img.shape[:2])
+    else:
+        # generate_well_mask failed to fit a superellipse
+        pruning_mask = binary_erosion(well_mask, disk(5))
     pruning_mask = np.logical_not(pruning_mask)
 
     print("")
     print("Segmenting image...")
 
-    pred = model.predict(img, auto_resample=False)
+    pred = model.predict(img * well_mask, auto_resample=False)
     seg_mask = pred > 0.5
 
     if save_intermediates:
