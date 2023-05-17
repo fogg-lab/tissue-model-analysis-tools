@@ -19,7 +19,7 @@ def get_superellipse_hull(x, y, n, num_iters=25000):
         x (np.ndarray): x-coordinates of the points.
         y (np.ndarray): y-coordinates of the points.
         n (float): Exponent of the superellipse.
-        num_iters (int): Number of random parameter sets to try. Defaults to 10000.
+        num_iters (int): Number of random parameter sets to try. Defaults to 25000.
     Returns:
         tuple: Tuple containing:
             t (float): Rotation angle of the superellipse in radians.
