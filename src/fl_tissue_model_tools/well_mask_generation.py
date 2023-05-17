@@ -12,7 +12,8 @@ from skimage.exposure import rescale_intensity, equalize_adapthist
 from skimage.transform import rescale, resize
 from skimage.draw import disk as circle
 
-def get_superellipse_hull(x, y, n, num_iters=10000):
+
+def get_superellipse_hull(x, y, n, num_iters=25000):
     """Find a superellipse that encloses the given points.
     Args:
         x (np.ndarray): x-coordinates of the points.
@@ -27,15 +28,15 @@ def get_superellipse_hull(x, y, n, num_iters=10000):
             s_b (float): Scale factor for the y-axis.
             c_x (float): x-coordinate of the center of the superellipse.
             c_y (float): y-coordinate of the center of the superellipse.
-
     """
+
     # Generate array of num_iters random values for each parameter
     # Interpolate random values for the parameterss within their bounds
     linear_weights = np.random.rand(num_iters, 6)
 
     # Get the parameters to use for each iteration
     bounds = np.array([
-        (-np.pi/20, np.pi/20),   # theta
+        (-np.pi/16, np.pi/16),   # theta
         (0.67, 1.33),            # d
         (0.9, 1.1),              # s_a
         (0.9, 1.1),              # s_b
@@ -46,11 +47,26 @@ def get_superellipse_hull(x, y, n, num_iters=10000):
     param_values = (bounds[:, 1] - bounds[:, 0]) * linear_weights + bounds[:, 0]
     t, d, s_a, s_b, c_x, c_y = param_values.T[..., np.newaxis]
 
-    candidate_indices = np.where(
-        np.max(
-            np.abs(((x - c_x) * np.cos(t) - ((y - c_y) * np.sin(t))) / (d * s_a)) ** n
-            + np.abs(((x - c_x) * np.sin(t) + (y - c_y) * np.cos(t)) / (d * s_b)) ** n,
-        axis=1) < 1)[0]
+    # Using a general equation for a superellipse, find parameters that enclose the points
+    # If the exponent (n) is even, absolute value is not needed
+    # If n is 2, theta doesn't affect anything, so it can be ignored
+    if n == 2:
+        candidate_indices = np.where(
+            np.max(
+                ((x - c_x) / (d * s_a)) ** 2 + ((y - c_y) / (d * s_b)) ** 2,
+            axis=1) < 1)[0]
+    elif n % 2 == 0:
+        candidate_indices = np.where(
+            np.max(
+                (((x - c_x) * np.cos(t) - ((y - c_y) * np.sin(t))) / (d * s_a)) ** n
+                + (((x - c_x) * np.sin(t) + (y - c_y) * np.cos(t)) / (d * s_b)) ** n,
+            axis=1) < 1)[0]
+    else:
+        candidate_indices = np.where(
+            np.max(
+                np.abs(((x - c_x) * np.cos(t) - ((y - c_y) * np.sin(t))) / (d * s_a)) ** n
+                + np.abs(((x - c_x) * np.sin(t) + (y - c_y) * np.cos(t)) / (d * s_b)) ** n,
+            axis=1) < 1)[0]
 
     t = t[candidate_indices]
     d = d[candidate_indices]
@@ -120,7 +136,103 @@ def create_convex_hull_mask(array_shape: Tuple[int, int], hull_vertices: npt.NDA
     # Check if each coordinate is inside the convex hull
     mask = (delaunay.find_simplex(coord_arrays) >= 0).reshape(array_shape)
 
-    return mask.astype(np.uint8)
+    return mask
+
+
+def generate_well_mask(image: npt.NDArray, well_buffer: float=0.05, mask_val: Integral=1,
+                       return_superellipse_params: bool=False) -> npt.NDArray:
+    """Generate a binary mask over the well in an image.
+    Args:
+        image (np.ndarray): Image to create the mask for.
+        well_buffer (float): Buffer to add around the well mask, as a fraction of the well diameter.
+                             Defaults to 0.05.
+        mask_val (int): Value in the range [0,255] to give pixels in the well. Defaults to 1.
+        return_superellipse_params (bool): Whether to return the parameters of the superellipse.
+                                           Defaults to False.
+    Returns:
+        Union[np.ndarray, tuple]: Mask over the well. If return_superellipse_params is True, returns
+                                  a tuple containing the mask and the superellipse parameters.
+
+    """
+    ### Threshold the image
+    im_thresh = auto_threshold_well(image)
+
+    # Downsample the thresholded image
+    downsamp_ratio = min(1, 200 / np.max(im_thresh.shape))
+    im_thresh = rescale(im_thresh, downsamp_ratio, order=0, preserve_range=True)
+
+    ### Get the convex hull of the thresholded image
+
+    # Get the mask's border
+    im_thresh_border = canny(im_thresh)
+    # Include points on the edge of the image
+    im_thresh_border[0, :] += im_thresh[0, :]
+    im_thresh_border[-1, :] += im_thresh[-1, :]
+    im_thresh_border[:, 0] += im_thresh[:, 0]
+    im_thresh_border[:, -1] += im_thresh[:, -1]
+
+    def get_circ_mask():
+        # Fall back to a circular mask if the convex hull fails (e.g. blank thresholded image)
+
+        circ_mask = np.zeros(image.shape, dtype=np.uint8)
+        center = image.shape[0] // 2, image.shape[1] // 2
+        radius = int(image.shape[0] * 0.5 * (1 - well_buffer))
+        rr, cc = circle((center[0], center[1]), radius, shape=image.shape)
+        circ_mask[rr, cc] = mask_val
+
+        return circ_mask
+
+    border_points = np.argwhere(im_thresh_border)
+    try:
+        hull = ConvexHull(border_points)
+    except ValueError:
+        return get_circ_mask()
+    hull_vertices = border_points[hull.vertices]
+
+    hull_verts_mask = np.zeros_like(im_thresh)
+    hull_verts_mask[hull_vertices[:, 0], hull_vertices[:, 1]] = 1
+
+    # Create a mask for the convex hull
+    well_mask = create_convex_hull_mask(im_thresh.shape, hull_vertices)
+    well_mask_border = canny(well_mask)
+    well_mask_border[0, :] += well_mask[0, :]
+    well_mask_border[-1, :] += well_mask[-1, :]
+    well_mask_border[:, 0] += well_mask[:, 0]
+    well_mask_border[:, -1] += well_mask[:, -1]
+
+    ### Try fitting a superellipse to the convex hull
+
+    # See if well is more circular or rectangular to determine the exponent
+    area = np.sum(well_mask)
+    perimeter = np.sum(well_mask_border)
+    if perimeter / area > .027:
+        # Well is more rectangular
+        n = 8
+    else:
+        # Well is more circular
+        n = 2
+
+    # Get the parameters for the superellipse
+    x = hull_vertices[:, 0] / im_thresh.shape[0] * 2 - 1
+    y = hull_vertices[:, 1] / im_thresh.shape[1] * 2 - 1
+    found_superellipse = False
+    try:
+        t, d, s_a, s_b, c_x, c_y = get_superellipse_hull(x, y, n)
+        d *= (1 - well_buffer * 2)
+        well_mask = gen_superellipse_mask(t, d, s_a, s_b, c_x, c_y, n, im_thresh.shape)
+        found_superellipse = True
+    except Exception:
+        traceback.print_exc()
+        print("Falling back to convex hull well mask.")
+
+    # Prepare the mask
+    well_mask = well_mask.astype(np.uint8) * mask_val
+    well_mask = resize(well_mask, image.shape, order=0, preserve_range=True)
+
+    if found_superellipse and return_superellipse_params:
+        return well_mask, t, d, s_a, s_b, c_x, c_y, n
+
+    return well_mask
 
 
 def auto_threshold_well(image: npt.NDArray) -> npt.NDArray:
@@ -131,10 +243,8 @@ def auto_threshold_well(image: npt.NDArray) -> npt.NDArray:
         npt.ndarray: Thresholded image.
 
     """
-    # Blur/equalize image and invert it if the corners are lighter than the center
+    # Blur the image and get the min and max values
     im_blur = gaussian(image, sigma=3)
-    im_blur = rescale_intensity(im_blur.astype(np.float32), out_range=(-1, 1))
-    im_blur = equalize_adapthist(im_blur)
     im_blur = rescale_intensity(im_blur, out_range=(0, 255)).astype(np.uint8)
     im_extrema = im_blur.min(), im_blur.max()
 
@@ -224,13 +334,18 @@ def generate_well_mask(image: npt.NDArray, well_buffer: float=0.05, mask_val: In
 
     # Create a mask for the convex hull
     well_mask = create_convex_hull_mask(im_thresh.shape, hull_vertices)
+    well_mask_border = canny(well_mask)
+    well_mask_border[0, :] += well_mask[0, :]
+    well_mask_border[-1, :] += well_mask[-1, :]
+    well_mask_border[:, 0] += well_mask[:, 0]
+    well_mask_border[:, -1] += well_mask[:, -1]
 
     ### Try fitting a superellipse to the convex hull
 
     # See if well is more circular or rectangular to determine the exponent
     area = np.sum(well_mask)
-    perimeter = len(border_points)
-    if perimeter / area < .045:
+    perimeter = np.sum(well_mask_border)
+    if perimeter / area > .027:
         # Well is more rectangular
         n = 8
     else:
@@ -247,7 +362,6 @@ def generate_well_mask(image: npt.NDArray, well_buffer: float=0.05, mask_val: In
         well_mask = gen_superellipse_mask(t, d, s_a, s_b, c_x, c_y, n, im_thresh.shape)
         found_superellipse = True
     except Exception:
-        # Probably IndexError or ValueError from get_superellipse_hull().
         traceback.print_exc()
         print("Falling back to convex hull well mask.")
 
