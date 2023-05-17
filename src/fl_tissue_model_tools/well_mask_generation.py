@@ -8,7 +8,7 @@ from skimage.morphology import disk, binary_erosion
 from skimage.feature import canny
 from scipy.spatial import ConvexHull, Delaunay
 from scipy.special import gamma
-from skimage.exposure import rescale_intensity, equalize_adapthist
+from skimage.exposure import rescale_intensity
 from skimage.transform import rescale, resize
 from skimage.draw import disk as circle
 
