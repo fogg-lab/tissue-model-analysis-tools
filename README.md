@@ -183,7 +183,7 @@ Here, `input_path` is the full path to a directory of images which will be analy
 * Create custom configuration `.json` file, using `config/default_cell_area_computation.json` as a template.
     * `dsamp_size`: Size that input images will be downsampled to for analysis. Smaller sizes mean faster, less accurate analysis.
     * `sd_coef`: Strictness of thresholding. Positive numbers are more strict, negative numbers are less strict. This is a multiplier of the foreground pixel standard deviation, so values in the range (-2, 2) are the most reasonable.
-    * `pinhole_buffer`: Used to compute radius of circular mask. For a 250 pixel downsampled image, `pinhole_buffer` = 0.04 means the circular mask radius will extend from the center of the image to 0.04 * 250 = 10 pixels from the top of the image. In other words, the diameter of the circular mask will be 250 - (10*2) = 230 pixels.
+    * `well_buffer`: Proportion of the well's outer width/diameter to trim from the outer part of the well mask. For example, a circular well with an outer diameter of 1000 microns and inner diameter of 900 microns, the buffer is 50 microns, so the `well_buffer` should be 50/1000=0.05.
     * `rs_seed`: A random seed for the algorithm. Allows for reproducability since the Gaussian curves are randomly initialized.
 
 #### Z Projection
