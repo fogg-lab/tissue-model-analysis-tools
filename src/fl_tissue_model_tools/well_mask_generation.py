@@ -244,7 +244,7 @@ def auto_threshold_well(image: npt.NDArray) -> npt.NDArray:
 
     """
     # Blur the image and get the min and max values
-    im_blur = gaussian(image, sigma=3)
+    im_blur = gaussian(image, sigma=1)
     im_blur = rescale_intensity(im_blur, out_range=(0, 255)).astype(np.uint8)
     im_extrema = im_blur.min(), im_blur.max()
 
