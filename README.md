@@ -174,7 +174,7 @@ tmat
 #### Cell Area
 **Basic usage:**
 ```bash
-tmat compute_cell_area -v [input_root_path] [output_root_path]
+tmat compute_cell_area -v "path/to/input/folder" "path/to/output/folder"
 ```
 Here, `input_path` is the full path to a directory of images which will be analyzed.
 
@@ -189,9 +189,9 @@ Here, `input_path` is the full path to a directory of images which will be analy
 #### Z Projection
 **Basic usage:**
 ```bash
-tmat compute_zproj -v [input_root_path] [output_root_path]
+tmat compute_zproj -v "path/to/input/directory" "path/to/output/folder"
 ```
-Here, `input_root_path` is the full path to a directory of Z stack subdirectories which will be analyzed. Each Z stack subdirectory should contain all images for a given Z stack with files containing the pattern `...Z[pos]_...` in their name. For example `...Z01_...` denotes Z position 1 for a given image.
+Here, "path/to/input/directory" is the full path to a directory of Z stack subdirectories which will be analyzed. Each Z stack subfolder should contain all images for a given Z stack with files containing the pattern `...Z[pos]_...` in their name. For example `...Z01_...` denotes Z position 1 for a given image.
 
 For N Z stacks, the input directory structure would be:
 ```
@@ -216,7 +216,7 @@ Root directory
 
 **To compute Z-projections and their cell area, add the --area flag:**  
 ```bash
-tmat compute_zproj -v --area [input_root_path] [output_root_path]
+tmat compute_zproj -v --area "path/to/input/folder" "path/to/output/folder"
 ```
 
 **Advanced usage:**
@@ -233,23 +233,23 @@ See [Capabilities](#capabilities) for details.
 #### Invasion Depth
 **Basic usage:**
 ```
-tmat compute_inv_depth -v [input_root_path] [output_root_path]
+tmat compute_inv_depth -v "path/to/input/folder" "path/to/output/folder"
 ```
 
-For a description of `input_root_path` directory structure, see [Z Projection](#z-projection).
+For a description of the input directory structure, see [Z Projection](#z-projection).
 
 #### Branches (quantify vessel formation)
 **Basic usage:**
 ```bash
 # the -g flag saves visualizations in a folder in the output directory
-tmat compute_branches -v -g [input_root_path] [output_root_path]
+tmat compute_branches -v -g "path/to/input/folder" "path/to/output/folder"
 ```
 
 or,
 
 ```bash
 # the -i flag saves visualizations plus other intermediates in a folder in the output directory
-tmat compute_branches -v -i [input_root_path] [output_root_path]
+tmat compute_branches -v -i "path/to/input/folder" "path/to/output/folder"
 ```
 
 **Advanced usage:**
