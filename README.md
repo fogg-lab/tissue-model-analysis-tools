@@ -32,7 +32,7 @@ If you are using the generic environment.yml file (instead of one of the reprodu
 
 ### Quick setup
 
-Run the following commands in a terminal.
+Run the following commands in a terminal/command prompt window.
 
 ```bash
 # Recommended: replace environment.yml with a platform-specific file such as environment_windows.yml or environment_linux.yml
