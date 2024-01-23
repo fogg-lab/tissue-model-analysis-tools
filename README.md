@@ -18,6 +18,7 @@ A Python package for the high-throughput analysis of cancer and endothelial cell
 *Create the conda environment and install the fl_tissue_model_tools package*
 
 ### Prerequisites:
+**Note**: Conda is not strictly a requirement. Alternatively, you can install the packages listed in the requirements.txt file.
 - [Conda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html) package manager
    - For devices with ARM processors (e.g. a MacBook with an M1 or M2 chip), install [Mambaforge](https://github.com/conda-forge/miniforge) instead of Miniconda or Anaconda
 - Build tools for your operating system
