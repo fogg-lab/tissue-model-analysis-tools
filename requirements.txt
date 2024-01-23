@@ -5,7 +5,7 @@ gudhi
 jupyterlab
 matplotlib
 networkx
-opencv
+opencv-python
 pandas
 scikit-learn
 scipy
