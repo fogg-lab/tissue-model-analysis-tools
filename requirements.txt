@@ -6,6 +6,7 @@ jupyterlab
 matplotlib
 networkx
 opencv
+pandas
 scikit-learn
 scipy
 setuptools
