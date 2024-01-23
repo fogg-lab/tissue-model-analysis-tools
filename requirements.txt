@@ -1,0 +1,17 @@
+albumentations
+boost
+dask
+gudhi
+jupyterlab
+matplotlib
+networkx
+opencv
+scikit-learn
+scipy
+setuptools
+tensorflow
+keras-tuner
+pillow
+scikit-image
+tqdm
+imagecodecs
