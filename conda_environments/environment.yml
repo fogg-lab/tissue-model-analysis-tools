@@ -11,12 +11,14 @@ dependencies:
   - matplotlib
   - networkx
   - opencv
-  - python>=3.8
+  - pip
+  - python=3.10
   - scikit-learn
   - scipy
   - setuptools
-  - tensorflow
-  - keras-tuner
   - pillow
   - scikit-image
   - tqdm
+  - pip:
+    - keras-tuner
+    - tensorflow[and-cuda]
