@@ -28,9 +28,6 @@ A Python package for the high-throughput analysis of cancer and endothelial cell
    - Mac: Clang (run `xcode-select --install` in the terminal)
    - Linux: g++ (likely already installed)
 
-**Tip**:
-If you are using the generic environment.yml file (instead of one of the reproducible platform-specific environments), the legacy conda solver may take a very long time to solve the environment. To avoid this, you can enable [libmamba solver](https://www.anaconda.com/blog/a-faster-conda-for-a-growing-community) before running the setup.
-
 ### Quick setup
 
 Run the following commands in a terminal/command prompt window.
