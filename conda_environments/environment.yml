@@ -9,6 +9,7 @@ dependencies:
   - gudhi
   - jupyterlab
   - matplotlib
+  - nd2reader
   - networkx
   - opencv
   - pip
@@ -18,6 +19,7 @@ dependencies:
   - setuptools
   - pillow
   - scikit-image
+  - tifffile
   - tqdm
   - pip:
     - keras-tuner
