@@ -16,3 +16,5 @@ pillow
 scikit-image
 tqdm
 imagecodecs
+nd2reader
+tifffile

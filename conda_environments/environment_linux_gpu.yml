@@ -411,6 +411,7 @@ dependencies:
       - libclang==16.0.6
       - markdown==3.5.2
       - ml-dtypes==0.2.0
+      - nd2reader
       - nvidia-cublas-cu12==12.2.5.6
       - nvidia-cuda-cupti-cu12==12.2.142
       - nvidia-cuda-nvcc-cu12==12.2.140
