@@ -1,5 +1,6 @@
 import argparse
 import os
+import os.path as osp
 from pathlib import Path
 import shutil
 import json
@@ -17,8 +18,8 @@ from . import data_prep, zstacks
 
 @dataclass
 class SFM:
-    """Colorized messages for success/failure output (uses ANSI escape codes)
-    """
+    """Colorized messages for success/failure output (uses ANSI escape codes)"""
+
     red = "\u001b[31m"
     green = "\u001b[32m"
     cyan = "\u001b[36m"
@@ -27,6 +28,7 @@ class SFM:
     failure = f"{red}[FAILURE]{reset}"
     all_succeeded = f"{green}[ALL SUCCEEDED]{reset}"
     failures_present = f"{red}[FAILURES PRESENT]{reset}"
+
 
 dash = "="
 chunk_width = shutil.get_terminal_size((10, 10)).columns
@@ -45,8 +47,7 @@ def verbose_header(title: str) -> None:
 
 
 def verbose_footer() -> None:
-    """Print a section footer during verbose output.
-    """
+    """Print a section footer during verbose output."""
     print(verbose_end)
 
 
@@ -63,35 +64,61 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("in_root", type=str, help=(
-        "Full path to root directory of input images. "
-        "Ex: [...]/my_data/images/experiment_1_yyyy_mm_dd/")
+    parser.add_argument(
+        "in_root",
+        type=str,
+        help=(
+            "Full path to root directory of input images. "
+            "Ex: [...]/my_data/images/experiment_1_yyyy_mm_dd/"
+        ),
     )
 
-    parser.add_argument("out_root", type=str, help=(
-        "Full path to root directory where output will be stored. "
-        "Ex: [...]/my_data/analysis_output/experiment_1_yyyy_mm_dd/. "
-        "In this example, experiment_1_yyyy_mm_dd/ will be created if it "
-        "does not already exist. If it does exist then the contents of "
-        "experiment_1_yyyy_mm_dd/ will be overwritten.")
+    parser.add_argument(
+        "out_root",
+        type=str,
+        help=(
+            "Full path to root directory where output will be stored. "
+            "Ex: [...]/my_data/analysis_output/experiment_1_yyyy_mm_dd/. "
+            "In this example, experiment_1_yyyy_mm_dd/ will be created if it "
+            "does not already exist. If it does exist then the contents of "
+            "experiment_1_yyyy_mm_dd/ will be overwritten."
+        ),
     )
 
-    parser.add_argument("-c", "--config", type=str,
-        default=arg_defaults["default_config_path"], help=(
-        "Full path to branching configuration file. Ex: "
-        "[...]/my_data/analysis_output/experiment_1_yyyy_mm_dd/branching_config.json")
+    parser.add_argument(
+        "-c",
+        "--config",
+        type=str,
+        default=arg_defaults["default_config_path"],
+        help=(
+            "Full path to branching configuration file. Ex: "
+            "[...]/my_data/analysis_output/experiment_1_yyyy_mm_dd/branching_config.json"
+        ),
     )
 
-    parser.add_argument("-i", "--save-intermediates", action="store_true", help=(
-        "Save all intermediate images and visualizations generated during branching analysis.")
+    parser.add_argument(
+        "-i",
+        "--save-intermediates",
+        action="store_true",
+        help=(
+            "Save all intermediate images and visualizations generated during branching analysis."
+        ),
     )
 
-    parser.add_argument("-g", "--save-graphics", action="store_true", help=(
-        "Save visualizations: original image, segmentation mask, and morse tree plot.")
+    parser.add_argument(
+        "-g",
+        "--save-graphics",
+        action="store_true",
+        help=(
+            "Save visualizations: original image, segmentation mask, and morse tree plot."
+        ),
     )
 
-    parser.add_argument("-v", "--verbose", action="store_true", help=(
-        "Print verbose output to the console.")
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help=("Print verbose output to the console."),
     )
 
     args = parser.parse_args()
@@ -116,29 +143,46 @@ def parse_cell_area_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("in_root", type=str, help=(
-        "Full path to root directory of input images. "
-        "Ex: [...]/my_data/images/experiment_1_yyyy_mm_dd/")
+    parser.add_argument(
+        "in_root",
+        type=str,
+        help=(
+            "Full path to root directory of input images. "
+            "Ex: [...]/my_data/images/experiment_1_yyyy_mm_dd/"
+        ),
     )
 
-    parser.add_argument("out_root", type=str, help=(
-        "Full path to root directory where output will be stored. "
-        "Ex: [...]/my_data/analysis_output/experiment_1_yyyy_mm_dd/. "
-        "In this example, experiment_1_yyyy_mm_dd/ will be created if it "
-        "does not already exist. If it does exist then the contents of "
-        f"experiment_1_yyyy_mm_dd/{thresh_subdir}/ and "
-        f"experiment_1_yyyy_mm_dd/{calc_subdir}/ will be overwritten.")
+    parser.add_argument(
+        "out_root",
+        type=str,
+        help=(
+            "Full path to root directory where output will be stored. "
+            "Ex: [...]/my_data/analysis_output/experiment_1_yyyy_mm_dd/. "
+            "In this example, experiment_1_yyyy_mm_dd/ will be created if it "
+            "does not already exist. If it does exist then the contents of "
+            f"experiment_1_yyyy_mm_dd/{thresh_subdir}/ and "
+            f"experiment_1_yyyy_mm_dd/{calc_subdir}/ will be overwritten."
+        ),
     )
 
-    parser.add_argument("-c", "--config", type=str,
-        default=default_config_path, help=(
-        "Full path to cell area computation configuration file. Ex: "
-        "C:/my_config/cell_area_comp_config.json. If no argument supplied, "
-        "default configuration will be used.")
+    parser.add_argument(
+        "-c",
+        "--config",
+        type=str,
+        default=default_config_path,
+        help=(
+            "Full path to cell area computation configuration file. Ex: "
+            "C:/my_config/cell_area_comp_config.json. If no argument supplied, "
+            "default configuration will be used."
+        ),
     )
 
-    parser.add_argument("-v", "--verbose", action="store_true", help=
-        "Verbose output during script execution.")
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Verbose output during script execution.",
+    )
 
     args = parser.parse_args()
     return _strip_quotes(args)
@@ -156,36 +200,65 @@ def parse_zproj_args() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("in_root", type=str, help=(
-        "Full path to root directory of input zstacks. Ex: "
-        "[...]/my_data/z_stacks/experiment_1_yyyy_mm_dd/")
+    parser.add_argument(
+        "in_root",
+        type=str,
+        help=(
+            "Full path to root directory of input zstacks. Ex: "
+            "[...]/my_data/z_stacks/experiment_1_yyyy_mm_dd/"
+        ),
     )
 
-    parser.add_argument("out_root", type=str, help=(
-        "Full path to root directory where output will be stored. Ex: "
-        "[...]/my_data/z_projections/experiment_1_yyyy_mm_dd/. In this "
-        "example, experiment_1_yyyy_mm_dd/ will be created if it does not "
-        "already exist.")
+    parser.add_argument(
+        "out_root",
+        type=str,
+        help=(
+            "Full path to root directory where output will be stored. Ex: "
+            "[...]/my_data/z_projections/experiment_1_yyyy_mm_dd/. In this "
+            "example, experiment_1_yyyy_mm_dd/ will be created if it does not "
+            "already exist."
+        ),
     )
 
-    parser.add_argument("-m", "--method", type=str, default="fs",
-        choices=["min", "max", "med", "avg", "fs"], help=(
-        "Z projection method. If no argument supplied, defaults to 'fs' "
-        "(focus stacking).")
+    parser.add_argument(
+        "-m",
+        "--method",
+        type=str,
+        default="fs",
+        choices=["min", "max", "med", "avg", "fs"],
+        help=(
+            "Z projection method. If no argument supplied, defaults to 'fs' "
+            "(focus stacking)."
+        ),
     )
 
-    parser.add_argument("-o", "--order", type=int, default=1, choices=[0, 1],
-        help=("Interpretation of Z stack order. 0=Ascending, 1=Descending. "
-        "For Z stack of size k: -o 0 means (TOP -> BOTTOM) = (Z0 -> Zk) "
-        "while -o 1 means (TOP -> BOTTOM) = (Zk -> Z0). If no argument "
-        "supplied, defaults to 1=Descending.")
+    parser.add_argument(
+        "-o",
+        "--order",
+        type=int,
+        default=1,
+        choices=[0, 1],
+        help=(
+            "Interpretation of Z stack order. 0=Ascending, 1=Descending. "
+            "For Z stack of size k: -o 0 means (TOP -> BOTTOM) = (Z0 -> Zk) "
+            "while -o 1 means (TOP -> BOTTOM) = (Zk -> Z0). If no argument "
+            "supplied, defaults to 1=Descending."
+        ),
     )
 
-    parser.add_argument("-a", "--area", action="store_true",
-        help="Compute cell area after computing Z projection.")
+    parser.add_argument(
+        "-a",
+        "--area",
+        action="store_true",
+        help="Compute cell area after computing Z projection.",
+    )
 
-    parser.add_argument("-v", "--verbose", action="store_true",
-        help="Verbose output during script execution.")
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Verbose output during script execution.",
+    )
 
     args = parser.parse_args()
     return _strip_quotes(args)
@@ -206,36 +279,65 @@ def parse_inv_depth_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("in_root", type=str, help=(
-                        "Full path to root directory of input zstacks. "
-                        "Ex: [...]/my_data/z_stacks/experiment_1_yyyy_mm_dd/. "))
+    parser.add_argument(
+        "in_root",
+        type=str,
+        help=(
+            "Full path to root directory of input zstacks. "
+            "Ex: [...]/my_data/z_stacks/experiment_1_yyyy_mm_dd/. "
+        ),
+    )
 
-    parser.add_argument("out_root", type=str, help=(
-                        "Full path to root directory where output will be stored. "
-                        "Ex: [...]/my_data/z_projections/experiment_1_yyyy_mm_dd/. "
-                        "In this example, experiment_1_yyyy_mm_dd/ will be created "
-                        "if it does not already exist."))
+    parser.add_argument(
+        "out_root",
+        type=str,
+        help=(
+            "Full path to root directory where output will be stored. "
+            "Ex: [...]/my_data/z_projections/experiment_1_yyyy_mm_dd/. "
+            "In this example, experiment_1_yyyy_mm_dd/ will be created "
+            "if it does not already exist."
+        ),
+    )
 
-    parser.add_argument("-c", "--config", type=str, default=default_config_path, help=(
-                        "Full path to invasion depth computation configuration file. "
-                        "Ex: C:/my_config/inv_depth_comp_config.json. If no argument "
-                        "supplied, default configuration will be used."))
+    parser.add_argument(
+        "-c",
+        "--config",
+        type=str,
+        default=default_config_path,
+        help=(
+            "Full path to invasion depth computation configuration file. "
+            "Ex: C:/my_config/inv_depth_comp_config.json. If no argument "
+            "supplied, default configuration will be used."
+        ),
+    )
 
-    parser.add_argument("-o", "--order", type=int, default=1, choices=[0, 1], help=(
-                        "Interpretation of Z stack order. 0=Ascending, 1=Descending."
-                        "For Z stack of size k: -o 0 means (TOP -> BOTTOM) = (Z0 -> Zk)"
-                        "while -o 1 means (TOP -> BOTTOM) = (Zk -> Z0). If no argument"
-                        "supplied, defaults to 1=Descending."))
+    parser.add_argument(
+        "-o",
+        "--order",
+        type=int,
+        default=1,
+        choices=[0, 1],
+        help=(
+            "Interpretation of Z stack order. 0=Ascending, 1=Descending."
+            "For Z stack of size k: -o 0 means (TOP -> BOTTOM) = (Z0 -> Zk)"
+            "while -o 1 means (TOP -> BOTTOM) = (Zk -> Z0). If no argument"
+            "supplied, defaults to 1=Descending."
+        ),
+    )
 
-    parser.add_argument("-v", "--verbose", action="store_true",
-                        help="Verbose output during script execution.")
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Verbose output during script execution.",
+    )
 
     args = parser.parse_args()
     return _strip_quotes(args)
 
 
 ### File/Directory Validation ###
-def cell_area_verify_input_dir(input_path: str, verbose: bool=False) -> Sequence[str]:
+def cell_area_verify_input_dir(input_path: str, verbose: bool = False) -> Sequence[str]:
     """Verify appropriate contents of input data directory.
 
     Args:
@@ -253,9 +355,10 @@ def cell_area_verify_input_dir(input_path: str, verbose: bool=False) -> Sequence
     if verbose:
         verbose_header("Verifying Input Directory")
 
-    if not os.path.isdir(input_path):
-        raise FileNotFoundError("Input data directory not found:"
-                                f"{os.linesep}\t{input_path}")
+    if not osp.isdir(input_path):
+        raise FileNotFoundError(
+            "Input data directory not found:" f"{os.linesep}\t{input_path}"
+        )
 
     # Get all images in input directory
     img_paths = get_img_paths(input_path)
@@ -268,8 +371,9 @@ def cell_area_verify_input_dir(input_path: str, verbose: bool=False) -> Sequence
     return img_paths
 
 
-def cell_area_verify_output_dir(output_path: str, thresh_subdir: str, calc_subdir: str,
-                                verbose: bool=False) -> None:
+def cell_area_verify_output_dir(
+    output_path: str, thresh_subdir: str, calc_subdir: str, verbose: bool = False
+) -> None:
     """Verify output directory is either created or wiped.
 
     Args:
@@ -284,7 +388,7 @@ def cell_area_verify_output_dir(output_path: str, thresh_subdir: str, calc_subdi
     if verbose:
         verbose_header("Verifying Output Directory")
 
-    if not os.path.isdir(output_path):
+    if not osp.isdir(output_path):
         if verbose:
             print(f"Did not find output dir:{os.linesep}\t{output_path}")
             print("Creating...")
@@ -308,7 +412,9 @@ def cell_area_verify_output_dir(output_path: str, thresh_subdir: str, calc_subdi
         verbose_footer()
 
 
-def cell_area_verify_config_file(config_path: str, verbose: bool=False) -> Dict[str, Any]:
+def cell_area_verify_config_file(
+    config_path: str, verbose: bool = False
+) -> Dict[str, Any]:
     """Verify config script for performing area computations.
 
     Args:
@@ -325,9 +431,9 @@ def cell_area_verify_config_file(config_path: str, verbose: bool=False) -> Dict[
     if verbose:
         verbose_header("Verifying Config File")
 
-    if not os.path.isfile(config_path):
+    if not osp.isfile(config_path):
         raise FileNotFoundError(f"Config file not found: {config_path}")
-    with open(config_path, 'r', encoding="utf8") as config_fp:
+    with open(config_path, "r", encoding="utf8") as config_fp:
         config = json.load(config_fp)
 
     if verbose:
@@ -341,11 +447,12 @@ def cell_area_verify_config_file(config_path: str, verbose: bool=False) -> Dict[
     return config
 
 
-def zproj_verify_input_dir(input_path: str, verbose: bool=False) -> Sequence[str]:
+def zproj_verify_input_dir(input_path: str, verbose: bool = False) -> Sequence[str]:
     """Verify appropriate contents of input data directory.
 
-    Input directory should contain either:  
+    Input directory should contain either:
      - One subdirectory per Z stack.
+     - One OME-TIFF file or ND2 file per Z stack.
      - No subdirectories, requires filenames for each z-stack to have the same unique
        alphanumeric pattern at the beginning of the filename (e.g. A12_...).
     Each Zstack should contain all Z position images for that stack.
@@ -367,11 +474,19 @@ def zproj_verify_input_dir(input_path: str, verbose: bool=False) -> Sequence[str
     if verbose:
         verbose_header("Verifying Input Directory")
 
-    if not os.path.isdir(input_path):
+    if zstacks.is_single_file_zstack(input_path):
+        input_path = zstacks.convert_zstack_image_to_tiffs(input_path)
+
+    if not osp.isdir(input_path):
         raise FileNotFoundError(
-            f"Input data directory not found:{os.linesep}\t{input_path}"
+            f"Data directory, ND2 or OME-TIF file not found at path: {os.linesep}\t{input_path}"
         )
-    zstack_paths = [fp for fp in glob(f"{input_path}/*") if os.path.isdir(fp)]
+
+    zstack_paths = list(filter(zstacks.is_zstack, glob(f"{input_path}/*")))
+    for i, zsp in enumerate(zstack_paths):
+        if zstacks.is_single_file_zstack(zsp):
+            zstack_paths[i] = zstacks.convert_zstack_image_to_tiffs(zsp)
+    zstack_paths = list(set(zstack_paths))
 
     if len(zstack_paths) == 0:
         zstack_prefixes = set()
@@ -391,7 +506,7 @@ def zproj_verify_input_dir(input_path: str, verbose: bool=False) -> Sequence[str
                     "Ex: A12_..., Q001_..., W09_..., etc. "
                 )
             zstack_prefixes.add(prefix)
-        zstack_paths = [os.path.join(input_path, prefix) for prefix in zstack_prefixes]
+        zstack_paths = [osp.join(input_path, prefix) for prefix in zstack_prefixes]
 
     if verbose:
         print(f"{'Z Stack ID':<40}{'No. Z Positions':>20}")
@@ -411,7 +526,7 @@ def zproj_verify_input_dir(input_path: str, verbose: bool=False) -> Sequence[str
                 raise FileNotFoundError(
                     f"Image file{os.linesep}\t{iname}{os.linesep} "
                     "does not contain the expected pattern to denote Z position. "
-                    "Files must have ...Z[pos]_... in their name, where [pos] is "
+                    "Files must have ...Z[pos]... in their name, where [pos] is "
                     "a number denoting Z stack position."
                 )
 
@@ -426,7 +541,7 @@ def zproj_verify_input_dir(input_path: str, verbose: bool=False) -> Sequence[str
     return zstack_paths
 
 
-def zproj_verify_output_dir(output_path: str, verbose: bool=True) -> None:
+def zproj_verify_output_dir(output_path: str, verbose: bool = True) -> None:
     """Verify output directory is either created or wiped.
 
     Args:
@@ -437,7 +552,7 @@ def zproj_verify_output_dir(output_path: str, verbose: bool=True) -> None:
     if verbose:
         verbose_header("Verifying Output Directory")
 
-    if not os.path.isdir(output_path):
+    if not osp.isdir(output_path):
         if verbose:
             print(f"Did not find output dir:{os.linesep}\t{output_path}")
             print("Creating...")
@@ -454,7 +569,7 @@ def zproj_verify_output_dir(output_path: str, verbose: bool=True) -> None:
 
         # Remove previous zproj images in output directory
         for prev_output_fp in [Path(output_path) / f for f in os.listdir(output_path)]:
-            if os.path.isfile(prev_output_fp) and imghdr.what(prev_output_fp) is not None:
+            if osp.isfile(prev_output_fp) and imghdr.what(prev_output_fp) is not None:
                 os.remove(prev_output_fp)
 
         if verbose:
@@ -465,7 +580,7 @@ def zproj_verify_output_dir(output_path: str, verbose: bool=True) -> None:
         verbose_footer()
 
 
-def inv_depth_verify_input_dir(input_path: str, verbose: bool=False) -> None:
+def inv_depth_verify_input_dir(input_path: str, verbose: bool = False) -> None:
     """Verify appropriate contents of input data directory.
 
     Each Z stack image should have the pattern ...Z[pos]_... in its name,
@@ -484,8 +599,10 @@ def inv_depth_verify_input_dir(input_path: str, verbose: bool=False) -> None:
     if verbose:
         verbose_header("Verifying Input Directory")
 
-    if not os.path.isdir(input_path):
-        raise FileNotFoundError(f"Input data directory not found:{os.linesep}\t{input_path}")
+    if not osp.isdir(input_path):
+        raise FileNotFoundError(
+            f"Input data directory not found:{os.linesep}\t{input_path}"
+        )
 
     if verbose:
         print(f"{'Z Stack ID':<60}{'No. Z Positions':>20}")
@@ -505,7 +622,8 @@ def inv_depth_verify_input_dir(input_path: str, verbose: bool=False) -> None:
                 f"Image file{os.linesep}\t{iname}{os.linesep}does not contain "
                 "the expected pattern to denote Z position. Files must have "
                 "...Z[pos]_... in their name, where [pos] is a number denoting "
-                "Z stack position.")
+                "Z stack position."
+            )
 
     if verbose:
         zsp_id = Path(input_path).name
@@ -516,7 +634,7 @@ def inv_depth_verify_input_dir(input_path: str, verbose: bool=False) -> None:
         verbose_footer()
 
 
-def inv_depth_verify_output_dir(output_path: str, verbose: bool=True) -> None:
+def inv_depth_verify_output_dir(output_path: str, verbose: bool = True) -> None:
     """Verify output directory is either created or wiped.
 
     Args:
@@ -527,7 +645,7 @@ def inv_depth_verify_output_dir(output_path: str, verbose: bool=True) -> None:
     if verbose:
         verbose_header("Verifying Output Directory")
 
-    if not os.path.isdir(output_path):
+    if not osp.isdir(output_path):
         if verbose:
             print(f"Did not find output dir:{os.linesep}\t{output_path}")
             print("Creating...")
@@ -542,8 +660,13 @@ def inv_depth_verify_output_dir(output_path: str, verbose: bool=True) -> None:
             print("Clearing...")
 
         # Remove previous zproj output files
-        for prev_output_filepath in [Path(output_path) / f for f in os.listdir(output_path)]:
-            if os.path.isfile(prev_output_filepath) and prev_output_filepath.suffix == ".csv":
+        for prev_output_filepath in [
+            Path(output_path) / f for f in os.listdir(output_path)
+        ]:
+            if (
+                osp.isfile(prev_output_filepath)
+                and prev_output_filepath.suffix == ".csv"
+            ):
                 os.remove(prev_output_filepath)
 
         if verbose:
@@ -554,8 +677,9 @@ def inv_depth_verify_output_dir(output_path: str, verbose: bool=True) -> None:
         verbose_footer()
 
 
-def inv_depth_verify_config_file(config_path: str, n_models: int,
-                                verbose: bool=False) -> Dict[str, Any]:
+def inv_depth_verify_config_file(
+    config_path: str, n_models: int, verbose: bool = False
+) -> Dict[str, Any]:
     """Verifies that the config file exists and is valid.
 
     Args:
@@ -572,13 +696,13 @@ def inv_depth_verify_config_file(config_path: str, n_models: int,
     Returns:
         A dictionary of config parameters.
     """
-    if not os.path.isfile(config_path):
+    if not osp.isfile(config_path):
         raise FileNotFoundError(f"Config file not found: {config_path}")
 
     if verbose:
         print(f"Using config file: {os.linesep}\t{config_path}")
 
-    with open(config_path, 'r', encoding='utf8') as config_fp:
+    with open(config_path, "r", encoding="utf8") as config_fp:
         config = json.load(config_fp)
     n_pred_models = config["n_pred_models"]
     if not n_pred_models <= n_models:
@@ -595,6 +719,7 @@ def inv_depth_verify_config_file(config_path: str, n_models: int,
         verbose_footer()
 
     return config
+
 
 def _strip_quotes(args: argparse.Namespace) -> argparse.Namespace:
     """Strips quotes around in_root and out_root arguments (escaped by the interactive prompt)."""

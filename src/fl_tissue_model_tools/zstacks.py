@@ -5,16 +5,23 @@ https://github.com/cmcguinness/focusstack
 """
 
 import re
-from typing import Optional, Sequence, Callable, Tuple
+import os
+import os.path as osp
+from typing import Optional, Sequence, Callable
+from glob import glob
 import numbers
 import numpy.typing as npt
 import numpy as np
 import cv2
+import tifffile
+import nd2reader
 
 from . import defs
 from .helper import get_img_paths
 
-ZPOS_PATTERN = "(z|Z)[0-9]+_"
+# Zpos pattern: designed to be flexible, matches substrings like z012., Z34_, z[567]-
+ZPOS_PATTERN = "(z|Z)(\[)?[0-9]+(\])?(_|\.|\-)"
+
 
 def default_get_zpos(z_path: str) -> int:
     """Use `ZPOS_PATTERN` to retrieve z-position from path string.
@@ -30,7 +37,7 @@ def default_get_zpos(z_path: str) -> int:
     return int(re.search(ZPOS_PATTERN, z_path)[0][1:-1])
 
 
-def _blur_and_lap(image: npt.NDArray, kernel_size: int=5) -> npt.NDArray:
+def _blur_and_lap(image: npt.NDArray, kernel_size: int = 5) -> npt.NDArray:
     """Compute Laplacian of a blurred image.
 
     Used to perform edge detection of `image`. A larger kernel size
@@ -48,12 +55,89 @@ def _blur_and_lap(image: npt.NDArray, kernel_size: int=5) -> npt.NDArray:
     return cv2.Laplacian(blurred, cv2.CV_64F, ksize=kernel_size)
 
 
-def zstack_paths_from_dir(z_stack_dir: str, descending: bool=True,
-                        get_zpos: Optional[Callable[[str], int]]=None) -> Sequence[str]:
+def is_single_file_zstack(fp: str) -> bool:
+    """Check whether given file path `fp` is an OME or ND2 file."""
+    basename = osp.basename(fp)
+    return osp.isfile(fp) and any(
+        ext in ("ome", "nd2") for ext in basename.lower().split(".")[1:]
+    )
+
+
+def is_zstack(fp):
+    """Check whether file path given file path `fp` contains a z-stack."""
+    return (osp.isdir(fp) and len(glob(f"{fp}/*")) > 0) or is_single_file_zstack(fp)
+
+
+def save_tiff_zstack(image_stack: npt.NDArray, basename: str, output_dir: str) -> None:
+    """Save a stack of images as individual TIFF files.
+
+    Args:
+        image_stack: A numpy array representing a stack of images.
+        basename: Base name for the output TIFF files.
+        output_dir: Directory to save the TIFF files.
+    """
+    for i, image in enumerate(image_stack):
+        print(image.shape)
+        output_path = osp.join(output_dir, f"Z[{str(i).zfill(5)}].tiff")
+        tifffile.imsave(output_path, image)
+
+
+def convert_zstack_image_to_tiffs(img_path: str) -> str:
+    """Convert a z-stack image file to individual TIFF files.
+
+    Args:
+        img_path: Path to the input z-stack image file.
+
+    Returns:
+        The directory where the TIFF files are saved.
+    """
+    filename = osp.basename(img_path)
+    basename = osp.splitext(filename)[0]
+    output_dir = osp.join(osp.dirname(img_path), filename + "_tiff_files")
+    os.makedirs(output_dir, exist_ok=True)
+
+    def print_failure_message(e: Exception) -> None:
+        print(f"Failed to read {img_path}. Error:\n{e}")
+
+    if img_path.endswith("nd2"):
+        try:
+            images = nd2reader.ND2Reader(img_path)
+        except nd2reader.exceptions.InvalidVersionError as e:
+            try:
+                with tifffile.TiffFile(img_path) as tif:
+                    images = tif.asarray()
+            except Exception as e:
+                print_failure_message(e)
+        except Exception as e:
+            print_failure_message(e)
+    else:
+        try:
+            with tifffile.TiffFile(img_path) as tif:
+                images = tif.asarray()
+        except Exception as e:
+            print_failure_message(e)
+
+    if images.ndim > 3:
+        # Move z dimension to the first axis
+        images = np.moveaxis(images, -3, 0)
+        # Move channel dimension to the last axis
+        images = np.moveaxis(images, 1, -1)
+        # Squeeze: Remove axes of length one
+        images = np.squeeze(images)
+
+    save_tiff_zstack(images, basename, output_dir)
+    return output_dir
+
+
+def zstack_paths_from_dir(
+    z_stack_dir: str,
+    descending: bool = True,
+    get_zpos: Optional[Callable[[str], int]] = None,
+) -> Sequence[str]:
     """Get sorted z-stack image paths.
 
     Args:
-        z_stack_dir: Directory where z-stack images are located.
+        z_stack_dir: Directory containing z-stack images.
         descending: Whether z-position index is numbered from top to bottom
             or bottom to top. For example, descending means z-position 3 is
             located _above_ z-position 2.
@@ -69,12 +153,12 @@ def zstack_paths_from_dir(z_stack_dir: str, descending: bool=True,
     z_paths = get_img_paths(z_stack_dir)
     if get_zpos is None:
         get_zpos = default_get_zpos
-    sorted_z_paths = sorted(z_paths, key = get_zpos, reverse = descending)
+    sorted_z_paths = sorted(z_paths, key=get_zpos, reverse=descending)
     return sorted_z_paths
 
 
 def proj_focus_stacking(
-    stack: npt.NDArray, axis: int=0, kernel_size:int=5
+    stack: npt.NDArray, axis: int = 0, kernel_size: int = 5
 ) -> npt.NDArray:
     """Project image stack along given axis using focus stacking.
 
@@ -117,7 +201,7 @@ def proj_focus_stacking(
     return defs.MAX_UINT8 - output
 
 
-def proj_avg(stack: npt.NDArray, axis: int=0, dtype=np.uint8) -> npt.NDArray:
+def proj_avg(stack: npt.NDArray, axis: int = 0, dtype=np.uint8) -> npt.NDArray:
     """Project image stack along given axis using average pixel intensity.
 
     Args:
@@ -135,7 +219,7 @@ def proj_avg(stack: npt.NDArray, axis: int=0, dtype=np.uint8) -> npt.NDArray:
     return proj.astype(dtype)
 
 
-def proj_med(stack: npt.NDArray, axis: int=0, dtype=np.uint8) -> npt.NDArray:
+def proj_med(stack: npt.NDArray, axis: int = 0, dtype=np.uint8) -> npt.NDArray:
     """Project image stack along given axis using median pixel intensity.
 
     Args:
@@ -154,7 +238,7 @@ def proj_med(stack: npt.NDArray, axis: int=0, dtype=np.uint8) -> npt.NDArray:
     return proj.astype(dtype)
 
 
-def proj_max(stack: npt.NDArray, axis: int=0, dtype=np.uint8) -> npt.NDArray:
+def proj_max(stack: npt.NDArray, axis: int = 0, dtype=np.uint8) -> npt.NDArray:
     """Project image stack along given axis using maximum pixel intensity.
 
     Args:
@@ -173,7 +257,7 @@ def proj_max(stack: npt.NDArray, axis: int=0, dtype=np.uint8) -> npt.NDArray:
     return proj.astype(dtype)
 
 
-def proj_min(stack: npt.NDArray, axis: int=0, dtype=np.uint8) -> npt.NDArray:
+def proj_min(stack: npt.NDArray, axis: int = 0, dtype=np.uint8) -> npt.NDArray:
     """Project image stack along given axis using minimum pixel intensity.
 
     Args:
