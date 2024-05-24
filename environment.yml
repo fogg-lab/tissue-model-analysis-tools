@@ -25,4 +25,4 @@ dependencies:
       - keras-tuner==1.4.7
       - numpy==1.24.3
       - tensorflow[with-gpu]==2.13.0
-      - py-ome-tiff==1.0.0
+      - pyometiff==1.0.0
