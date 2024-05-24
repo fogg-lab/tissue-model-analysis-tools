@@ -30,7 +30,7 @@ A Python package for the high-throughput analysis of cancer and endothelial cell
 
 ### Quick setup
 
-Run the following commands in a terminal/command prompt window.
+Run the following commands in a terminal/command prompt window (run the commands under whichever section matches your operating system).
 
 #### Linux w/ Nvidia GPU or Windows Subsystem for Linux (WSL) w/ Nvidia GPU
 ```bash
