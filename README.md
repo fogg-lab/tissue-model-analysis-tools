@@ -18,7 +18,6 @@ A Python package for the high-throughput analysis of cancer and endothelial cell
 *Create the conda environment and install the fl_tissue_model_tools package*
 
 ### Prerequisites:
-**Note**: Conda is not strictly a requirement. Alternatively, you can install the packages listed in the requirements.txt file.
 - [Conda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html) package manager
    - For devices with ARM processors (e.g. a MacBook with an M1 or M2 chip), install [Mambaforge](https://github.com/conda-forge/miniforge) instead of Miniconda or Anaconda
 - Build tools for your operating system
@@ -73,10 +72,10 @@ git clone --recurse-submodules https://github.com/fogg-lab/tissue-model-analysis
 
 #### Create conda environment
 Build a conda environment using the right environment file, which is different for each operating system:
-- environment_linux_gpu.yml for either Linux or Windows Subsystem for Linux (WSL), with a CUDA-capable system (Nvidia GPU + CUDA installed).
-- environment_linux_cpu.yml for Linux or WSL. CPU-only.
-- environment_windows.yml for Windows. Note: If you have an Nvidia GPU you should definitely go ahead and use WSL + the linux GPU environment instead, after installing the appropriate drivers for CUDA GPU acceleration.
-- environment_mac.yml for Mac.
+- `environment_linux_gpu.yml` for either Linux or Windows Subsystem for Linux (WSL), with a CUDA-capable system (Nvidia GPU + CUDA installed).
+- `environment_linux_cpu.yml` for Linux or WSL. CPU-only.
+- `environment_windows.yml` for Windows. Note: If you have an Nvidia GPU you should definitely go ahead and use WSL + the linux GPU environment instead, after installing the appropriate drivers for CUDA GPU acceleration.
+- `environment_mac.yml` for Mac.
 
 For more information on how to manage conda environments, see [environment management reference](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html).
 
