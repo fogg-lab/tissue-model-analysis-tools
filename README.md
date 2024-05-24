@@ -29,35 +29,10 @@ A Python package for the high-throughput analysis of cancer and endothelial cell
 
 ### Quick setup
 
-Run the following commands in a terminal/command prompt window (run the commands under whichever section matches your operating system).
+Run the following commands in a terminal/command prompt window.
 
-#### Linux w/ Nvidia GPU or Windows Subsystem for Linux (WSL) w/ Nvidia GPU
 ```bash
-conda env update -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/conda_environments/environment_linux_gpu.yml
-conda activate tissue-model-analysis
-pip install -I fl_tissue_model_tools@git+https://github.com/fogg-lab/tissue-model-analysis-tools.git#subdirectory=src
-tmat configure
-```
-
-#### Linux (CPU only)
-```bash
-conda env update -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/conda_environments/environment_linux_cpu.yml
-conda activate tissue-model-analysis
-pip install -I fl_tissue_model_tools@git+https://github.com/fogg-lab/tissue-model-analysis-tools.git#subdirectory=src
-tmat configure
-```
-
-#### Windows
-```bash
-conda env update -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/conda_environments/environment_windows.yml
-conda activate tissue-model-analysis
-pip install -I fl_tissue_model_tools@git+https://github.com/fogg-lab/tissue-model-analysis-tools.git#subdirectory=src
-tmat configure
-```
-
-#### Mac
-```bash
-conda env update -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/conda_environments/environment_mac.yml
+conda env update -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/environment.yml
 conda activate tissue-model-analysis
 pip install -I fl_tissue_model_tools@git+https://github.com/fogg-lab/tissue-model-analysis-tools.git#subdirectory=src
 tmat configure
@@ -71,54 +46,19 @@ git clone --recurse-submodules https://github.com/fogg-lab/tissue-model-analysis
 ```
 
 #### Create conda environment
-Build a conda environment using the right environment file, which is different for each operating system:
-- `environment_linux_gpu.yml` for either Linux or Windows Subsystem for Linux (WSL), with a CUDA-capable system (Nvidia GPU + CUDA installed).
-- `environment_linux_cpu.yml` for Linux or WSL. CPU-only.
-- `environment_windows.yml` for Windows. Note: If you have an Nvidia GPU you should definitely go ahead and use WSL + the linux GPU environment instead, after installing the appropriate drivers for CUDA GPU acceleration.
-- `environment_mac.yml` for Mac.
+Build a conda environment using the `environment.yml` file.
 
-For more information on how to manage conda environments, see [environment management reference](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html).
+For more info on Conda environments, see [environment management reference](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html).
 
-If you cloned the repo, `cd` to the project directory and run (run the right command below for your operating system):
+If you cloned the repo, `cd` to the project directory and run:
+```bash
+conda env create -f environment.yml
+```
+
+If you didn't clone the repo, run:
 #### Linux w/ Nvidia GPU or Windows Subsystem for Linux (WSL) w/ Nvidia GPU
 ```bash
-conda env create -f conda_environments/environment_linux_gpu.yml
-```
-
-#### Linux (CPU only)
-```bash
-conda env create -f conda_environments/environment_linux_cpu.yml
-```
-
-#### Windows
-```bash
-conda env create -f conda_environments/environment_windows.yml
-```
-
-#### Mac
-```bash
-conda env create -f conda_environments/environment_mac.yml
-```
-
-If you didn't clone the repo, run (run the right command below for your operating system):
-#### Linux w/ Nvidia GPU or Windows Subsystem for Linux (WSL) w/ Nvidia GPU
-```bash
-conda env create -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/conda_environments/environment_linux_gpu.yml
-```
-
-#### Linux (CPU only)
-```bash
-conda env create -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/conda_environments/environment_linux_cpu.yml
-```
-
-#### Windows
-```bash
-conda env create -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/conda_environments/environment_windows.yml
-```
-
-#### Mac
-```bash
-conda env create -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/conda_environments/environment_mac.yml
+conda env create -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/environment.yml
 ```
 
 Next, activate the environment:
@@ -171,14 +111,7 @@ pip uninstall fl_tissue_model_tools
 ---
 
 #### Update `fl_tissue_model_tools` package
-Execute
-```bash
-tmat update
-```
-Or, to update existing scripts and config files without confirmation, execute:
-```bash
-tmat update -f
-```
+Run the setup commands again. When you run `tmat configure`, make sure to select `y` at every prompt to overwrite the old scripts.
 
 #### Jupyter + `fl_tissue_model_tools`
 If changes are made to the `fl_tissue_model_tools` code, the notebook kernel must be restarted for those changes to be reflected.
