@@ -56,7 +56,6 @@ conda env update -f environment.yml
 ```
 
 If you didn't clone the repo, run:
-#### Linux w/ Nvidia GPU or Windows Subsystem for Linux (WSL) w/ Nvidia GPU
 ```bash
 conda env update -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/environment.yml
 ```
