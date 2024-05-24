@@ -19,7 +19,7 @@ THRESH_SUBDIR = "thresholded"
 CALC_SUBDIR = "calculations"
 
 
-def load_img(img_path: str, dsamp: bool=True, dsize: int=250) -> npt.NDArray:
+def load_img(img_path: str, dsamp: bool = True, dsize: int = 250) -> npt.NDArray:
     """Load and downsample image.
 
     Args:
@@ -39,7 +39,7 @@ def load_img(img_path: str, dsamp: bool=True, dsize: int=250) -> npt.NDArray:
     return img
 
 
-def load_and_norm(img_path: str, dsize: int=250) -> npt.NDArray:
+def load_and_norm(img_path: str, dsize: int = 250) -> npt.NDArray:
     """Load and normalize image to new range.
 
     Args:
@@ -58,8 +58,11 @@ def load_and_norm(img_path: str, dsize: int=250) -> npt.NDArray:
 
 
 def mask_and_threshold(
-    img: npt.NDArray, well_mask: npt.NDArray, well_idx: Tuple[npt.NDArray, npt.NDArray],
-    sd_coef: float, rand_state: np.random.RandomState,
+    img: npt.NDArray,
+    well_mask: npt.NDArray,
+    well_idx: Tuple[npt.NDArray, npt.NDArray],
+    sd_coef: float,
+    rand_state: np.random.RandomState,
 ) -> npt.NDArray:
     """Apply well mask to image and perform foreground thresholding on the masked image.
 
@@ -77,7 +80,7 @@ def mask_and_threshold(
     masked = prep.apply_mask(img, well_mask).astype(float)
     masked_and_thresholded = prep.exec_threshold(masked, well_idx, sd_coef, rand_state)
 
-    return masked_and_thresholded
+    return (masked_and_thresholded > 0).astype(np.uint8) * defs.MAX_UINT8
 
 
 def prep_images(img_paths: Sequence[str], dsamp_size: int) -> List[npt.NDArray]:
@@ -92,10 +95,12 @@ def prep_images(img_paths: Sequence[str], dsamp_size: int) -> List[npt.NDArray]:
         Downsampled, grayscale versions of initial images.
 
     """
-    gs_ds_imgs = d.compute([
-        d.delayed(load_and_norm)(img_p, dsize=(dsamp_size, dsamp_size))
-        for img_p in img_paths
-    ])[0]
+    gs_ds_imgs = d.compute(
+        [
+            d.delayed(load_and_norm)(img_p, dsize=(dsamp_size, dsamp_size))
+            for img_p in img_paths
+        ]
+    )[0]
     return gs_ds_imgs
 
 
@@ -118,9 +123,11 @@ def well_mask_setup(img: npt.NDArray, well_buffer=0.05):
 
 
 def threshold_images(
-    imgs: List[npt.NDArray], well_masks: List[npt.NDArray],
-    well_idx: List[Tuple[npt.NDArray, npt.NDArray]], sd_coef: float,
-    rand_state: np.random.RandomState
+    imgs: List[npt.NDArray],
+    well_masks: List[npt.NDArray],
+    well_idx: List[Tuple[npt.NDArray, npt.NDArray]],
+    sd_coef: float,
+    rand_state: np.random.RandomState,
 ) -> List[npt.NDArray]:
     """Apply mask & threshold to all images.
 
@@ -136,8 +143,12 @@ def threshold_images(
 
     """
     gmm_thresh_all = d.compute(
-        [d.delayed(mask_and_threshold)(img, well_masks[i], well_idx[i], sd_coef, rand_state)
-            for i, img in enumerate(imgs)]
+        [
+            d.delayed(mask_and_threshold)(
+                img, well_masks[i], well_idx[i], sd_coef, rand_state
+            )
+            for i, img in enumerate(imgs)
+        ]
     )[0]
     return gmm_thresh_all
 
@@ -156,22 +167,26 @@ def compute_areas(
 
     """
     area_prop = d.compute(
-        [d.delayed(an.compute_area_prop)(img, well_pix_area[i]) for i, img in enumerate(imgs)]
+        [
+            d.delayed(an.compute_area_prop)(img, well_pix_area[i])
+            for i, img in enumerate(imgs)
+        ]
     )[0]
     area_prop = np.array(area_prop)
     return area_prop
 
 
 def main():
-    '''Computes cell area and saves to output directory.'''
+    """Computes cell area and saves to output directory."""
 
-    args = su.parse_cell_area_args({
-        "thresh_subdir": THRESH_SUBDIR,
-        "calc_subdir": CALC_SUBDIR,
-        "default_config_path": DEFAULT_CONFIG_PATH}
+    args = su.parse_cell_area_args(
+        {
+            "thresh_subdir": THRESH_SUBDIR,
+            "calc_subdir": CALC_SUBDIR,
+            "default_config_path": DEFAULT_CONFIG_PATH,
+        }
     )
     verbose = args.verbose
-
 
     ### Verify input source ###
     try:
@@ -180,14 +195,14 @@ def main():
         print(f"{su.SFM.failure} {error}")
         sys.exit()
 
-
     ### Verify output destination ###
     try:
-        su.cell_area_verify_output_dir(args.out_root, THRESH_SUBDIR, CALC_SUBDIR, verbose=verbose)
+        su.cell_area_verify_output_dir(
+            args.out_root, THRESH_SUBDIR, CALC_SUBDIR, verbose=verbose
+        )
     except PermissionError as error:
         print(f"{su.SFM.failure} {error}")
         sys.exit()
-
 
     ### Load config ###
     config_path = args.config
@@ -200,7 +215,6 @@ def main():
     if verbose:
         su.verbose_header("Performing Analysis")
         print("Computing areas...")
-
 
     ### Prep images ###
     dsamp_size = config["dsamp_size"]
@@ -216,7 +230,7 @@ def main():
     def chunks(lst, n):
         """Yield successive n-sized chunks from lst."""
         for i in range(0, len(lst), n):
-            yield lst[i:i + n]
+            yield lst[i : i + n]
 
     for img_paths in chunks(all_img_paths, batch_size):
         try:
@@ -230,7 +244,9 @@ def main():
         well_masks, well_idx, well_pix_areas = zip(*well_masks_with_info)
 
         # Threshold images
-        gmm_thresh = threshold_images(gs_ds_imgs, well_masks, well_idx, sd_coef, rand_state)
+        gmm_thresh = threshold_images(
+            gs_ds_imgs, well_masks, well_idx, sd_coef, rand_state
+        )
         gmm_thresh_all.extend(gmm_thresh)
         ### Compute areas ###
         area_prop.extend(compute_areas(gmm_thresh, well_pix_areas))
@@ -245,16 +261,19 @@ def main():
         print(f"{os.linesep}Saving results...")
 
     img_ids = [Path(img_n).stem for img_n in all_img_paths]
-    area_df = pd.DataFrame(
-        data = {"image_id": img_ids, "area_pct": area_prop * 100}
-    )
-    for i, img_id in enumerate(img_ids):
-        out_img = gmm_thresh_all[i].astype(np.uint8)
-        out_path = os.path.join(args.out_root, THRESH_SUBDIR, f"{img_id}_thresholded.png")
-        cv2.imwrite(out_path, out_img)
+    area_df = pd.DataFrame(data={"image_id": img_ids, "area_pct": area_prop * 100})
+    if args.save_intermediates:
+        for i, img_id in enumerate(img_ids):
+            out_img = gmm_thresh_all[i].astype(np.uint8)
+            out_path = os.path.join(
+                args.out_root, THRESH_SUBDIR, f"{img_id}_thresholded.png"
+            )
+            cv2.imwrite(out_path, out_img)
 
     if verbose:
-        print(f"... Thresholded images saved to:{os.linesep}\t{args.out_root}/{THRESH_SUBDIR}")
+        print(
+            f"... Thresholded images saved to:{os.linesep}\t{args.out_root}/{THRESH_SUBDIR}"
+        )
 
     area_out_path = os.path.join(args.out_root, CALC_SUBDIR, "cell_area.csv")
     area_df.to_csv(area_out_path, index=False)
