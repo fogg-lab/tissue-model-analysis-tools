@@ -22,5 +22,6 @@ dependencies:
   - tifffile
   - tqdm
   - pip:
+    - keras<3
     - keras-tuner
-    - tensorflow[and-cuda]<3.0
+    - tensorflow[and-cuda]
