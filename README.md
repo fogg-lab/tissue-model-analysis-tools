@@ -32,9 +32,33 @@ A Python package for the high-throughput analysis of cancer and endothelial cell
 
 Run the following commands in a terminal/command prompt window.
 
+#### Linux w/ Nvidia GPU or Windows Subsystem for Linux (WSL) w/ Nvidia GPU
 ```bash
-# Recommended: replace environment.yml with a platform-specific file such as environment_windows.yml or environment_linux.yml
-conda env update -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/conda_environments/environment.yml
+conda env update -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/conda_environments/environment_linux_gpu.yml
+conda activate tissue-model-analysis
+pip install -I fl_tissue_model_tools@git+https://github.com/fogg-lab/tissue-model-analysis-tools.git#subdirectory=src
+tmat configure
+```
+
+#### Linux (CPU only)
+```bash
+conda env update -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/conda_environments/environment_linux_cpu.yml
+conda activate tissue-model-analysis
+pip install -I fl_tissue_model_tools@git+https://github.com/fogg-lab/tissue-model-analysis-tools.git#subdirectory=src
+tmat configure
+```
+
+#### Windows
+```bash
+conda env update -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/conda_environments/environment_windows.yml
+conda activate tissue-model-analysis
+pip install -I fl_tissue_model_tools@git+https://github.com/fogg-lab/tissue-model-analysis-tools.git#subdirectory=src
+tmat configure
+```
+
+#### Mac
+```bash
+conda env update -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/conda_environments/environment_mac.yml
 conda activate tissue-model-analysis
 pip install -I fl_tissue_model_tools@git+https://github.com/fogg-lab/tissue-model-analysis-tools.git#subdirectory=src
 tmat configure
@@ -48,20 +72,54 @@ git clone --recurse-submodules https://github.com/fogg-lab/tissue-model-analysis
 ```
 
 #### Create conda environment
-Build a conda environment using the `environment.yml` file.
+Build a conda environment using the right environment file, which is different for each operating system:
+- environment_linux_gpu.yml for either Linux or Windows Subsystem for Linux (WSL), with a CUDA-capable system (Nvidia GPU + CUDA installed).
+- environment_linux_cpu.yml for Linux or WSL. CPU-only.
+- environment_windows.yml for Windows, CPU-only. Note: If you have an Nvidia GPU you should definitely go ahead and use WSL and install the appropriate drivers/CUDA for GPU acceleration.
+- environment_mac.yml for Mac, CPU-only.
 
 For more information on how to manage conda environments, see [environment management reference](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html).
 
-If you cloned the repo, `cd` to the project directory and run:
+If you cloned the repo, `cd` to the project directory and run (run the right command below for your operating system):
+#### Linux w/ Nvidia GPU or Windows Subsystem for Linux (WSL) w/ Nvidia GPU
 ```bash
-# Recommended: replace environment.yml with a platform-specific file such as environment_windows.yml or environment_linux.yml
-conda env create -f conda_environments/environment.yml
+conda env create -f conda_environments/environment_linux_gpu.yml
 ```
 
-If you didn't clone the repo, run:
+#### Linux (CPU only)
 ```bash
-# Recommended: replace environment.yml with a platform-specific file such as environment_windows.yml or environment_linux.yml
-conda env create -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/conda_environments/environment.yml
+conda env create -f conda_environments/environment_linux_cpu.yml
+```
+
+#### Windows
+```bash
+conda env create -f conda_environments/environment_windows.yml
+```
+
+#### Mac
+```bash
+conda env create -f conda_environments/environment_mac.yml
+```
+
+If you didn't clone the repo, run (run the right command below for your operating system):
+#### Linux w/ Nvidia GPU or Windows Subsystem for Linux (WSL) w/ Nvidia GPU
+```bash
+conda env create -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/conda_environments/environment_linux_gpu.yml
+```
+
+#### Linux (CPU only)
+```bash
+conda env create -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/conda_environments/environment_linux_cpu.yml
+```
+
+#### Windows
+```bash
+conda env create -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/conda_environments/environment_windows.yml
+```
+
+#### Mac
+```bash
+conda env create -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/conda_environments/environment_mac.yml
 ```
 
 Next, activate the environment:
@@ -179,10 +237,10 @@ Here, `input_path` is the full path to a directory of images which will be analy
 **Advanced usage:**
 
 * Create custom configuration `.json` file, using `config/default_cell_area_computation.json` as a template.
-    * `dsamp_size`: Size that input images will be downsampled to for analysis. Smaller sizes mean faster, less accurate analysis.
-    * `sd_coef`: Strictness of thresholding. Positive numbers are more strict, negative numbers are less strict. This is a multiplier of the foreground pixel standard deviation, so values in the range (-2, 2) are the most reasonable.
-    * `well_buffer`: Proportion of the well's outer width/diameter to trim from the outer part of the well mask. For example, a circular well with an outer diameter of 1000 microns and inner diameter of 900 microns, the buffer is 50 microns, so the `well_buffer` should be 50/1000=0.05.
-    * `rs_seed`: A random seed for the algorithm. Allows for reproducability since the Gaussian curves are randomly initialized.
+    * `dsamp_size` (float): Size that input images will be downsampled to for analysis. Smaller sizes mean faster, less accurate analysis.
+    * `sd_coef` (float): Strictness of thresholding. Positive numbers are more strict, negative numbers are less strict. This is a multiplier of the foreground pixel standard deviation, so values in the range (-2, 2) are the most reasonable.
+    * `well_buffer` (float): Proportion of the image outer width/diameter to exclude from processing (to apply exclusion mask starting at the edge of the well). E.g., for a circular well with an outer diameter of 1000 microns and inner diameter of 900 microns, the buffer is 50 microns, so the `well_buffer` should be 50/1000=0.05. By default, this parameter is set to 0, which means that no exclusion mask will be applied.
+    * `rs_seed` (integer): A random seed for the algorithm. Allows for reproducability since the Gaussian curves are randomly initialized.
 
 #### Z Projection
 **Basic usage:**
@@ -255,6 +313,7 @@ tmat compute_branches -v -i "path/to/input/folder" "path/to/output/folder"
 Customize configuration variables (you can edit `config/default_branching_computation.json` in your base directory, or refer to `src/fl_tissue_model_tools/config` in this repository):
 
 - `well_width_microns` (float): Physical width of the image in microns.
+- `well_buffer` (float): Proportion of the image outer width/diameter to exclude from processing (to apply exclusion mask starting at the edge of the well). E.g., for a circular well with an outer diameter of 1000 microns and inner diameter of 900 microns, the buffer is 50 microns, so the `well_buffer` should be 50/1000=0.05. By default, this parameter is set to 0, which means that no exclusion mask will be applied.
 - `use_latest_model_cfg` (boolean): If `True`, the most recently trained model in the `model_training` folder will be used. If `False`, the model specified in `model_cfg_path` will be used.
 - `model_cfg_path` (string): Path to the configuration file of the segmentation model. You can leave this blank (`''`) to use the most recently trained model in the `model_training` folder.
 - `graph_thresh_1` (float): May require some experimentation to find the best value for your data. This threshold controls how much of the morse graph is used to compute the number of branches. Lower values include more of the graph, and more branches are detected. Higher values include less of the graph, and fewer branches are detected. Try different values like 0.25, 0.5, 1, 2, 4, etc. up to around 64.
