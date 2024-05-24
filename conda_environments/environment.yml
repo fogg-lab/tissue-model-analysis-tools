@@ -1,0 +1,26 @@
+name: tissue-model-analysis
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - albumentations
+  - boost
+  - dask
+  - gudhi
+  - jupyterlab
+  - matplotlib
+  - nd2reader
+  - networkx
+  - opencv
+  - pip
+  - python=3.10.13
+  - scikit-learn
+  - scipy
+  - setuptools
+  - pillow
+  - scikit-image
+  - tifffile
+  - tqdm
+  - pip:
+    - keras-tuner
+    - tensorflow[and-cuda]<3.0
