@@ -52,13 +52,13 @@ For more info on Conda environments, see [environment management reference](http
 
 If you cloned the repo, `cd` to the project directory and run:
 ```bash
-conda env create -f environment.yml
+conda env update -f environment.yml
 ```
 
 If you didn't clone the repo, run:
 #### Linux w/ Nvidia GPU or Windows Subsystem for Linux (WSL) w/ Nvidia GPU
 ```bash
-conda env create -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/environment.yml
+conda env update -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/environment.yml
 ```
 
 Next, activate the environment:
