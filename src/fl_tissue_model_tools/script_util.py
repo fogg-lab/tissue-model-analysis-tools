@@ -103,6 +103,7 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
         help=(
             "Save all intermediate images and visualizations generated during branching analysis."
         ),
+        default=True,
     )
 
     parser.add_argument(
@@ -112,6 +113,7 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
         help=(
             "Save visualizations: original image, segmentation mask, and morse tree plot."
         ),
+        default=True,
     )
 
     parser.add_argument(
@@ -119,6 +121,7 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
         "--verbose",
         action="store_true",
         help=("Print verbose output to the console."),
+        default=True,
     )
 
     args = parser.parse_args()
@@ -178,10 +181,21 @@ def parse_cell_area_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "-i",
+        "--save-intermediates",
+        action="store_true",
+        help=(
+            "Save all intermediate images generated during cell area analysis."
+        ),
+        default=True,
+    )
+
+    parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
         help="Verbose output during script execution.",
+        default=True,
     )
 
     args = parser.parse_args()
@@ -258,6 +272,7 @@ def parse_zproj_args() -> argparse.Namespace:
         "--verbose",
         action="store_true",
         help="Verbose output during script execution.",
+        default=True,
     )
 
     args = parser.parse_args()
@@ -330,6 +345,7 @@ def parse_inv_depth_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
         "--verbose",
         action="store_true",
         help="Verbose output during script execution.",
+        default=True,
     )
 
     args = parser.parse_args()
