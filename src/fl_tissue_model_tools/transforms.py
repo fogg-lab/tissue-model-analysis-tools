@@ -280,7 +280,7 @@ def filter_branch_seg_mask(mask: npt.NDArray) -> npt.NDArray:
 
     labeled_components = measure.label(mask, connectivity=2)
     region_props = measure.regionprops(labeled_components)
-    region_circularities = [4 * np.pi * r.area / r.perimeter**2 for r in region_props]
+    region_circularities = [4 * np.pi * r.area / (r.perimeter**2 + 1e-7) for r in region_props]
 
     seg_skel=morphology.skeletonize(mask)
     G = nx_graph_from_binary_skeleton(seg_skel)
