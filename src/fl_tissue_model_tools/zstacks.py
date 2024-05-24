@@ -19,7 +19,7 @@ import nd2reader
 from . import defs
 from .helper import get_img_paths
 
-# Zpos pattern: designed to be flexible, matches substrings like z012., Z34_, z[567]-
+# Zpos pattern: flexible, matches substrings like z012., Z34_, z[567]-
 ZPOS_PATTERN = "(z|Z)(\[)?[0-9]+(\])?(_|\.|\-)"
 
 
@@ -78,7 +78,7 @@ def save_tiff_zstack(image_stack: npt.NDArray, basename: str, output_dir: str) -
     """
     for i, image in enumerate(image_stack):
         print(image.shape)
-        output_path = osp.join(output_dir, f"Z[{str(i).zfill(5)}].tiff")
+        output_path = osp.join(output_dir, f"Z{str(i).zfill(5)}.tiff")
         tifffile.imsave(output_path, image)
 
 
