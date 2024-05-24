@@ -100,15 +100,15 @@ Copy-Item -Path .\branching_input\B1_001-1.tif -Destination .\branching_in2
 
 Write-Host "----------------------------------------"
 Write-Host "Command:"
-Write-Host "tmat compute_branches ./branching_in2 ./branching_out2"
+Write-Host "tmat compute_branches ./branching_in2 ./branching_out2 -c $HOME\fl_tissue_model_tools\config\branching_computation_with_well_boundaries.json"
 Write-Host "----------------------------------------"
-tmat compute_branches .\branching_in2 .\branching_out2
+tmat compute_branches .\branching_in2 .\branching_out2 -c $HOME\fl_tissue_model_tools\config\branching_computation_with_well_boundaries.json
 
 Write-Host "----------------------------------------"
 Write-Host "Command:"
-Write-Host "tmat compute_cell_area ./cell_coverage_area_input ./cell_coverage_area_out"
+Write-Host "tmat compute_cell_area ./cell_coverage_area_input ./cell_coverage_area_out -c $HOME\fl_tissue_model_tools\config\cell_area_computation_with_well_boundaries.json"
 Write-Host "----------------------------------------"
-tmat compute_cell_area .\cell_coverage_area_input .\cell_coverage_area_out
+tmat compute_cell_area .\cell_coverage_area_input .\cell_coverage_area_out -c $HOME\fl_tissue_model_tools\config\cell_area_computation_with_well_boundaries.json
 
 Write-Host "----------------------------------------"
 Write-Host "Command:"

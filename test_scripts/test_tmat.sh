@@ -87,14 +87,14 @@ echo "----------------------------------------"
 cp ./branching_input/B1_001-1.tif ./branching_in2
 echo "----------------------------------------"
 echo "Command:"
-echo "tmat compute_branches ./branching_in2 ./branching_out2"
+echo "tmat compute_branches ./branching_in2 ./branching_out2 -c ~/fl_tissue_model_tools/config/branching_computation_with_well_boundaries.json"
 echo "----------------------------------------"
-tmat compute_branches ./branching_in2 ./branching_out2
+tmat compute_branches ./branching_in2 ./branching_out2 -c ~/fl_tissue_model_tools/config/branching_computation_with_well_boundaries.json
 echo "----------------------------------------"
 echo "Command:"
-echo "tmat compute_cell_area ./cell_coverage_area_input ./cell_coverage_area_out"
+echo "tmat compute_cell_area ./cell_coverage_area_input ./cell_coverage_area_out -c ~/fl_tissue_model_tools/config/cell_area_computation_with_well_boundaries.json"
 echo "----------------------------------------"
-tmat compute_cell_area ./cell_coverage_area_input ./cell_coverage_area_out
+tmat compute_cell_area ./cell_coverage_area_input ./cell_coverage_area_out -c ~/fl_tissue_model_tools/config/cell_area_computation_with_well_boundaries.json
 echo "----------------------------------------"
 echo "Command:"
 echo "tmat compute_inv_depth ./invasion_depth_input ./invasion_depth_out"
