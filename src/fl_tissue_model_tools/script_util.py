@@ -468,7 +468,7 @@ def zproj_verify_input_dir(input_path: str, verbose: bool = False) -> Sequence[s
 
     Input directory should contain either:
      - One subdirectory per Z stack.
-     - One OME-TIFF file or ND2 file per Z stack.
+     - One OME-TIFF file per Z stack.
      - No subdirectories, requires filenames for each z-stack to have the same unique
        alphanumeric pattern at the beginning of the filename (e.g. A12_...).
     Each Zstack should contain all Z position images for that stack.
@@ -495,7 +495,7 @@ def zproj_verify_input_dir(input_path: str, verbose: bool = False) -> Sequence[s
 
     if not osp.isdir(input_path):
         raise FileNotFoundError(
-            f"Data directory, ND2 or OME-TIF file not found at path: {os.linesep}\t{input_path}"
+            f"Data directory or OME-TIF file not found at path: {os.linesep}\t{input_path}"
         )
 
     zstack_paths = list(filter(zstacks.is_zstack, glob(f"{input_path}/*")))

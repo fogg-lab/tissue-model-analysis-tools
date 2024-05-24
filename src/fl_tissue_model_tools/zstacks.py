@@ -14,7 +14,8 @@ import numpy.typing as npt
 import numpy as np
 import cv2
 import tifffile
-import nd2reader
+import imghdr
+from pyometiff import OMETIFFReader
 
 from . import defs
 from .helper import get_img_paths
@@ -56,11 +57,23 @@ def _blur_and_lap(image: npt.NDArray, kernel_size: int = 5) -> npt.NDArray:
 
 
 def is_single_file_zstack(fp: str) -> bool:
-    """Check whether given file path `fp` is an OME or ND2 file."""
+    """Check whether given file path `fp` is an OME file."""
     basename = osp.basename(fp)
-    return osp.isfile(fp) and any(
-        ext in ("ome", "nd2") for ext in basename.lower().split(".")[1:]
-    )
+    if not osp.isfile(fp):
+        # directory or wrong file path
+        return False
+    if not any(ext == "ome" for ext in basename.lower().split(".")[1:]):
+        if imghdr.what(fp) != "tiff":
+            # Not a TIFF file of any kind
+            return False
+    if re.search(ZPOS_PATTERN, basename) is not None:
+        # Looks like a single slice within a z-stack, not a whole z-stack
+        return False
+    try:
+        OMETIFFReader(fp).read()
+    except Exception:
+        return False
+    return True
 
 
 def is_zstack(fp):
@@ -83,7 +96,7 @@ def save_tiff_zstack(image_stack: npt.NDArray, basename: str, output_dir: str) -
 
 
 def convert_zstack_image_to_tiffs(img_path: str) -> str:
-    """Convert a z-stack image file to individual TIFF files.
+    """Convert a z-stack image file in OME-TIFF format to individual TIFF files.
 
     Args:
         img_path: Path to the input z-stack image file.
@@ -99,23 +112,11 @@ def convert_zstack_image_to_tiffs(img_path: str) -> str:
     def print_failure_message(e: Exception) -> None:
         print(f"Failed to read {img_path}. Error:\n{e}")
 
-    if img_path.endswith("nd2"):
-        try:
-            images = nd2reader.ND2Reader(img_path)
-        except nd2reader.exceptions.InvalidVersionError as e:
-            try:
-                with tifffile.TiffFile(img_path) as tif:
-                    images = tif.asarray()
-            except Exception as e:
-                print_failure_message(e)
-        except Exception as e:
-            print_failure_message(e)
-    else:
-        try:
-            with tifffile.TiffFile(img_path) as tif:
-                images = tif.asarray()
-        except Exception as e:
-            print_failure_message(e)
+    try:
+        with tifffile.TiffFile(img_path) as tif:
+            images = tif.asarray()
+    except Exception as e:
+        print_failure_message(e)
 
     if images.ndim > 3:
         # Move z dimension to the first axis
