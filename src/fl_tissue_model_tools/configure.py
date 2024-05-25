@@ -65,7 +65,7 @@ def configure(target_base_dir: str='', replace_subdirs_auto=False):
 
     # Ensure that base_dir.parent exists
     if not Path(target_base_dir).parent.is_dir():
-        print(f'Error - Parent directory does not exist: {target_base_dir.parent}')
+        print(f'Error - Parent directory does not exist: {Path(target_base_dir).parent}')
         sys.exit(1)
 
     # Create or move the base directory
