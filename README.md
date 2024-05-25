@@ -164,9 +164,9 @@ tmat compute_cell_area "path/to/input/folder" "path/to/output/folder"
 
 Here, `path/to/input/folder` is the full path to a directory of images which will be analyzed.
 
-If your images are not cropped to the region inside the well, you can have the script automatically detect the well region by adding the `--detect_well` flag (or `-w` for short). For instance, if your wells are circular and you add the `--detect_well` flag, the script will detect and mask out the region outside of this circular well. Also works for "squircle" shaped (i.e. square with rounded corners) wells. Example usage:
+If your images are not cropped to the region inside the well, you can have the script automatically detect the well region by adding the `--detect-well` flag (or `-w` for short). For instance, if your wells are circular and you add the `--detect-well` flag, the script will detect and mask out the region outside of this circular well. Also works for "squircle" shaped (i.e. square with rounded corners) wells. Example usage:
 ```bash
-tmat compute_cell_area --detect_well "path/to/input/folder" "path/to/output/folder"
+tmat compute_cell_area --detect-well "path/to/input/folder" "path/to/output/folder"
 ```
 
 **Advanced usage:**
@@ -244,9 +244,9 @@ tmat compute_branches "path/to/input/folder" "path/to/output/folder"
 
 Here, `path/to/input/folder` is the full path to a directory of images which will be analyzed.
 
-If your images are not cropped to the region inside the well, you can have the script automatically detect the well region by adding the `--detect_well` flag (or `-w` for short). For instance, if your wells are circular and you add the `--detect_well` flag, the script will detect and mask out the region outside of this circular well. Also works for "squircle" shaped (i.e. square with rounded corners) wells. Example usage:
+If your images are not cropped to the region inside the well, you can have the script automatically detect the well region by adding the `--detect-well` flag (or `-w` for short). For instance, if your wells are circular and you add the `--detect-well` flag, the script will detect and mask out the region outside of this circular well. Also works for "squircle" shaped (i.e. square with rounded corners) wells. Example usage:
 ```bash
-tmat compute_branches --detect_well "path/to/input/folder" "path/to/output/folder"
+tmat compute_branches --detect-well "path/to/input/folder" "path/to/output/folder"
 ```
 
 **Advanced usage:**
