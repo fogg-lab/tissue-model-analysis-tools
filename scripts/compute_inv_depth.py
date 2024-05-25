@@ -20,25 +20,23 @@ DEFAULT_CONFIG_PATH = str(defs.SCRIPT_CONFIG_DIR / "default_invasion_depth_compu
 
 def main():
     args = su.parse_inv_depth_args({"default_config_path": DEFAULT_CONFIG_PATH})
-    verbose = args.verbose
 
     ### Verify input source ###
     try:
-        su.inv_depth_verify_input_dir(args.in_root, verbose=verbose)
+        su.inv_depth_verify_input_dir(args.in_root)
     except FileNotFoundError as e:
         print(f"{su.SFM.failure} {e}")
         sys.exit()
 
     ### Verify output destination ###
     try:
-        su.inv_depth_verify_output_dir(args.out_root, verbose=verbose)
+        su.inv_depth_verify_output_dir(args.out_root)
     except PermissionError as e:
         print(f"{su.SFM.failure} {e}")
         sys.exit()
 
     ### Load best hyperparameters ###
-    if verbose:
-        su.verbose_header("Loading Classifier")
+    su.section_header("Loading Classifier")
 
     best_hp_path = defs.MODEL_TRAINING_DIR / "invasion_depth_best_hp.json"
     with open(best_hp_path, 'r') as fp:
@@ -62,7 +60,7 @@ def main():
     ### Load config ###
     config_path = args.config
     try:
-        config = su.inv_depth_verify_config_file(config_path, n_models, verbose=verbose)
+        config = su.inv_depth_verify_config_file(config_path, n_models)
     except FileNotFoundError as e:
         print(f"{su.SFM.failure} {e}")
         sys.exit()
@@ -89,8 +87,7 @@ def main():
     ]
 
     for i, m in enumerate(inv_depth_models):
-        if verbose:
-            print(f"Loading classifier {i}...")
+        print(f"Loading classifier {i}...")
         # Weights don't load properly in trainable set to False for model
         # Set trainable to True, load weights, then set back to False
         ith_best_idx = sorted_best_model_idx[i]
@@ -98,17 +95,14 @@ def main():
         weights_path = str(best_ensemble_dir / f"best_finetune_weights_{ith_best_idx}.h5")
         m.load_weights(weights_path)
         m.trainable = False
-        if verbose:
-            print(f"... Classifier {i} loaded.")
+        print(f"... Classifier {i} loaded.")
 
-    if verbose:
-        print("All classifiers loaded.")
-        print(su.SFM.success)
-        su.verbose_footer()
+    print("All classifiers loaded.")
+    print(su.SFM.success)
+    su.section_footer()
 
     ### Generate predictions ###
-    if verbose:
-        su.verbose_header("Making predictions")
+    su.section_header("Making predictions")
 
     try:
         zstack_dir = args.in_root
@@ -128,22 +122,18 @@ def main():
         yhatp = np.mean(yhatp_m, axis=1, keepdims=True)
         # Threshold probability predictions
         yhat = (yhatp > cls_thresh).astype(np.int32)
-        if verbose:
-            print("... Predictions finished.")
+        print("... Predictions finished.")
 
         # Save outputs
-        if verbose:
-            print("Saving results...")
+        print("Saving results...")
         output_file = pd.DataFrame({"img_name": [Path(zp).name for zp in zpaths],
                         "inv_prob": yhatp.squeeze(), "inv_label": yhat.squeeze()})
         out_csv_path = os.path.join(args.out_root, "invasion_depth_predictions.csv")
         output_file.to_csv(out_csv_path, index=False)
-        if verbose:
-            print("... Results saved.")
+        print("... Results saved.")
 
-        if verbose:
-            print(su.SFM.success)
-            su.verbose_footer()
+        print(su.SFM.success)
+        su.section_footer()
 
     except Exception as e:
         print(f"{su.SFM.failure} {e}")

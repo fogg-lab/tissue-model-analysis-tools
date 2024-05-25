@@ -29,7 +29,7 @@ def save_vis(img, save_dir, filename):
 
 
 def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output_dir: Path,
-                config: dict, save_intermediates: bool, save_graphics: bool) -> None:
+                config: dict, use_well_mask: bool = False) -> None:
     '''Measure branches in image and save results to output directory.
 
     Args:
@@ -39,7 +39,6 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
     '''
 
     well_width_microns = config.get("well_width_microns", 1000.0)
-    well_buffer = config.get("well_buffer", 0.0)
     morse_thresholds = config.get("graph_thresh_1", 2), config.get("graph_thresh_2", 4)
     graph_smoothing_window = config.get("graph_smoothing_window", 10)
     min_branch_length = config.get("min_branch_length", 10)
@@ -55,24 +54,34 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
     target_shape = tuple(np.round(np.multiply(img.shape[:2], model.ds_ratio)).astype(int))
     img = cv2.resize(img, target_shape, interpolation=cv2.INTER_LANCZOS4)
 
-    if save_intermediates or save_graphics:
-        vis_dir = output_dir / "visualizations" / img_path.stem
-        vis_dir.mkdir(parents=True, exist_ok=True)
-        save_vis(img, vis_dir, "original_image.png")
+    # Create directory for intermediate outputs and save original image
+    vis_dir = output_dir / "visualizations" / img_path.stem
+    vis_dir.mkdir(parents=True, exist_ok=True)
+    save_vis(img, vis_dir, "original_image.png")
 
     print("Applying mask to image...")
 
     # Create a mask over the well and a smaller, inverted mask for pruning
     # The pruning mask is used to remove spurious branches detected near the well edge
-    well_mask = generate_well_mask(img, well_buffer, return_superellipse_params=True)
+    if use_well_mask:
+        print("Applying mask to image...")
+        well_mask = generate_well_mask(img, return_superellipse_params=True)
+    else:
+        well_mask = np.full_like(img, fill_value=True, dtype=np.bool_)
+
     if isinstance(well_mask, tuple):
         well_mask, t, d, s_a, s_b, c_x, c_y, n = well_mask
-        d = d * 0.9     # shrink superellipse for the pruning mask
-        pruning_mask = gen_superellipse_mask(t, d, s_a, s_b, c_x, c_y, n, img.shape[:2])
+        well_mask = well_mask > 0
+        # shrink superellipse for the pruning mask
+        d *= 0.9
+        shrunken_well_mask = gen_superellipse_mask(t, d, s_a, s_b, c_x, c_y, n, img.shape[:2])
     else:
-        # generate_well_mask failed to fit a superellipse
-        pruning_mask = binary_erosion(well_mask, disk(5))
-    pruning_mask = np.logical_not(pruning_mask)
+        # `generate_well_mask` failed to fit a superellipse
+        # convert `well_mask` to a boolean mask
+        well_mask = well_mask > 0
+        # shrink superellipse for the pruning mask using binary erosion
+        shrunken_well_mask = binary_erosion(well_mask, disk(5))
+    pruning_mask = np.logical_not(shrunken_well_mask)
 
     print("")
     print("Segmenting image...")
@@ -80,8 +89,9 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
     pred = model.predict(img * well_mask, auto_resample=False)
     seg_mask = pred > 0.5
 
-    if save_intermediates:
-        save_vis(pred, vis_dir, "prediction.png")
+    # Save pred and save well mask if needed
+    save_vis(pred, vis_dir, "prediction.png")
+    if use_well_mask:
         save_vis(well_mask, vis_dir, "well_mask.png")
 
     # filter out non-branching structures from segmentation mask
@@ -94,10 +104,9 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
 
     pred = pred * relative_dt
 
-    if save_intermediates or save_graphics:
-        save_vis(seg_mask, vis_dir, "segmentation_mask.png")
-    if save_intermediates:
-        save_vis(pred, vis_dir, "distance_transform.png")
+    # Save seg mask and distance transform result
+    save_vis(seg_mask, vis_dir, "segmentation_mask.png")
+    save_vis(pred, vis_dir, "distance_transform.png")
 
     pred = rescale_intensity(pred, out_range=(0, 255))
     pred = pred.astype(np.double)
@@ -113,20 +122,20 @@ def analyze_img(img_path: Path, model: models.UNetXceptionPatchSegmentor, output
         print(f"No branches found for {img_path.stem}.")
         return
 
-    if save_intermediates or save_graphics:
-        save_path = str(vis_dir / "barcode.png")
-        plt.figure(figsize=(6, 6))
-        plt.margins(0)
-        ax = plt.gca()
-        morse_graph.plot_colored_barcode(ax=ax)
-        plt.savefig(save_path, dpi=300, bbox_inches='tight', pad_inches=0)
-        save_path = str(vis_dir / "morse_tree.png")
-        plt.figure(figsize=(10, 10))
-        plt.margins(0)
-        ax = plt.gca()
-        ax.imshow(rescale_intensity(img, out_range=(0, 255)), cmap='gray')
-        morse_graph.plot_colored_tree(ax=ax)
-        plt.savefig(save_path, dpi=300, bbox_inches='tight', pad_inches=0)
+    # Save barcode and Morse tree visualization
+    save_path = str(vis_dir / "barcode.png")
+    plt.figure(figsize=(6, 6))
+    plt.margins(0)
+    ax = plt.gca()
+    morse_graph.plot_colored_barcode(ax=ax)
+    plt.savefig(save_path, dpi=300, bbox_inches='tight', pad_inches=0)
+    save_path = str(vis_dir / "morse_tree.png")
+    plt.figure(figsize=(10, 10))
+    plt.margins(0)
+    ax = plt.gca()
+    ax.imshow(rescale_intensity(img, out_range=(0, 255)), cmap='gray')
+    morse_graph.plot_colored_tree(ax=ax)
+    plt.savefig(save_path, dpi=300, bbox_inches='tight', pad_inches=0)
 
     print("\nComputing branch statistics...")
 
@@ -216,7 +225,7 @@ def main():
 
     ### Analyze images ###
     for img_path in img_paths:
-        analyze_img(Path(img_path), model, output_dir, config, args.save_intermediates, args.save_graphics)
+        analyze_img(Path(img_path), model, output_dir, config, args.detect_well)
 
 
 if __name__ == "__main__":
