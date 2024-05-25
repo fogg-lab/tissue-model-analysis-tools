@@ -110,7 +110,7 @@ pip uninstall fl_tissue_model_tools
 ---
 
 #### Update `fl_tissue_model_tools` package
-To update `tmat`, just run the setup commands again. When you run `tmat configure`, make sure to select `y` at every prompt to overwrite the old scripts.
+To update `tmat`, just run the setup commands again (with one caveat: if you cloned the repo, you should `cd` into it and run `git pull` instead of cloning again). When you run `tmat configure`, make sure to select `y` at every prompt to overwrite the old scripts.
 
 #### Jupyter + `fl_tissue_model_tools`
 If changes are made to the `fl_tissue_model_tools` code, the notebook kernel must be restarted for those changes to be reflected.
