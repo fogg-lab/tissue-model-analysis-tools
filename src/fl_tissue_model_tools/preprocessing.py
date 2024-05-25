@@ -1,4 +1,4 @@
-from typing import Sequence, Any, Tuple, Dict, List, Callable
+from typing import Sequence, Any, Tuple, Dict, List, Callable, Optional
 from numbers import Integral
 import cv2
 import numpy as np
@@ -63,7 +63,7 @@ def bin_thresh(
 
 
 def exec_threshold(
-    masked: npt.NDArray, mask_idx: Sequence, sd_coef: float, rand_state: RandomState
+    masked: npt.NDArray, mask_idx: Optional[Sequence], sd_coef: float, rand_state: RandomState
 ) -> npt.NDArray:
     """Apply threshold to obtain the foreground (cell content) of a plate image.
     A 2-component Gaussian mixture model is fit to pixel the intensities of
@@ -86,6 +86,8 @@ def exec_threshold(
 
     # Select pixels within the mask. Exclude masked-out pixels since they
     # will alter the shape of the background distribution.
+    if mask_idx is None:
+        mask_idx = tuple(np.indices(masked.shape).reshape(2, -1))
     pixels = masked[mask_idx][:, np.newaxis]
     gm = GaussianMixture(n_components=2, random_state=rand_state)
     gm = gm.fit(pixels)

@@ -141,8 +141,6 @@ tmat [command_script] [-flags] [arguments]
 tmat
 ```
 
-It is recommended that the `-v` (verbose) flag be used for each command.
-
 For input data paths, it is usually easiest to copy the path from the file explorer search bar.
 
 For a description of all parameters that each commandline tool accepts, execute one of the following:
@@ -161,24 +159,40 @@ tmat
 #### Cell Area
 **Basic usage:**
 ```bash
-tmat compute_cell_area -v "path/to/input/folder" "path/to/output/folder"
+tmat compute_cell_area "path/to/input/folder" "path/to/output/folder"
 ```
-Here, `input_path` is the full path to a directory of images which will be analyzed.
+
+Here, `path/to/input/folder` is the full path to a directory of images which will be analyzed.
+
+If your images are not cropped to the region inside the well, you can have the script automatically detect the well region by adding the `--detect_well` flag (or `-w` for short). For example:
+```bash
+tmat compute_cell_area --detect_well "path/to/input/folder" "path/to/output/folder"
+```
+
+For example, if your wells are circular and you add the `--detect_well` flag, the script will detect and mask out the well region, which might look something like this:
+[](data:image/png;base64,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)
 
 **Advanced usage:**
 
-* Create custom configuration `.json` file, using `config/default_cell_area_computation.json` as a template.
-    * `dsamp_size` (float): Size that input images will be downsampled to for analysis. Smaller sizes mean faster, less accurate analysis.
+* Create custom configuration `.json` file, using `config/default_cell_area_computation.json` as a template. The following parameters can be customized:
+    * `dsamp_size` (int): Size that input images will be downsampled to for analysis. Smaller sizes mean faster, less accurate analysis. Default is 512, meaning the image will be downscaled so that the 
     * `sd_coef` (float): Strictness of thresholding. Positive numbers are more strict, negative numbers are less strict. This is a multiplier of the foreground pixel standard deviation, so values in the range (-2, 2) are the most reasonable.
-    * `well_buffer` (float): Proportion of the image outer width/diameter to exclude from processing (to apply exclusion mask starting at the edge of the well). E.g., for a circular well with an outer diameter of 1000 microns and inner diameter of 900 microns, the buffer is 50 microns, so the `well_buffer` should be 50/1000=0.05. By default, this parameter is set to 0, which means that no exclusion mask will be applied.
-    * `rs_seed` (integer): A random seed for the algorithm. Allows for reproducability since the Gaussian curves are randomly initialized.
+    * `rs_seed` (integer): A random seed for the algorithm. Allows for reproducability since the Gaussian curves are randomly initialized. Default is 0.
+    * `batch_size` (integer): Number of images to process at once. Larger numbers are faster but require more memory. Default is 4.
+
+**Run with custom configuration file:**
+```bash
+tmat compute_cell_area --config "path/to/config/file.json" "path/to/input/folder" "path/to/output/folder"
+```
 
 #### Z Projection
 **Basic usage:**
 ```bash
-tmat compute_zproj -v "path/to/input/directory" "path/to/output/folder"
+tmat compute_zproj "path/to/input/directory" "path/to/output/folder"
 ```
-Here, "path/to/input/directory" is the full path to a directory of Z stack subdirectories which will be analyzed. Each Z stack subfolder should contain all images for a given Z stack with files containing the pattern `...Z[pos]_...` in their name. For example `...Z01_...` denotes Z position 1 for a given image.
+Here, "path/to/input/directory" is the full path to a directory of Z stacks. Each Z stack should either be an OME-TIFF format file, or subdirectory of individual TIFF format files. 
+
+If you create subdirectories of indidual TIFFs for each Z stack, they assign filenames to the images containing the following pattern: `...Z[pos]_...` to indicate the Z position for each image. For example `...Z01_...` denotes Z position 1 for a given image.
 
 For N Z stacks, the input directory structure would be:
 ```
@@ -201,9 +215,9 @@ Root directory
 |    |    ...
 ```
 
-**To compute Z-projections and their cell area, add the --area flag:**  
+**To compute Z-projections and their cell area, add the --area flag:**
 ```bash
-tmat compute_zproj -v --area "path/to/input/folder" "path/to/output/folder"
+tmat compute_zproj --area "path/to/input/folder" "path/to/output/folder"
 ```
 
 **Advanced usage:**
@@ -220,7 +234,7 @@ See [Capabilities](#capabilities) for details.
 #### Invasion Depth
 **Basic usage:**
 ```
-tmat compute_inv_depth -v "path/to/input/folder" "path/to/output/folder"
+tmat compute_inv_depth "path/to/input/folder" "path/to/output/folder"
 ```
 
 For a description of the input directory structure, see [Z Projection](#z-projection).
@@ -228,23 +242,24 @@ For a description of the input directory structure, see [Z Projection](#z-projec
 #### Branches (quantify vessel formation)
 **Basic usage:**
 ```bash
-# the -g flag saves visualizations in a folder in the output directory
-tmat compute_branches -v -g "path/to/input/folder" "path/to/output/folder"
+tmat compute_branches "path/to/input/folder" "path/to/output/folder"
 ```
 
-or,
+Here, `path/to/input/folder` is the full path to a directory of images which will be analyzed.
 
+If your images are not cropped to the region inside the well, you can have the script automatically detect the well region by adding the `--detect_well` flag (or `-w` for short). For example:
 ```bash
-# the -i flag saves visualizations plus other intermediates in a folder in the output directory
-tmat compute_branches -v -i "path/to/input/folder" "path/to/output/folder"
+tmat compute_branches --detect_well "path/to/input/folder" "path/to/output/folder"
 ```
+
+For example, if your wells are circular and you add the `--detect_well` flag, the script will detect and mask out the well region, which might look something like this:
+[](data:image/png;base64,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)
 
 **Advanced usage:**
 
 Customize configuration variables (you can edit `config/default_branching_computation.json` in your base directory, or refer to `src/fl_tissue_model_tools/config` in this repository):
 
 - `well_width_microns` (float): Physical width of the image in microns.
-- `well_buffer` (float): Proportion of the image outer width/diameter to exclude from processing (to apply exclusion mask starting at the edge of the well). E.g., for a circular well with an outer diameter of 1000 microns and inner diameter of 900 microns, the buffer is 50 microns, so the `well_buffer` should be 50/1000=0.05. By default, this parameter is set to 0, which means that no exclusion mask will be applied.
 - `use_latest_model_cfg` (boolean): If `True`, the most recently trained model in the `model_training` folder will be used. If `False`, the model specified in `model_cfg_path` will be used.
 - `model_cfg_path` (string): Path to the configuration file of the segmentation model. You can leave this blank (`''`) to use the most recently trained model in the `model_training` folder.
 - `graph_thresh_1` (float): May require some experimentation to find the best value for your data. This threshold controls how much of the morse graph is used to compute the number of branches. Lower values include more of the graph, and more branches are detected. Higher values include less of the graph, and fewer branches are detected. Try different values like 0.25, 0.5, 1, 2, 4, etc. up to around 64.

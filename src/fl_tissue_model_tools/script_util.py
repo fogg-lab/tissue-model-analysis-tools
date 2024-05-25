@@ -30,25 +30,24 @@ class SFM:
     failures_present = f"{red}[FAILURES PRESENT]{reset}"
 
 
-dash = "="
-chunk_width = shutil.get_terminal_size((10, 10)).columns
-verbose_end = f"{SFM.cyan}{dash * chunk_width}{SFM.reset}{os.linesep}"
+DASH = "="
+CHUNK_WIDTH = shutil.get_terminal_size((10, 10)).columns
+END_SEPARATOR = f"{SFM.cyan}{DASH * CHUNK_WIDTH}{SFM.reset}{os.linesep}"
 
 
-### Verbose Output ###
-def verbose_header(title: str) -> None:
-    """Print a section header during verbose output.
+def section_header(title: str) -> None:
+    """Print a section header.
 
     Args:
         title: Text to display in the header.
 
     """
-    print(f"{os.linesep}{SFM.cyan}{f'[{title}]':{dash}<{chunk_width}}{SFM.reset}")
+    print(f"{os.linesep}{SFM.cyan}{f'[{title}]':{DASH}<{CHUNK_WIDTH}}{SFM.reset}")
 
 
-def verbose_footer() -> None:
-    """Print a section footer during verbose output."""
-    print(verbose_end)
+def section_footer() -> None:
+    """Print a section footer."""
+    print(END_SEPARATOR)
 
 
 def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
@@ -86,6 +85,13 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "-w",
+        "--detect-well",
+        action="store_true",
+        help="Auto detect the well boundary and exclude regions outside the well.",
+    )
+
+    parser.add_argument(
         "-c",
         "--config",
         type=str,
@@ -94,34 +100,6 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
             "Full path to branching configuration file. Ex: "
             "[...]/my_data/analysis_output/experiment_1_yyyy_mm_dd/branching_config.json"
         ),
-    )
-
-    parser.add_argument(
-        "-i",
-        "--save-intermediates",
-        action="store_true",
-        help=(
-            "Save all intermediate images and visualizations generated during branching analysis."
-        ),
-        default=True,
-    )
-
-    parser.add_argument(
-        "-g",
-        "--save-graphics",
-        action="store_true",
-        help=(
-            "Save visualizations: original image, segmentation mask, and morse tree plot."
-        ),
-        default=True,
-    )
-
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help=("Print verbose output to the console."),
-        default=True,
     )
 
     args = parser.parse_args()
@@ -169,6 +147,13 @@ def parse_cell_area_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "-w",
+        "--detect-well",
+        action="store_true",
+        help="Auto detect the well boundary and exclude regions outside the well.",
+    )
+
+    parser.add_argument(
         "-c",
         "--config",
         type=str,
@@ -178,24 +163,6 @@ def parse_cell_area_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
             "C:/my_config/cell_area_comp_config.json. If no argument supplied, "
             "default configuration will be used."
         ),
-    )
-
-    parser.add_argument(
-        "-i",
-        "--save-intermediates",
-        action="store_true",
-        help=(
-            "Save all intermediate images generated during cell area analysis."
-        ),
-        default=True,
-    )
-
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="Verbose output during script execution.",
-        default=True,
     )
 
     args = parser.parse_args()
@@ -267,14 +234,6 @@ def parse_zproj_args() -> argparse.Namespace:
         help="Compute cell area after computing Z projection.",
     )
 
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="Verbose output during script execution.",
-        default=True,
-    )
-
     args = parser.parse_args()
     return _strip_quotes(args)
 
@@ -340,25 +299,16 @@ def parse_inv_depth_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
         ),
     )
 
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="Verbose output during script execution.",
-        default=True,
-    )
-
     args = parser.parse_args()
     return _strip_quotes(args)
 
 
 ### File/Directory Validation ###
-def cell_area_verify_input_dir(input_path: str, verbose: bool = False) -> Sequence[str]:
+def cell_area_verify_input_dir(input_path: str) -> Sequence[str]:
     """Verify appropriate contents of input data directory.
 
     Args:
         input_path: Path to input images.
-        verbose: Whether to print verbose output.
 
     Raises:
         FileNotFoundError: Input data directory not found.
@@ -368,8 +318,7 @@ def cell_area_verify_input_dir(input_path: str, verbose: bool = False) -> Sequen
         The full paths to each relevant image in the directory.
 
     """
-    if verbose:
-        verbose_header("Verifying Input Directory")
+    section_header("Verifying Input Directory")
 
     if not osp.isdir(input_path):
         raise FileNotFoundError(
@@ -379,16 +328,15 @@ def cell_area_verify_input_dir(input_path: str, verbose: bool = False) -> Sequen
     # Get all images in input directory
     img_paths = get_img_paths(input_path)
 
-    if verbose:
-        print(f"Found {len(img_paths)} images in:{os.linesep}\t{input_path}")
-        print(SFM.success)
-        verbose_footer()
+    print(f"Found {len(img_paths)} images in:{os.linesep}\t{input_path}")
+    print(SFM.success)
+    section_footer()
 
     return img_paths
 
 
 def cell_area_verify_output_dir(
-    output_path: str, thresh_subdir: str, calc_subdir: str, verbose: bool = False
+    output_path: str, thresh_subdir: str, calc_subdir: str
 ) -> None:
     """Verify output directory is either created or wiped.
 
@@ -398,44 +346,37 @@ def cell_area_verify_output_dir(
             stored: output_path/thresh_subdir/
         calc_subdir: Name of subdirectory where computation outputs will be
             stored: output_path/calc_subdir/
-        verbose: Whether to print verbose output.
 
     """
-    if verbose:
-        verbose_header("Verifying Output Directory")
+    section_header("Verifying Output Directory")
 
     if not osp.isdir(output_path):
-        if verbose:
-            print(f"Did not find output dir:{os.linesep}\t{output_path}")
-            print("Creating...")
+        print(f"Did not find output dir:{os.linesep}\t{output_path}")
+        print("Creating...")
         data_prep.make_dir(output_path)
-        if verbose:
-            print(f"... Created dir:{os.linesep}\t{output_path}")
+        print(f"... Created dir:{os.linesep}\t{output_path}")
 
-    if verbose:
-        print("Creating subdirs (overwriting if previously existed)...")
-        print(f"\t{output_path}/{thresh_subdir}")
-        print(f"\t{output_path}/{calc_subdir}")
+    print("Creating subdirs (overwriting if previously existed)...")
+    print(f"\t{output_path}/{thresh_subdir}")
+    print(f"\t{output_path}/{calc_subdir}")
 
     data_prep.make_dir(f"{output_path}/{thresh_subdir}")
     data_prep.make_dir(f"{output_path}/{calc_subdir}")
 
-    if verbose:
-        print("... Created dirs:")
-        print(f"\t{output_path}/{thresh_subdir}")
-        print(f"\t{output_path}/{calc_subdir}")
-        print(SFM.success)
-        verbose_footer()
+    print("... Created dirs:")
+    print(f"\t{output_path}/{thresh_subdir}")
+    print(f"\t{output_path}/{calc_subdir}")
+    print(SFM.success)
+    section_footer()
 
 
 def cell_area_verify_config_file(
-    config_path: str, verbose: bool = False
+    config_path: str
 ) -> Dict[str, Any]:
     """Verify config script for performing area computations.
 
     Args:
         config_path: Path to config file.
-        verbose: Whether to print verbose output.
 
     Raises:
         FileNotFoundError: Config file not found.
@@ -444,26 +385,24 @@ def cell_area_verify_config_file(
         Dictionary containing configuration values.
 
     """
-    if verbose:
-        verbose_header("Verifying Config File")
+    section_header("Verifying Config File")
 
     if not osp.isfile(config_path):
         raise FileNotFoundError(f"Config file not found: {config_path}")
     with open(config_path, "r", encoding="utf8") as config_fp:
         config = json.load(config_fp)
 
-    if verbose:
-        print(f"Using config file: {os.linesep}\t{config_path}")
-        print(f"{os.linesep}Parameter values:")
-        for key, val in config.items():
-            print(f"{key:<20}{val:>20}")
-        print(SFM.success)
-        verbose_footer()
+    print(f"Using config file: {os.linesep}\t{config_path}")
+    print(f"{os.linesep}Parameter values:")
+    for key, val in config.items():
+        print(f"{key:<20}{val:>20}")
+    print(SFM.success)
+    section_footer()
 
     return config
 
 
-def zproj_verify_input_dir(input_path: str, verbose: bool = False) -> Sequence[str]:
+def zproj_verify_input_dir(input_path: str) -> Sequence[str]:
     """Verify appropriate contents of input data directory.
 
     Input directory should contain either:
@@ -476,7 +415,6 @@ def zproj_verify_input_dir(input_path: str, verbose: bool = False) -> Sequence[s
 
     Args:
         input_path: Path to input Z stacks.
-        verbose: Whether to print verbose output.
 
     Raises:
         FileNotFoundError: Input data directory not found.
@@ -487,8 +425,7 @@ def zproj_verify_input_dir(input_path: str, verbose: bool = False) -> Sequence[s
 
     """
 
-    if verbose:
-        verbose_header("Verifying Input Directory")
+    section_header("Verifying Input Directory")
 
     if zstacks.is_single_file_zstack(input_path):
         input_path = zstacks.convert_zstack_image_to_tiffs(input_path)
@@ -524,8 +461,7 @@ def zproj_verify_input_dir(input_path: str, verbose: bool = False) -> Sequence[s
             zstack_prefixes.add(prefix)
         zstack_paths = [osp.join(input_path, prefix) for prefix in zstack_prefixes]
 
-    if verbose:
-        print(f"{'Z Stack ID':<40}{'No. Z Positions':>20}")
+    print(f"{'Z Stack ID':<40}{'No. Z Positions':>20}")
 
     for zsp in zstack_paths:
         # Get all images in subdirectory
@@ -546,57 +482,48 @@ def zproj_verify_input_dir(input_path: str, verbose: bool = False) -> Sequence[s
                     "a number denoting Z stack position."
                 )
 
-        if verbose:
-            zsp_id = Path(zsp).name
-            print(f"{zsp_id:.<40}{n_imgs:.>20}")
+        zsp_id = Path(zsp).name
+        print(f"{zsp_id:.<40}{n_imgs:.>20}")
 
-    if verbose:
-        print(SFM.success)
-        verbose_footer()
+    print(SFM.success)
+    section_footer()
 
     return zstack_paths
 
 
-def zproj_verify_output_dir(output_path: str, verbose: bool = True) -> None:
+def zproj_verify_output_dir(output_path: str) -> None:
     """Verify output directory is either created or wiped.
 
     Args:
         output_path: Path to root output directory.
-        verbose: Whether to print verbose output.
 
     """
-    if verbose:
-        verbose_header("Verifying Output Directory")
+    section_header("Verifying Output Directory")
 
     if not osp.isdir(output_path):
-        if verbose:
-            print(f"Did not find output dir:{os.linesep}\t{output_path}")
-            print("Creating...")
+        print(f"Did not find output dir:{os.linesep}\t{output_path}")
+        print("Creating...")
 
         data_prep.make_dir(output_path)
 
-        if verbose:
-            print(f"... Created dir:{os.linesep}\t{output_path}")
+        print(f"... Created dir:{os.linesep}\t{output_path}")
 
     else:
-        if verbose:
-            print(f"Found dir:{os.linesep}\t{output_path}")
-            print("Clearing...")
+        print(f"Found dir:{os.linesep}\t{output_path}")
+        print("Clearing...")
 
         # Remove previous zproj images in output directory
         for prev_output_fp in [Path(output_path) / f for f in os.listdir(output_path)]:
             if osp.isfile(prev_output_fp) and imghdr.what(prev_output_fp) is not None:
                 os.remove(prev_output_fp)
 
-        if verbose:
-            print(f"... Cleared dir:{os.linesep}\t{output_path}")
+        print(f"... Cleared dir:{os.linesep}\t{output_path}")
 
-    if verbose:
-        print(SFM.success)
-        verbose_footer()
+    print(SFM.success)
+    section_footer()
 
 
-def inv_depth_verify_input_dir(input_path: str, verbose: bool = False) -> None:
+def inv_depth_verify_input_dir(input_path: str) -> None:
     """Verify appropriate contents of input data directory.
 
     Each Z stack image should have the pattern ...Z[pos]_... in its name,
@@ -604,7 +531,6 @@ def inv_depth_verify_input_dir(input_path: str, verbose: bool = False) -> None:
 
     Args:
         input_path: Path to input Z stacks.
-        verbose: Whether to print verbose output.
 
     Raises:
         FileNotFoundError: Input data directory not found.
@@ -612,16 +538,14 @@ def inv_depth_verify_input_dir(input_path: str, verbose: bool = False) -> None:
         FileNotFoundError: Image file does not contain the expected pattern.
     """
 
-    if verbose:
-        verbose_header("Verifying Input Directory")
+    section_header("Verifying Input Directory")
 
     if not osp.isdir(input_path):
         raise FileNotFoundError(
             f"Input data directory not found:{os.linesep}\t{input_path}"
         )
 
-    if verbose:
-        print(f"{'Z Stack ID':<60}{'No. Z Positions':>20}")
+    print(f"{'Z Stack ID':<60}{'No. Z Positions':>20}")
 
     # Get all images in input directory
     img_paths = get_img_paths(input_path)
@@ -641,39 +565,32 @@ def inv_depth_verify_input_dir(input_path: str, verbose: bool = False) -> None:
                 "Z stack position."
             )
 
-    if verbose:
-        zsp_id = Path(input_path).name
-        print(f"{zsp_id:.<60}{n_imgs:.>20}")
+    zsp_id = Path(input_path).name
+    print(f"{zsp_id:.<60}{n_imgs:.>20}")
 
-    if verbose:
-        print(SFM.success)
-        verbose_footer()
+    print(SFM.success)
+    section_footer()
 
 
-def inv_depth_verify_output_dir(output_path: str, verbose: bool = True) -> None:
+def inv_depth_verify_output_dir(output_path: str) -> None:
     """Verify output directory is either created or wiped.
 
     Args:
         output_path: Path to root output directory.
-        verbose: Whether to print verbose output.
 
     """
-    if verbose:
-        verbose_header("Verifying Output Directory")
+    section_header("Verifying Output Directory")
 
     if not osp.isdir(output_path):
-        if verbose:
-            print(f"Did not find output dir:{os.linesep}\t{output_path}")
-            print("Creating...")
+        print(f"Did not find output dir:{os.linesep}\t{output_path}")
+        print("Creating...")
 
         data_prep.make_dir(output_path)
 
-        if verbose:
-            print(f"... Created dir:{os.linesep}\t{output_path}")
+        print(f"... Created dir:{os.linesep}\t{output_path}")
     else:
-        if verbose:
-            print(f"Found dir:{os.linesep}\t{output_path}")
-            print("Clearing...")
+        print(f"Found dir:{os.linesep}\t{output_path}")
+        print("Clearing...")
 
         # Remove previous zproj output files
         for prev_output_filepath in [
@@ -685,24 +602,20 @@ def inv_depth_verify_output_dir(output_path: str, verbose: bool = True) -> None:
             ):
                 os.remove(prev_output_filepath)
 
-        if verbose:
-            print(f"... Cleared dir:{os.linesep}\t{output_path}")
+        print(f"... Cleared dir:{os.linesep}\t{output_path}")
 
-    if verbose:
-        print(SFM.success)
-        verbose_footer()
+    print(SFM.success)
+    section_footer()
 
 
 def inv_depth_verify_config_file(
-    config_path: str, n_models: int, verbose: bool = False
+    config_path: str, n_models: int
 ) -> Dict[str, Any]:
     """Verifies that the config file exists and is valid.
 
     Args:
         config_path: Path to config file.
         n_models: The number of saved models.
-        verbose: Using verbose output prints out the config path and parameter values.
-                 Defaults to False.
 
     Raises:
         FileNotFoundError: Raised when the config file is not found.
@@ -715,8 +628,7 @@ def inv_depth_verify_config_file(
     if not osp.isfile(config_path):
         raise FileNotFoundError(f"Config file not found: {config_path}")
 
-    if verbose:
-        print(f"Using config file: {os.linesep}\t{config_path}")
+    print(f"Using config file: {os.linesep}\t{config_path}")
 
     with open(config_path, "r", encoding="utf8") as config_fp:
         config = json.load(config_fp)
@@ -727,12 +639,11 @@ def inv_depth_verify_config_file(
             "is greater than number of saved models."
         )
 
-    if verbose:
-        print(f"{os.linesep}Parameter values:")
-        for key, val in config.items():
-            print(f"{key:<20}{val:>20}")
-        print(SFM.success)
-        verbose_footer()
+    print(f"{os.linesep}Parameter values:")
+    for key, val in config.items():
+        print(f"{key:<20}{val:>20}")
+    print(SFM.success)
+    section_footer()
 
     return config
 
