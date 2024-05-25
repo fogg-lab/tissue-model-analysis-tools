@@ -91,7 +91,7 @@ def get_superellipse_hull(x, y, n, num_iters=25000):
     return t, d, s_a, s_b, c_x, c_y
 
 
-def gen_superellipse_mask(t, d, s_a, s_b, c_x, c_y, n, shape):
+def gen_superellipse_mask(t, d, s_a, s_b, c_x, c_y, n, shape) -> np.ndarray[np.bool_]:
     """Generate a superellipse mask with the given parameters.
     Args:
         t (float): Rotation angle of the superellipse in radians.
@@ -139,13 +139,11 @@ def create_convex_hull_mask(array_shape: Tuple[int, int], hull_vertices: npt.NDA
     return mask
 
 
-def generate_well_mask(image: npt.NDArray, well_buffer: float=0.05, mask_val: Integral=1,
+def generate_well_mask(image: npt.NDArray, mask_val: Integral=1,
                        return_superellipse_params: bool=False) -> npt.NDArray:
     """Generate a binary mask over the well in an image.
     Args:
         image (np.ndarray): Image to create the mask for.
-        well_buffer (float): Buffer to add around the well mask, as a fraction of the well diameter.
-                             Defaults to 0.05.
         mask_val (int): Value in the range [0,255] to give pixels in the well. Defaults to 1.
         return_superellipse_params (bool): Whether to return the parameters of the superellipse.
                                            Defaults to False.
@@ -176,7 +174,7 @@ def generate_well_mask(image: npt.NDArray, well_buffer: float=0.05, mask_val: In
 
         circ_mask = np.zeros(image.shape, dtype=np.uint8)
         center = image.shape[0] // 2, image.shape[1] // 2
-        radius = int(image.shape[0] * 0.5 * (1 - well_buffer))
+        radius = int(image.shape[0] * 0.5 * (1 - 0.95))
         rr, cc = circle((center[0], center[1]), radius, shape=image.shape)
         circ_mask[rr, cc] = mask_val
 
@@ -218,7 +216,7 @@ def generate_well_mask(image: npt.NDArray, well_buffer: float=0.05, mask_val: In
     found_superellipse = False
     try:
         t, d, s_a, s_b, c_x, c_y = get_superellipse_hull(x, y, n)
-        d *= (1 - well_buffer * 2)
+        d *= 0.9
         well_mask = gen_superellipse_mask(t, d, s_a, s_b, c_x, c_y, n, im_thresh.shape)
         found_superellipse = True
     except Exception:
@@ -277,99 +275,3 @@ def auto_threshold_well(image: npt.NDArray) -> npt.NDArray:
     im_thresh = binary_erosion(im_thresh, footprint=disk(5))
 
     return im_thresh
-
-
-def generate_well_mask(image: npt.NDArray, well_buffer: float=0.05, mask_val: Integral=1,
-                       return_superellipse_params: bool=False) -> npt.NDArray:
-    """Generate a binary mask over the well in an image.
-    Args:
-        image (np.ndarray): Image to create the mask for.
-        well_buffer (float): Buffer to add around the well mask, as a fraction of the well diameter.
-                             Defaults to 0.05.
-        mask_val (int): Value in the range [0,255] to give pixels in the well. Defaults to 1.
-        return_superellipse_params (bool): Whether to return the parameters of the superellipse.
-                                           Defaults to False.
-    Returns:
-        Union[np.ndarray, tuple]: Mask over the well. If return_superellipse_params is True, returns
-                                  a tuple containing the mask and the superellipse parameters.
-
-    """
-    ### Threshold the image
-    im_thresh = auto_threshold_well(image)
-
-    # Downsample the thresholded image
-    downsamp_ratio = min(1, 200 / np.max(im_thresh.shape))
-    im_thresh = rescale(im_thresh, downsamp_ratio, order=0, preserve_range=True)
-
-    ### Get the convex hull of the thresholded image
-
-    # Get the mask's border
-    im_thresh_border = canny(im_thresh)
-    # Include points on the edge of the image
-    im_thresh_border[0, :] += im_thresh[0, :]
-    im_thresh_border[-1, :] += im_thresh[-1, :]
-    im_thresh_border[:, 0] += im_thresh[:, 0]
-    im_thresh_border[:, -1] += im_thresh[:, -1]
-
-    def get_circ_mask():
-        # Fall back to a circular mask if the convex hull fails (e.g. blank thresholded image)
-
-        circ_mask = np.zeros(image.shape, dtype=np.uint8)
-        center = image.shape[0] // 2, image.shape[1] // 2
-        radius = int(image.shape[0] * 0.5 * (1 - well_buffer))
-        rr, cc = circle((center[0], center[1]), radius, shape=image.shape)
-        circ_mask[rr, cc] = mask_val
-
-        return circ_mask
-
-    border_points = np.argwhere(im_thresh_border)
-    try:
-        hull = ConvexHull(border_points)
-    except ValueError:
-        return get_circ_mask()
-    hull_vertices = border_points[hull.vertices]
-
-    hull_verts_mask = np.zeros_like(im_thresh)
-    hull_verts_mask[hull_vertices[:, 0], hull_vertices[:, 1]] = 1
-
-    # Create a mask for the convex hull
-    well_mask = create_convex_hull_mask(im_thresh.shape, hull_vertices)
-    well_mask_border = canny(well_mask)
-    well_mask_border[0, :] += well_mask[0, :]
-    well_mask_border[-1, :] += well_mask[-1, :]
-    well_mask_border[:, 0] += well_mask[:, 0]
-    well_mask_border[:, -1] += well_mask[:, -1]
-
-    ### Try fitting a superellipse to the convex hull
-
-    # See if well is more circular or rectangular to determine the exponent
-    area = np.sum(well_mask)
-    perimeter = np.sum(well_mask_border)
-    if perimeter / area > .027:
-        # Well is more rectangular
-        n = 8
-    else:
-        # Well is more circular
-        n = 2
-
-    # Get the parameters for the superellipse
-    x = hull_vertices[:, 0] / im_thresh.shape[0] * 2 - 1
-    y = hull_vertices[:, 1] / im_thresh.shape[1] * 2 - 1
-    found_superellipse = False
-    try:
-        t, d, s_a, s_b, c_x, c_y = get_superellipse_hull(x, y, n)
-        d *= (1 - well_buffer * 2)
-        well_mask = gen_superellipse_mask(t, d, s_a, s_b, c_x, c_y, n, im_thresh.shape)
-        found_superellipse = True
-    except Exception:
-        traceback.print_exc()
-        print("Falling back to convex hull well mask.")
-
-    # Prepare the mask
-    well_mask = well_mask.astype(np.uint8) * mask_val
-    well_mask = resize(well_mask, image.shape, order=0, preserve_range=True)
-
-    if found_superellipse and return_superellipse_params:
-        return well_mask, t, d, s_a, s_b, c_x, c_y, n
-
-    return well_mask

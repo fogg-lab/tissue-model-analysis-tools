@@ -1,1 +1,6 @@
-{"dsamp_size": 512, "sd_coef": 0, "well_buffer": 0.05, "rs_seed": 123, "batch_size": 4}
+{
+    "dsamp_size": 512,
+    "sd_coef": 0,
+    "rs_seed": 0,
+    "batch_size": 4
+}

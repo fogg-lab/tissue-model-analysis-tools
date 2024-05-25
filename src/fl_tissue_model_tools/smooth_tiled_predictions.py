@@ -12,7 +12,12 @@
 
 import gc
 import numpy as np
-import scipy.signal
+
+try:
+    from scipy.signal import triang
+except ImportError:
+    from scipy.signal.windows import triang
+
 from tqdm import tqdm
 
 
@@ -21,11 +26,11 @@ def _spline_window(window_size, power=2):
     Squared spline (power=2) window function:
     https://www.wolframalpha.com/input/?i=y%3Dx**2,+y%3D-(x-2)**2+%2B2,+y%3D(x-4)**2,+from+y+%3D+0+to+2
     """
-    intersection = int(window_size/4)
-    wind_outer = (abs(2*(scipy.signal.triang(window_size))) ** power)/2
+    intersection = int(window_size / 4)
+    wind_outer = (abs(2 * (triang(window_size))) ** power) / 2
     wind_outer[intersection:-intersection] = 0
 
-    wind_inner = 1 - (abs(2*(scipy.signal.triang(window_size) - 1)) ** power)/2
+    wind_inner = 1 - (abs(2 * (triang(window_size) - 1)) ** power) / 2
     wind_inner[:intersection] = 0
     wind_inner[-intersection:] = 0
 
@@ -35,6 +40,8 @@ def _spline_window(window_size, power=2):
 
 
 cached_2d_windows = dict()
+
+
 def _window_2D(window_size, power=2):
     """
     Make a 1D window function, then infer and return a 2D window function.
@@ -48,7 +55,9 @@ def _window_2D(window_size, power=2):
         wind = cached_2d_windows[key]
     else:
         wind = _spline_window(window_size, power)
-        wind = np.expand_dims(np.expand_dims(wind, 1), 1)      #SREENI: Changed from 3, 3, to 1, 1 
+        wind = np.expand_dims(
+            np.expand_dims(wind, 1), 1
+        )  # SREENI: Changed from 3, 3, to 1, 1
         wind = wind * wind.transpose(1, 0, 2)
         cached_2d_windows[key] = wind
     return wind
@@ -60,9 +69,11 @@ def _pad_img(img, window_size, subdivisions):
     "subdivisions".
     Image is an np array of shape (x, y, nb_channels).
     """
-    aug = int(round(window_size * (1 - 1.0/subdivisions)))
+    aug = int(round(window_size * (1 - 1.0 / subdivisions)))
     more_borders = ((aug, aug), (aug, aug))
-    ret = np.pad(img, pad_width=more_borders, mode='constant', constant_values=img.min())
+    ret = np.pad(
+        img, pad_width=more_borders, mode="constant", constant_values=img.min()
+    )
     return ret
 
 
@@ -71,7 +82,7 @@ def _unpad_img(padded_img, window_size, subdivisions):
     Undo what's done in the `_pad_img` function.
     Image is an np array of shape (x, y, nb_channels).
     """
-    aug = int(round(window_size * (1 - 1.0/subdivisions)))
+    aug = int(round(window_size * (1 - 1.0 / subdivisions)))
     ret = padded_img[
         aug:-aug,
         aug:-aug,
@@ -136,15 +147,17 @@ def _windowed_subdivs(padded_img, window_size, subdivisions, pred_func):
     """
     WINDOW_SPLINE_2D = _window_2D(window_size=window_size, power=2)
 
-    step = int(window_size/subdivisions)
+    step = int(window_size / subdivisions)
     padx_len = padded_img.shape[0]
     pady_len = padded_img.shape[1]
     subdivs = []
 
-    for i in range(0, padx_len-window_size+1, step):
+    for i in range(0, padx_len - window_size + 1, step):
         subdivs.append([])
-        for j in range(0, pady_len-window_size+1, step):            #SREENI: Changed padx to pady (Bug in original code)
-            patch = padded_img[i:i+window_size, j:j+window_size]
+        for j in range(
+            0, pady_len - window_size + 1, step
+        ):  # SREENI: Changed padx to pady (Bug in original code)
+            patch = padded_img[i : i + window_size, j : j + window_size]
             subdivs[-1].append(patch)
 
     # Here, `gc.collect()` clears RAM between operations.
@@ -173,21 +186,25 @@ def _recreate_from_subdivs(subdivs, window_size, subdivisions, padded_out_shape)
     """
     Merge tiled overlapping patches smoothly.
     """
-    step = int(window_size/subdivisions)
+    step = int(window_size / subdivisions)
     padx_len = padded_out_shape[0]
     pady_len = padded_out_shape[1]
 
     y = np.zeros(padded_out_shape)
 
     a = 0
-    for i in range(0, padx_len-window_size+1, step):
+    for i in range(0, padx_len - window_size + 1, step):
         b = 0
-        for j in range(0, pady_len-window_size+1, step):                #SREENI: Changed padx to pady (Bug in original code)
+        for j in range(
+            0, pady_len - window_size + 1, step
+        ):  # SREENI: Changed padx to pady (Bug in original code)
             windowed_patch = subdivs[a, b]
-            y[i:i+window_size, j:j+window_size] = y[i:i+window_size, j:j+window_size] + windowed_patch
+            y[i : i + window_size, j : j + window_size] = (
+                y[i : i + window_size, j : j + window_size] + windowed_patch
+            )
             b += 1
         a += 1
-    return y / (subdivisions ** 2)
+    return y / (subdivisions**2)
 
 
 def predict_img_with_smooth_windowing(input_img, window_size, subdivisions, pred_func):
@@ -224,8 +241,8 @@ def predict_img_with_smooth_windowing(input_img, window_size, subdivisions, pred
         # For every rotation:
         sd = _windowed_subdivs(pad, window_size, subdivisions, pred_func)
         one_padded_result = _recreate_from_subdivs(
-            sd, window_size, subdivisions,
-            padded_out_shape=list(pad.shape))
+            sd, window_size, subdivisions, padded_out_shape=list(pad.shape)
+        )
 
         res.append(one_padded_result)
 
@@ -234,6 +251,6 @@ def predict_img_with_smooth_windowing(input_img, window_size, subdivisions, pred
 
     prd = _unpad_img(padded_results, window_size, subdivisions)
 
-    prd = prd[:input_img.shape[0], :input_img.shape[1]]
+    prd = prd[: input_img.shape[0], : input_img.shape[1]]
 
     return prd

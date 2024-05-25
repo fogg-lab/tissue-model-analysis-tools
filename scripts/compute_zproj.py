@@ -75,31 +75,28 @@ def main():
     print(sys.argv[1:])
 
     args = su.parse_zproj_args()
-    verbose = args.verbose
     compute_cell_area = args.area
 
     ### Verify input source ###
     try:
-        zstack_paths = su.zproj_verify_input_dir(args.in_root, verbose=verbose)
+        zstack_paths = su.zproj_verify_input_dir(args.in_root)
     except FileNotFoundError as error:
         print(f"{su.SFM.failure} {error}")
         sys.exit()
 
     ### Verify output destination ###
     try:
-        su.zproj_verify_output_dir(args.out_root, verbose=verbose)
+        su.zproj_verify_output_dir(args.out_root)
     except PermissionError as error:
         print(f"{su.SFM.failure} {error}")
         sys.exit()
 
     ### Compute Z projections ###
-    if verbose:
-        su.verbose_header("Constructing Z projections")
+    su.section_header("Constructing Z projections")
 
     proj_method = proj_methods[args.method]
     descending = bool(args.order)
-    if verbose:
-        print("Loading and computing Z stacks...")
+    print("Loading and computing Z stacks...")
     try:
         # zprojs: A dictionary of Z projections, keyed by Z stack ID.
         zprojs = {Path(zsp).name: proj_method(get_zstack(zsp, descending)) for zsp in zstack_paths}
@@ -107,8 +104,7 @@ def main():
         print(f"{su.SFM.failure}{error}")
         sys.exit()
 
-    if verbose:
-        print("... Projections computed.")
+    print("... Projections computed.")
 
     ### Save Z projections ###
 
@@ -117,15 +113,13 @@ def main():
     if out_ext not in (".tif", ".tiff", ".png"):
         out_ext = ".tif"
 
-    if verbose:
-        print(f"{os.linesep}Saving projections...")
+    print(f"{os.linesep}Saving projections...")
     for z_id, zproj in zprojs.items():
         save_zproj(zproj, args.out_root, z_id, args.method, out_ext)
 
-    if verbose:
-        print("... Projections saved.")
-        print(su.SFM.success)
-        print(su.verbose_end)
+    print("... Projections saved.")
+    print(su.SFM.success)
+    print(su.END_SEPARATOR)
 
     if compute_cell_area:
         if "-a" in sys.argv:

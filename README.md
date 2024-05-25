@@ -18,9 +18,8 @@ A Python package for the high-throughput analysis of cancer and endothelial cell
 *Create the conda environment and install the fl_tissue_model_tools package*
 
 ### Prerequisites:
-**Note**: Conda is not strictly a requirement. Alternatively, you can install the packages listed in the requirements.txt file.
 - [Conda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html) package manager
-   - For devices with ARM processors (e.g. a MacBook with an M1 or M2 chip), install [Mambaforge](https://github.com/conda-forge/miniforge) instead of Miniconda or Anaconda
+   - For devices with ARM processors (e.g. a MacBook with an M1 or M2 chip), install **Miniforge** and choose the **arm64** architecture, not x86_64.
 - Build tools for your operating system
    - Windows: [Build tools for visual studio](https://visualstudio.microsoft.com/downloads/?q=build+tools#build-tools-for-visual-studio-2022). At the installer, select "Desktop development with C++" with the following individual components (in the right-hand details pane) selected
       - MSVC C++ x64/86 build tools
@@ -33,8 +32,7 @@ A Python package for the high-throughput analysis of cancer and endothelial cell
 Run the following commands in a terminal/command prompt window.
 
 ```bash
-# Recommended: replace environment.yml with a platform-specific file such as environment_windows.yml or environment_linux.yml
-conda env update -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/conda_environments/environment.yml
+conda env update -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/environment.yml
 conda activate tissue-model-analysis
 pip install -I fl_tissue_model_tools@git+https://github.com/fogg-lab/tissue-model-analysis-tools.git#subdirectory=src
 tmat configure
@@ -50,18 +48,16 @@ git clone --recurse-submodules https://github.com/fogg-lab/tissue-model-analysis
 #### Create conda environment
 Build a conda environment using the `environment.yml` file.
 
-For more information on how to manage conda environments, see [environment management reference](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html).
+For more info on Conda environments, see [environment management reference](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html).
 
 If you cloned the repo, `cd` to the project directory and run:
 ```bash
-# Recommended: replace environment.yml with a platform-specific file such as environment_windows.yml or environment_linux.yml
-conda env create -f conda_environments/environment.yml
+conda env update -f environment.yml
 ```
 
 If you didn't clone the repo, run:
 ```bash
-# Recommended: replace environment.yml with a platform-specific file such as environment_windows.yml or environment_linux.yml
-conda env create -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/conda_environments/environment.yml
+conda env update -f https://raw.githubusercontent.com/fogg-lab/tissue-model-analysis-tools/main/environment.yml
 ```
 
 Next, activate the environment:
@@ -114,14 +110,7 @@ pip uninstall fl_tissue_model_tools
 ---
 
 #### Update `fl_tissue_model_tools` package
-Execute
-```bash
-tmat update
-```
-Or, to update existing scripts and config files without confirmation, execute:
-```bash
-tmat update -f
-```
+Run the setup commands again. When you run `tmat configure`, make sure to select `y` at every prompt to overwrite the old scripts.
 
 #### Jupyter + `fl_tissue_model_tools`
 If changes are made to the `fl_tissue_model_tools` code, the notebook kernel must be restarted for those changes to be reflected.
@@ -152,8 +141,6 @@ tmat [command_script] [-flags] [arguments]
 tmat
 ```
 
-It is recommended that the `-v` (verbose) flag be used for each command.
-
 For input data paths, it is usually easiest to copy the path from the file explorer search bar.
 
 For a description of all parameters that each commandline tool accepts, execute one of the following:
@@ -172,24 +159,37 @@ tmat
 #### Cell Area
 **Basic usage:**
 ```bash
-tmat compute_cell_area -v "path/to/input/folder" "path/to/output/folder"
+tmat compute_cell_area "path/to/input/folder" "path/to/output/folder"
 ```
-Here, `input_path` is the full path to a directory of images which will be analyzed.
+
+Here, `path/to/input/folder` is the full path to a directory of images which will be analyzed.
+
+If your images are not cropped to the region inside the well, you can have the script automatically detect the well region by adding the `--detect_well` flag (or `-w` for short). For instance, if your wells are circular and you add the `--detect_well` flag, the script will detect and mask out the region outside of this circular well. Also works for "squircle" shaped (i.e. square with rounded corners) wells. Example usage:
+```bash
+tmat compute_cell_area --detect_well "path/to/input/folder" "path/to/output/folder"
+```
 
 **Advanced usage:**
 
-* Create custom configuration `.json` file, using `config/default_cell_area_computation.json` as a template.
-    * `dsamp_size`: Size that input images will be downsampled to for analysis. Smaller sizes mean faster, less accurate analysis.
-    * `sd_coef`: Strictness of thresholding. Positive numbers are more strict, negative numbers are less strict. This is a multiplier of the foreground pixel standard deviation, so values in the range (-2, 2) are the most reasonable.
-    * `well_buffer`: Proportion of the well's outer width/diameter to trim from the outer part of the well mask. For example, a circular well with an outer diameter of 1000 microns and inner diameter of 900 microns, the buffer is 50 microns, so the `well_buffer` should be 50/1000=0.05.
-    * `rs_seed`: A random seed for the algorithm. Allows for reproducability since the Gaussian curves are randomly initialized.
+* Create custom configuration `.json` file, using `config/default_cell_area_computation.json` as a template. The following parameters can be customized:
+    * `dsamp_size` (int): Size that input images will be downsampled to for analysis. Smaller sizes mean faster, less accurate analysis. Default is 512, meaning the image will be downscaled so that the 
+    * `sd_coef` (float): Strictness of thresholding. Positive numbers are more strict, negative numbers are less strict. This is a multiplier of the foreground pixel standard deviation, so values in the range (-2, 2) are the most reasonable.
+    * `rs_seed` (integer): A random seed for the algorithm. Allows for reproducability since the Gaussian curves are randomly initialized. Default is 0.
+    * `batch_size` (integer): Number of images to process at once. Larger numbers are faster but require more memory. Default is 4.
+
+**Run with custom configuration file:**
+```bash
+tmat compute_cell_area --config "path/to/config/file.json" "path/to/input/folder" "path/to/output/folder"
+```
 
 #### Z Projection
 **Basic usage:**
 ```bash
-tmat compute_zproj -v "path/to/input/directory" "path/to/output/folder"
+tmat compute_zproj "path/to/input/directory" "path/to/output/folder"
 ```
-Here, "path/to/input/directory" is the full path to a directory of Z stack subdirectories which will be analyzed. Each Z stack subfolder should contain all images for a given Z stack with files containing the pattern `...Z[pos]_...` in their name. For example `...Z01_...` denotes Z position 1 for a given image.
+Here, "path/to/input/directory" is the full path to a directory of Z stacks. Each Z stack should either be an OME-TIFF format file, or subdirectory of individual TIFF format files. 
+
+If you create subdirectories of indidual TIFFs for each Z stack, they assign filenames to the images containing the following pattern: `...Z[pos]_...` to indicate the Z position for each image. For example `...Z01_...` denotes Z position 1 for a given image.
 
 For N Z stacks, the input directory structure would be:
 ```
@@ -212,9 +212,9 @@ Root directory
 |    |    ...
 ```
 
-**To compute Z-projections and their cell area, add the --area flag:**  
+**To compute Z-projections and their cell area, add the --area flag:**
 ```bash
-tmat compute_zproj -v --area "path/to/input/folder" "path/to/output/folder"
+tmat compute_zproj --area "path/to/input/folder" "path/to/output/folder"
 ```
 
 **Advanced usage:**
@@ -231,7 +231,7 @@ See [Capabilities](#capabilities) for details.
 #### Invasion Depth
 **Basic usage:**
 ```
-tmat compute_inv_depth -v "path/to/input/folder" "path/to/output/folder"
+tmat compute_inv_depth "path/to/input/folder" "path/to/output/folder"
 ```
 
 For a description of the input directory structure, see [Z Projection](#z-projection).
@@ -239,15 +239,14 @@ For a description of the input directory structure, see [Z Projection](#z-projec
 #### Branches (quantify vessel formation)
 **Basic usage:**
 ```bash
-# the -g flag saves visualizations in a folder in the output directory
-tmat compute_branches -v -g "path/to/input/folder" "path/to/output/folder"
+tmat compute_branches "path/to/input/folder" "path/to/output/folder"
 ```
 
-or,
+Here, `path/to/input/folder` is the full path to a directory of images which will be analyzed.
 
+If your images are not cropped to the region inside the well, you can have the script automatically detect the well region by adding the `--detect_well` flag (or `-w` for short). For instance, if your wells are circular and you add the `--detect_well` flag, the script will detect and mask out the region outside of this circular well. Also works for "squircle" shaped (i.e. square with rounded corners) wells. Example usage:
 ```bash
-# the -i flag saves visualizations plus other intermediates in a folder in the output directory
-tmat compute_branches -v -i "path/to/input/folder" "path/to/output/folder"
+tmat compute_branches --detect_well "path/to/input/folder" "path/to/output/folder"
 ```
 
 **Advanced usage:**
