@@ -190,7 +190,7 @@ tmat compute_zproj "path/to/input/directory" "path/to/output/folder"
 ```
 Here, "path/to/input/directory" is the full path to a directory of Z stacks. Each Z stack should either be an OME-TIFF format file, or subdirectory of individual TIFF format files. 
 
-If you create subdirectories of indidual TIFFs for each Z stack, they assign filenames to the images containing the following pattern: `...Z[pos]_...` to indicate the Z position for each image. For example `...Z01_...` denotes Z position 1 for a given image.
+If you create subdirectories of indidual TIFFs for each Z stack, you need to assign filenames to the images containing the following pattern: `...Z[pos]_...` to indicate the Z position for each image. For example `...Z01_...` denotes Z position 1 for a given image.
 
 For N Z stacks, the input directory structure would be:
 ```
