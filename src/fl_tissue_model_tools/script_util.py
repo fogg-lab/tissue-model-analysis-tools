@@ -429,17 +429,18 @@ def zproj_verify_input_dir(input_path: str) -> Sequence[str]:
 
     if zstacks.is_single_file_zstack(input_path):
         input_path = zstacks.convert_zstack_image_to_tiffs(input_path)
+        zstack_paths = [input_path]
+    else:
+        if not osp.isdir(input_path):
+            raise FileNotFoundError(
+                f"Data directory or OME-TIF file not found at path: {os.linesep}\t{input_path}"
+            )
 
-    if not osp.isdir(input_path):
-        raise FileNotFoundError(
-            f"Data directory or OME-TIF file not found at path: {os.linesep}\t{input_path}"
-        )
-
-    zstack_paths = list(filter(zstacks.is_zstack, glob(f"{input_path}/*")))
-    for i, zsp in enumerate(zstack_paths):
-        if zstacks.is_single_file_zstack(zsp):
-            zstack_paths[i] = zstacks.convert_zstack_image_to_tiffs(zsp)
-    zstack_paths = list(set(zstack_paths))
+        zstack_paths = list(filter(zstacks.is_zstack, glob(f"{input_path}/*")))
+        for i, zsp in enumerate(zstack_paths):
+            if zstacks.is_single_file_zstack(zsp):
+                zstack_paths[i] = zstacks.convert_zstack_image_to_tiffs(zsp)
+        zstack_paths = list(set(zstack_paths))
 
     if len(zstack_paths) == 0:
         zstack_prefixes = set()
@@ -483,6 +484,8 @@ def zproj_verify_input_dir(input_path: str) -> Sequence[str]:
                 )
 
         zsp_id = Path(zsp).name
+        if zsp_id.endswith(zstacks.TIFF_INTERIM_DIR_SUFFIX):
+            zsp_id = zsp_id[:-len(zstacks.TIFF_INTERIM_DIR_SUFFIX)]
         print(f"{zsp_id:.<40}{n_imgs:.>20}")
 
     print(SFM.success)
