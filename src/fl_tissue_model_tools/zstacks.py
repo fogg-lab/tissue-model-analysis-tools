@@ -22,7 +22,7 @@ from .helper import get_img_paths
 
 # Zpos pattern: flexible, matches substrings like z012., Z34_, z[567]-
 ZPOS_PATTERN = "(z|Z)(\[)?[0-9]+(\])?(_|\.|\-)"
-
+TIFF_INTERIM_DIR_SUFFIX = "_tiff_files"
 
 def default_get_zpos(z_path: str) -> int:
     """Use `ZPOS_PATTERN` to retrieve z-position from path string.
@@ -106,7 +106,7 @@ def convert_zstack_image_to_tiffs(img_path: str) -> str:
     """
     filename = osp.basename(img_path)
     basename = osp.splitext(filename)[0]
-    output_dir = osp.join(osp.dirname(img_path), filename + "_tiff_files")
+    output_dir = osp.join(osp.dirname(img_path), filename + TIFF_INTERIM_DIR_SUFFIX)
     os.makedirs(output_dir, exist_ok=True)
 
     def print_failure_message(e: Exception) -> None:

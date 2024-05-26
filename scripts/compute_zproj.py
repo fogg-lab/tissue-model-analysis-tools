@@ -64,6 +64,10 @@ def save_zproj(zproj: npt.NDArray, out_root: str, zid: str, zproj_type: str, ext
     new_min = 0
     new_max = defs.MAX_UINT16
 
+    # If interim tiff directory was created for the z stack, remove the suffix
+    if zid.endswith(zs.TIFF_INTERIM_DIR_SUFFIX):
+        zid = zid[:-len(zs.TIFF_INTERIM_DIR_SUFFIX)]
+
     zproj_out_path = os.path.join(out_root, f"{zid}_{zproj_type}{ext}")
     zproj_out_img = prep.min_max_(zproj, new_min, new_max, old_min, old_max).astype(cast_type)
     cv2.imwrite(zproj_out_path, zproj_out_img)
