@@ -19,11 +19,12 @@ A Python package for the high-throughput analysis of cancer and endothelial cell
 
 ### Prerequisites:
 - [Conda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html) package manager
-   - For devices with ARM processors (e.g. a MacBook with an M1 or M2 chip), install **Miniforge** and choose the **arm64** architecture, not x86_64.
-- Build tools for your operating system
-   - Windows: [Build tools for visual studio](https://visualstudio.microsoft.com/downloads/?q=build+tools#build-tools-for-visual-studio-2022). At the installer, select "Desktop development with C++" with the following individual components (in the right-hand details pane) selected
-      - MSVC C++ x64/86 build tools
-      - Windows SDK
+   - Install a Conda distribution such as **Miniconda** and choose the right installer for your operating system.
+   - Specifically for devices with ARM processors (e.g. a MacBook with an M1 or M2 chip), install **Miniforge** and choose the **arm64** architecture.
+- Build tools
+   - Windows: [Build tools for visual studio](https://visualstudio.microsoft.com/downloads/?q=build+tools#build-tools-for-visual-studio-2022). At the installer, select "Desktop development with C++" with the following individual components (in the right-hand details pane) selected:
+     - MSVC C++ x64/86 build tools
+     - Windows SDK
    - Mac: Clang (run `xcode-select --install` in the terminal)
    - Linux or Windows Subsystem for Linux (WSL): g++ (likely already installed)
 
