@@ -25,7 +25,7 @@ A Python package for the high-throughput analysis of cancer and endothelial cell
       - MSVC C++ x64/86 build tools
       - Windows SDK
    - Mac: Clang (run `xcode-select --install` in the terminal)
-   - Linux: g++ (likely already installed)
+   - Linux or Windows Subsystem for Linux (WSL): g++ (likely already installed)
 
 ### Quick setup
 
