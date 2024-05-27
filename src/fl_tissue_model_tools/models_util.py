@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Sequence, Tuple, Union
 from numbers import Number
 import os
+from skimage.exposure import rescale_intensity
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
@@ -214,6 +215,7 @@ def load_y(batch_mask_paths):
 def load_x(batch_img_paths):
     # Load the input images
     x = [cv2.imread(img_path, cv2.IMREAD_ANYDEPTH) for img_path in batch_img_paths]
+    x = [rescale_intensity(_, out_range=(0, 1)) for _ in x]
     return np.array(x)
 
 
