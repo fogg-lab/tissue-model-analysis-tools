@@ -7,11 +7,13 @@ https://github.com/cmcguinness/focusstack
 import re
 import os
 import os.path as osp
+from pathlib import Path
 from typing import Optional, Sequence, Callable
 from glob import glob
 import numbers
 import numpy.typing as npt
 import numpy as np
+from skimage.exposure import rescale_intensity
 import cv2
 import tifffile
 import imghdr
@@ -22,7 +24,8 @@ from .helper import get_img_paths
 
 # Zpos pattern: flexible, matches substrings like z012., Z34_, z[567]-
 ZPOS_PATTERN = "(z|Z)(\[)?[0-9]+(\])?(_|\.|\-)"
-TIFF_INTERIM_DIR_SUFFIX = "_tiff_files"
+TIFF_INTERIM_DIR_SUFFIX = "_TMP_tiff_files"
+
 
 def default_get_zpos(z_path: str) -> int:
     """Use `ZPOS_PATTERN` to retrieve z-position from path string.
@@ -81,12 +84,11 @@ def is_zstack(fp):
     return (osp.isdir(fp) and len(glob(f"{fp}/*")) > 0) or is_single_file_zstack(fp)
 
 
-def save_tiff_zstack(image_stack: npt.NDArray, basename: str, output_dir: str) -> None:
+def save_tiff_zstack(image_stack: npt.NDArray, output_dir: str) -> None:
     """Save a stack of images as individual TIFF files.
 
     Args:
         image_stack: A numpy array representing a stack of images.
-        basename: Base name for the output TIFF files.
         output_dir: Directory to save the TIFF files.
     """
     for i, image in enumerate(image_stack):
@@ -104,9 +106,11 @@ def convert_zstack_image_to_tiffs(img_path: str) -> str:
     Returns:
         The directory where the TIFF files are saved.
     """
-    filename = osp.basename(img_path)
-    basename = osp.splitext(filename)[0]
-    output_dir = osp.join(osp.dirname(img_path), filename + TIFF_INTERIM_DIR_SUFFIX)
+    output_dir_name = Path(img_path).stem + TIFF_INTERIM_DIR_SUFFIX
+    # Clean up output directory name, in case it contains spaces or periods
+    output_dir_name = output_dir_name.replace(" ", "_")
+    output_dir_name = output_dir_name.replace(".", "_")
+    output_dir = osp.join(osp.dirname(img_path), output_dir_name)
     os.makedirs(output_dir, exist_ok=True)
 
     def print_failure_message(e: Exception) -> None:
@@ -126,7 +130,7 @@ def convert_zstack_image_to_tiffs(img_path: str) -> str:
         # Squeeze: Remove axes of length one
         images = np.squeeze(images)
 
-    save_tiff_zstack(images, basename, output_dir)
+    save_tiff_zstack(images, output_dir)
     return output_dir
 
 
@@ -147,7 +151,7 @@ def zstack_paths_from_dir(
             z-position is used to sort the z-stack.
 
     Returns:
-        A list of the full paths to each z-poistion image
+        A list of the full paths to each z-position image
         in the z-stack (sorted by z-position)
 
     """
@@ -166,8 +170,6 @@ def proj_focus_stacking(
     This procedure projects an image stack by retaining the maximum
     sharpness pixels.
 
-    `stack` must be grayscale (8-bit), or will be converted.
-
     Args:
         stack: Image stack.
         axis: The axis to project along (defaults to z)
@@ -177,8 +179,6 @@ def proj_focus_stacking(
         Focus stack projection of image stack as grayscale (8-bit) image.
 
     """
-    if stack.dtype != np.uint8:
-        stack = stack.round().astype(np.uint8)
 
     # We do not perform the alignment step which is typically included,
     # since each image in the stack is assumed to be an in-focus cross-section.
@@ -186,60 +186,51 @@ def proj_focus_stacking(
     # Compute Laplacian for each slice in stack to measure the sharpness of each pixel.
     # Assign each output pixel with the value in the stack with the largest magnitude sharpness.
 
-    maxima = np.zeros(stack[0].shape, dtype=np.float64)
-    masks = []
+    if axis != 0:
+        stack = np.moveaxis(stack, axis, 0)
+
+    maxima = np.full_like(stack[0], -np.inf, dtype=np.float32)
+    zproj = stack[0].copy()
 
     for pos in stack:
         abs_laplacian = np.absolute(_blur_and_lap(pos, kernel_size))
-        maxima = np.max(np.array([maxima, abs_laplacian]), axis=axis)
-        masks.append((abs_laplacian == maxima).astype(np.uint8))
+        maxima_mask = abs_laplacian > maxima
+        maxima[maxima_mask] = abs_laplacian[maxima_mask]
+        zproj[maxima_mask] = pos[maxima_mask]
 
-    output = np.zeros_like(stack[0])
-
-    for i, z_img in enumerate(stack):
-        output = cv2.bitwise_not(z_img, output, mask=masks[i])
-
-    return defs.MAX_UINT8 - output
+    return zproj
 
 
-def proj_avg(stack: npt.NDArray, axis: int = 0, dtype=np.uint8) -> npt.NDArray:
+def proj_avg(stack: npt.NDArray, axis: int = 0) -> npt.NDArray:
     """Project image stack along given axis using average pixel intensity.
 
     Args:
         stack: Image stack.
         axis: The axis to project along (defaults to z)
-        dtype: The output datatype.
 
     Returns:
         Average projection of image stack.
 
     """
-    proj = np.mean(stack, axis=axis)
-    if issubclass(dtype, numbers.Integral):
-        return proj.round().astype(dtype)
-    return proj.astype(dtype)
+    return np.mean(stack, axis=axis)
 
 
-def proj_med(stack: npt.NDArray, axis: int = 0, dtype=np.uint8) -> npt.NDArray:
+def proj_med(stack: npt.NDArray, axis: int = 0) -> npt.NDArray:
     """Project image stack along given axis using median pixel intensity.
 
     Args:
         stack: Image stack.
         axis: The axis to project along (defaults to z)
-        dtype: The output datatype.
 
     Returns:
         Median projection of image stack.
 
     """
 
-    proj = np.median(stack, axis=axis)
-    if issubclass(dtype, numbers.Integral):
-        return proj.round().astype(dtype)
-    return proj.astype(dtype)
+    return np.median(stack, axis=axis)
 
 
-def proj_max(stack: npt.NDArray, axis: int = 0, dtype=np.uint8) -> npt.NDArray:
+def proj_max(stack: npt.NDArray, axis: int = 0) -> npt.NDArray:
     """Project image stack along given axis using maximum pixel intensity.
 
     Args:
@@ -252,26 +243,19 @@ def proj_max(stack: npt.NDArray, axis: int = 0, dtype=np.uint8) -> npt.NDArray:
 
     """
 
-    proj = np.max(stack, axis=axis)
-    if issubclass(dtype, numbers.Integral):
-        return proj.round().astype(dtype)
-    return proj.astype(dtype)
+    return np.max(stack, axis=axis)
 
 
-def proj_min(stack: npt.NDArray, axis: int = 0, dtype=np.uint8) -> npt.NDArray:
+def proj_min(stack: npt.NDArray, axis: int = 0) -> npt.NDArray:
     """Project image stack along given axis using minimum pixel intensity.
 
     Args:
         stack: Image stack.
         axis: The axis to project along (defaults to z)
-        dtype: The output datatype.
 
     Returns:
         Minimum projection of image stack.
 
     """
 
-    proj = np.min(stack, axis=axis)
-    if issubclass(dtype, numbers.Integral):
-        return proj.round().astype(dtype)
-    return proj.astype(dtype)
+    return np.min(stack, axis=axis)

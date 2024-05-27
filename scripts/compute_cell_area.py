@@ -7,6 +7,7 @@ import numpy as np
 import numpy.typing as npt
 import dask as d
 import pandas as pd
+from skimage.exposure import rescale_intensity
 
 from fl_tissue_model_tools import defs
 from fl_tissue_model_tools import preprocessing as prep
@@ -19,12 +20,11 @@ THRESH_SUBDIR = "thresholded"
 CALC_SUBDIR = "calculations"
 
 
-def load_img(img_path: str, dsamp: bool = True, dsize: int = 250) -> npt.NDArray:
-    """Load and downsample image.
+def load_img(img_path: str, dsamp_size: Optional[int] = None) -> npt.NDArray:
+    """Load and optionally downsample image.
 
     Args:
         img_path: Path to image.
-        dsamp: Whether to downsample the image.
         dsize: If downsampling image, size to downsample to.
 
     Returns:
@@ -33,28 +33,11 @@ def load_img(img_path: str, dsamp: bool = True, dsize: int = 250) -> npt.NDArray
     """
 
     img = cv2.imread(img_path, cv2.IMREAD_ANYDEPTH)
-    if dsamp:
+    if dsamp_size is not None:
+        dsamp_ratio = dsamp_size / max(img.shape)
+        dsize = tuple(np.round(np.multiply(img.shape[:2], dsamp_ratio)).astype(int))
         img = cv2.resize(img, dsize, cv2.INTER_AREA)
-
     return img
-
-
-def load_and_norm(img_path: str, dsize: int = 250) -> npt.NDArray:
-    """Load and normalize image to new range.
-
-    Args:
-        img_path: Path to image.
-        dsize: If downsampling image, size to downsample to.
-
-    Returns:
-        Normalized image located at img_path.
-
-    """
-    new_min, new_max = 0, defs.MAX_UINT8
-    old_min, old_max = 0, defs.MAX_UINT16
-    img = load_img(img_path, dsamp=True, dsize=dsize)
-
-    return prep.min_max_(img, new_min, new_max, old_min, old_max)
 
 
 def mask_and_threshold(
@@ -77,10 +60,11 @@ def mask_and_threshold(
         Thresholded images.
 
     """
+    img = rescale_intensity(img, out_range=(0, 1)).astype(np.float32)
     if well_mask is not None:
-        masked = prep.apply_mask(img, well_mask).astype(float)
+        masked = prep.apply_mask(img, well_mask)
     else:
-        masked = img.astype(float)
+        masked = img
     masked_and_thresholded = prep.exec_threshold(masked, well_idx, sd_coef, rand_state)
 
     return (masked_and_thresholded > 0).astype(np.uint8) * defs.MAX_UINT8
@@ -92,7 +76,6 @@ def prep_images(img_paths: Sequence[str], dsamp_size: int) -> List[npt.NDArray]:
     Args:
         img_paths: Paths to each image.
         dsamp_size: Image size after downsampling.
-        extension: File extension for image.
 
     Returns:
         Downsampled, grayscale versions of initial images.
@@ -100,7 +83,7 @@ def prep_images(img_paths: Sequence[str], dsamp_size: int) -> List[npt.NDArray]:
     """
     gs_ds_imgs = d.compute(
         [
-            d.delayed(load_and_norm)(img_p, dsize=(dsamp_size, dsamp_size))
+            d.delayed(load_img)(img_p, dsamp_size=dsamp_size)
             for img_p in img_paths
         ]
     )[0]
@@ -156,7 +139,7 @@ def threshold_images(
 
 def compute_areas(
     imgs: List[npt.NDArray], well_pix_area: List[Optional[int]]
-) -> npt.NDArray[float]:
+) -> npt.NDArray:
     """Compute non-zero pixel area of thresholded images.
 
     Args:
@@ -197,9 +180,7 @@ def main():
 
     ### Verify output destination ###
     try:
-        su.cell_area_verify_output_dir(
-            args.out_root, THRESH_SUBDIR, CALC_SUBDIR
-        )
+        su.cell_area_verify_output_dir(args.out_root, THRESH_SUBDIR, CALC_SUBDIR)
     except PermissionError as error:
         print(f"{su.SFM.failure} {error}")
         sys.exit()
@@ -282,9 +263,7 @@ def main():
         cv2.imwrite(out_path, out_img)
 
     if args.detect_well:
-        print(
-            f"... Well masks saved to:{os.linesep}\t{args.out_root}/{THRESH_SUBDIR}"
-        )
+        print(f"... Well masks saved to:{os.linesep}\t{args.out_root}/{THRESH_SUBDIR}")
     print(
         f"... Thresholded images saved to:{os.linesep}\t{args.out_root}/{THRESH_SUBDIR}"
     )
