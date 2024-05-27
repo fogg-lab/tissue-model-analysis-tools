@@ -10,27 +10,6 @@ from sklearn.mixture import GaussianMixture
 from . import defs
 
 
-def min_max_(
-    img: npt.NDArray, new_min: float, new_max: float, old_min: float, old_max: float
-) -> npt.NDArray:
-    """Normalize the array `img` from the range [`old_min`, `old_max`]
-       to the range [`new_min`, `new_max`]
-    Args:
-        img: The array to be normalized.
-        new_min: The new min value.
-        new_max: The new max value.
-        old_min: The old min value.
-        old_max: The old max value.
-    Returns:
-        The normalized array.
-    """
-
-    img = img.astype(np.float64)
-    img_norm = new_min + ( (img - old_min) * (new_max - new_min) ) / (old_max - old_min)
-
-    return img_norm
-
-
 def apply_mask(img: npt.NDArray, mask: npt.NDArray) -> npt.NDArray:
     """Apply a mask to an image.
     Args:
@@ -45,7 +24,7 @@ def apply_mask(img: npt.NDArray, mask: npt.NDArray) -> npt.NDArray:
 
 
 def bin_thresh(
-    img: npt.NDArray, img_max: npt.NDArray, threshold: float=0
+    img: npt.NDArray, img_max: npt.NDArray, threshold: float = 0
 ) -> npt.NDArray:
     """Threshold an image by setting all pixels with value above `threshold` to `img_max`
     and all other pixels to 0.
@@ -58,12 +37,15 @@ def bin_thresh(
         with values > `threshold` and all other pixels set to 0.
     """
     img = np.copy(img)
-    img = np.where(img>threshold, img_max, 0)
+    img = np.where(img > threshold, img_max, 0)
     return img
 
 
 def exec_threshold(
-    masked: npt.NDArray, mask_idx: Optional[Sequence], sd_coef: float, rand_state: RandomState
+    masked: npt.NDArray,
+    mask_idx: Optional[Sequence],
+    sd_coef: float,
+    rand_state: RandomState,
 ) -> npt.NDArray:
     """Apply threshold to obtain the foreground (cell content) of a plate image.
     A 2-component Gaussian mixture model is fit to pixel the intensities of
@@ -89,6 +71,10 @@ def exec_threshold(
     if mask_idx is None:
         mask_idx = tuple(np.indices(masked.shape).reshape(2, -1))
     pixels = masked[mask_idx][:, np.newaxis]
+
+    # print(pixels.shape, pixels.min(), pixels.max(), pixels.mean(), pixels.std())
+    # print(masked.shape, masked.min(), masked.max(), masked.mean(), masked.std())
+
     gm = GaussianMixture(n_components=2, random_state=rand_state)
     gm = gm.fit(pixels)
 
@@ -98,7 +84,9 @@ def exec_threshold(
 
     # Get mean foreground mean & threshold value
     foreground_dist_idx = np.argmax(means)
-    foreground_thresh = min(defs.MAX_UINT8, means[foreground_dist_idx] + sds[foreground_dist_idx] * sd_coef)
+    foreground_thresh = min(
+        defs.MAX_UINT8, means[foreground_dist_idx] + sds[foreground_dist_idx] * sd_coef
+    )
 
     # Apply threshold
     gmm_masked = np.copy(masked)
@@ -107,8 +95,12 @@ def exec_threshold(
     return gmm_masked
 
 
-def gen_circ_mask(center: Tuple[int, int], radius: float, shape: Tuple[int, int],
-                  mask_val: Integral=1) -> npt.NDArray:
+def gen_circ_mask(
+    center: Tuple[int, int],
+    radius: float,
+    shape: Tuple[int, int],
+    mask_val: Integral = 1,
+) -> npt.NDArray:
     """Generate a circular mask.
     Args:
         center: Center coordinates (column, row) of the circle.
@@ -126,7 +118,7 @@ def gen_circ_mask(center: Tuple[int, int], radius: float, shape: Tuple[int, int]
 
 
 def dt_blur(
-    img: npt.NDArray, blur_itr: int, dist_metric: int=cv2.DIST_L2, k_size: int=3
+    img: npt.NDArray, blur_itr: int, dist_metric: int = cv2.DIST_L2, k_size: int = 3
 ) -> npt.NDArray[np.uint8]:
     """Apply distance transform and blur the image for `blur_itr` iterations.
     Args:
@@ -146,7 +138,7 @@ def dt_blur(
 
 
 def sdt_blur(
-    img: npt.NDArray, blur_itr: int, dist_metric: int=cv2.DIST_L2, k_size: int=3
+    img: npt.NDArray, blur_itr: int, dist_metric: int = cv2.DIST_L2, k_size: int = 3
 ) -> npt.NDArray[np.uint8]:
     """Apply the signed distance and blur the image for `blur_itr` iterations.
     The signed distance transform assigns each pixel in a binary mask
@@ -166,13 +158,14 @@ def sdt_blur(
     # distance of pixels in the mask
     proc_img = cv2.distanceTransform(mask, dist_metric, 5)
     # distance of pixels not in the mask
-    proc_img -= cv2.distanceTransform(np.logical_not(mask).astype(np.uint8),
-                                      dist_metric, 5)
+    proc_img -= cv2.distanceTransform(
+        np.logical_not(mask).astype(np.uint8), dist_metric, 5
+    )
     return blur(proc_img, blur_itr, k_size, gs=False)
 
 
 def blur(
-    img: npt.NDArray, blur_itr: int, k_size: int=3, gs: bool=True
+    img: npt.NDArray, blur_itr: int, k_size: int = 3, gs: bool = True
 ) -> npt.NDArray[np.uint8]:
     """Blur an image for `blur_itr` iterations.
     Args:
@@ -195,12 +188,14 @@ def blur(
 def get_augmentor(augmentations: List[Callable]) -> Callable:
     """Returns a function that applies a list of augmentations to an image/mask pair."""
 
-    def augmentor(image: npt.NDArray, mask: npt.NDArray) -> Tuple[npt.NDArray, npt.NDArray]:
-        assert image.shape == mask.shape, 'Image and mask must have the same shape.'
+    def augmentor(
+        image: npt.NDArray, mask: npt.NDArray
+    ) -> Tuple[npt.NDArray, npt.NDArray]:
+        assert image.shape == mask.shape, "Image and mask must have the same shape."
 
         for aug in augmentations:
             transformed = aug(image=image, mask=mask)
-            image, mask = transformed['image'], transformed['mask']
+            image, mask = transformed["image"], transformed["mask"]
 
         return image, mask
 
@@ -212,11 +207,13 @@ def get_batch_augmentor(augmentations: List[Callable]) -> Callable:
 
     augmentor = get_augmentor(augmentations)
 
-    def batch_augmentor(images: npt.NDArray, masks: npt.NDArray) -> Tuple[npt.NDArray, npt.NDArray]:
+    def batch_augmentor(
+        images: npt.NDArray, masks: npt.NDArray
+    ) -> Tuple[npt.NDArray, npt.NDArray]:
         assert images.shape == masks.shape, "Images and masks must have the same shape."
         num_samples = images.shape[0]
 
-        #image_mask_pairs = d.compute([
+        # image_mask_pairs = d.compute([
         #    d.delayed(augmentor)(images[i], masks[i])
         #    for i in range(num_samples)])[0]
         image_mask_pairs = [augmentor(images[i], masks[i]) for i in range(num_samples)]
@@ -229,11 +226,11 @@ def get_batch_augmentor(augmentations: List[Callable]) -> Callable:
 
 
 def augment_invasion_imgs(
-    images: npt.NDArray[float],
+    images: npt.NDArray,
     rand_state: RandomState,
     rot_options=(0, 90, 180, 270),
-    expand_dims: bool=False
-) -> npt.NDArray[float]:
+    expand_dims: bool = False,
+) -> npt.NDArray:
     """Transform a list of images with random flips and rotations.
     Args:
         images: Original images.
@@ -268,8 +265,14 @@ def augment_invasion_imgs(
 
         return img
 
-    images = d.compute([d.delayed(augment_img)([images[i]], rots[i], hflips[i],
-                  vflips[i], expand_dims)[0] for i in range(num_images)])[0]
+    images = d.compute(
+        [
+            d.delayed(augment_img)(
+                [images[i]], rots[i], hflips[i], vflips[i], expand_dims
+            )[0]
+            for i in range(num_images)
+        ]
+    )[0]
 
     return np.array(images)
 

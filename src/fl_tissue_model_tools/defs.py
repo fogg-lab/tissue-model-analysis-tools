@@ -7,6 +7,9 @@ import numpy as np
 MAX_UINT16 = np.iinfo(np.uint16).max
 MAX_UINT8 = np.iinfo(np.uint8).max
 
+# Epsilon value for floating point operations
+EPSILON = np.finfo(np.float32).eps
+
 # Base directory of this package (where it is installed) and its config file path
 PKG_BASE_DIR = Path(__file__).resolve().parent
 PKG_CFG_PATH = PKG_BASE_DIR / 'package.cfg'
