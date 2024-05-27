@@ -173,7 +173,7 @@ tmat compute_cell_area --detect-well "path/to/input/folder" "path/to/output/fold
 **Advanced usage:**
 
 * Create custom configuration `.json` file, using `config/default_cell_area_computation.json` as a template. The following parameters can be customized:
-    * `dsamp_size` (int): Size that input images will be downsampled to for analysis. Smaller sizes mean faster, less accurate analysis. Default is 512, meaning the image will be downscaled so that the 
+    * `dsamp_size` (int): Size that input images will be downsampled to for analysis. Smaller sizes mean faster, less accurate analysis. Default is 512, meaning the image will be downscaled so that the maximum dimension is 512 (e.g., 1000x1500 is downsampled to 341x512).
     * `sd_coef` (float): Strictness of thresholding. Positive numbers are more strict, negative numbers are less strict. This is a multiplier of the foreground pixel standard deviation, so values in the range (-2, 2) are the most reasonable.
     * `rs_seed` (integer): A random seed for the algorithm. Allows for reproducability since the Gaussian curves are randomly initialized. Default is 0.
     * `batch_size` (integer): Number of images to process at once. Larger numbers are faster but require more memory. Default is 4.
