@@ -20,6 +20,8 @@ except ImportError:
 
 from tqdm import tqdm
 
+INFERENCE_BATCH_SIZE = 16
+
 
 def _spline_window(window_size, power=2):
     """
@@ -169,13 +171,21 @@ def _windowed_subdivs(padded_img, window_size, subdivisions, pred_func):
     subdivs = subdivs.reshape((a * b, c, d))
     gc.collect()
 
-    subdivs = pred_func(subdivs)
+    if len(subdivs) > INFERENCE_BATCH_SIZE:
+        predictions = []
+        for chunk_num in range(int(np.ceil(len(subdivs) / INFERENCE_BATCH_SIZE))):
+            i = chunk_num * INFERENCE_BATCH_SIZE
+            j = i + INFERENCE_BATCH_SIZE
+            predictions.append(pred_func(subdivs[i:j], verbose=0))
+        subdivs = np.concatenate(predictions)
+    else:
+        subdivs = pred_func(subdivs, verbose=0)
 
     gc.collect()
     subdivs = np.array([patch * WINDOW_SPLINE_2D for patch in subdivs])
     gc.collect()
 
-    # Such 5D array:
+    # Such 5D array:s
     subdivs = subdivs.reshape((a, b, c, d))
     gc.collect()
 

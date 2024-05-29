@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Sequence, Tuple, Union
 from numbers import Number
 import os
+from skimage.exposure import rescale_intensity
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
@@ -80,10 +81,6 @@ def save_unet_patch_segmentor_cfg(cfg: dict):
     for key in required_keys:
         if cfg.get(key) is None:
             raise ValueError(f"Missing required config parameter: {key}")
-
-    for key in optional_keys:
-        if cfg.get(key) is None:
-            print("Warning: Missing optional config parameter: {key}")
 
     for key in cfg.keys():
         if key not in required_keys and key not in optional_keys:

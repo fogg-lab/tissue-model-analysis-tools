@@ -92,7 +92,7 @@ def main():
         # Set trainable to True, load weights, then set back to False
         ith_best_idx = sorted_best_model_idx[i]
         m.trainable = True
-        weights_path = str(best_ensemble_dir / f"best_finetune_weights_{ith_best_idx}.h5")
+        weights_path = str(best_ensemble_dir / f"best_finetune_weights_{ith_best_idx}.weights.h5")
         m.load_weights(weights_path)
         m.trainable = False
         print(f"... Classifier {i} loaded.")

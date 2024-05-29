@@ -2,7 +2,7 @@ import json
 from operator import lt, gt
 from copy import deepcopy
 from pathlib import Path
-from typing import Sequence, Tuple
+from typing import Sequence, Tuple, Optional
 from itertools import product
 import os
 
@@ -464,7 +464,7 @@ class UNetXceptionGridSearch():
                 print(f"Testing filter counts: {fc}")
                 print(f"Optimizer index: {optim_cfg_idx}")
             K.clear_session()
-            best_weights_file = f"{self.save_dir}/best_weights_config_{i}.h5"
+            best_weights_file = f"{self.save_dir}/best_weights_config_{i}.weights.h5"
             cp_callback = ModelCheckpoint(
                 best_weights_file, save_best_only=True, save_weights_only=True, monitor="loss"
             )
@@ -545,7 +545,7 @@ class UNetXceptionGridSearch():
             self.n_outputs, self.img_shape, channels=self.channels,
             filter_counts=self.best_filter_counts, output_act=self.output_act
         )
-        model.load_weights(f"{self.save_dir}/best_weights_config_{self.best_score_idx}.h5")
+        model.load_weights(f"{self.save_dir}/best_weights_config_{self.best_score_idx}.weights.h5")
         optimizer = optimizers.deserialize(self.best_optimizer_cfg)
         model.compile(optimizer=optimizer, loss=self.loss, metrics=self.metrics)
         return model
@@ -554,7 +554,7 @@ class UNetXceptionGridSearch():
 class UNetXceptionPatchSegmentor():
     """ Class for binary segmentation inference on images in patches with UNetXception model."""
     def __init__(self, patch_size: int, checkpoint_file: str, filter_counts: Tuple[int],
-                 ds_ratio: float=0.5, norm_mean: float=0, norm_std: float=1, channels: int=1):
+                 ds_ratio: float=0.5, norm_mean: Optional[float]=None, norm_std: Optional[float]=None, channels: int=1):
         self.patch_size = patch_size
         self.channels = channels
         self.norm_mean = norm_mean
@@ -574,7 +574,8 @@ class UNetXceptionPatchSegmentor():
             x = Image.fromarray(x).resize(target_shape, resample=Image.Resampling.LANCZOS)
             x = np.array(x)
 
-        x = (x - self.norm_mean) / self.norm_std
+        if self.norm_mean is not None and self.norm_std is not None:
+            x = (x - self.norm_mean) / self.norm_std
 
         pred = predict_img_with_smooth_windowing(
             x,
@@ -610,9 +611,9 @@ def get_unet_patch_segmentor_from_cfg(cfg_json: str) -> UNetXceptionPatchSegment
         cfg["patch_size"],
         checkpoint_file,
         cfg["filter_counts"],
-        ds_ratio=cfg.get("ds_ratio", 0),
-        norm_mean=cfg.get("norm_mean", 0),
-        norm_std=cfg.get("norm_std", 1),
+        ds_ratio=cfg.get("ds_ratio", 1),
+        norm_mean=cfg.get("norm_mean", None),
+        norm_std=cfg.get("norm_std", None),
         channels=cfg.get("channels", 1)
     )
 
