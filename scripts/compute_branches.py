@@ -47,6 +47,7 @@ def analyze_img(
     """
 
     well_width_microns = config.get("well_width_microns", 1000.0)
+    vessel_p_thresh = config.get("vessel_probability_thresh", 0.5)
     morse_thresholds = config.get("graph_thresh_1", 2), config.get("graph_thresh_2", 4)
     graph_smoothing_window = config.get("graph_smoothing_window", 10)
     min_branch_length = config.get("min_branch_length", 10)
@@ -98,7 +99,7 @@ def analyze_img(
     print("Segmenting image...")
 
     pred = model.predict(img * well_mask, auto_resample=False)
-    seg_mask = pred > 0.5
+    seg_mask = pred > vessel_p_thresh
 
     # Save pred and save well mask if needed
     save_vis(pred, vis_dir, "prediction.png")

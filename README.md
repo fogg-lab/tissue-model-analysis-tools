@@ -127,7 +127,7 @@ Four command-line tools which handle the following operations:
 * Cell area computation (of Z projected images)
 * Z projection of image Z stacks
 * Invasion depth computation (of Z stacks)
-* Quantify blood vessel formation (number of branches, lengths of branches)
+* Quantify microvessel formation (number of branches, lengths of branches)
 
 To use these tools:
 
@@ -257,6 +257,7 @@ Customize configuration variables (you can edit `config/default_branching_comput
 - `well_width_microns` (float): Physical width of the image in microns.
 - `use_latest_model_cfg` (boolean): If `True`, the most recently trained model in the `model_training` folder will be used. If `False`, the model specified in `model_cfg_path` will be used.
 - `model_cfg_path` (string): Path to the configuration file of the segmentation model. You can leave this blank (`''`) to use the most recently trained model in the `model_training` folder.
+- `vessel_probability_thresh` (float): May require some experimentation to find the best value for your data. This is the segmentation probability threshold above which a pixel will be classified as part of a microvessel. The default is 0.5. Lower values such as 0.4 may work well if you want to detect vessels that are visibly faint, dim, or have dark spots along them. Higher values such as 0.6 may work well if the script is detecting too many objects as vessels.
 - `graph_thresh_1` (float): May require some experimentation to find the best value for your data. This threshold controls how much of the morse graph is used to compute the number of branches. Lower values include more of the graph, and more branches are detected. Higher values include less of the graph, and fewer branches are detected. Try different values like 0.25, 0.5, 1, 2, 4, etc. up to around 64.
 - `graph_thresh_2` (float): Also could use some tuning. This is the threshold for connecting branches, e.g. where it is ambiguous whether two branches are part of the same component. Lower values result in more connected branches, and higher values result in more disconnections. Try values like 0.0, 0.25, 0.5, 1, 2, 4, etc. up to around 64.
 - `graph_smoothing_window` (integer): This is the window size (in pixels) for smoothing the branch paths. Values in the range of 5-20 tend to work well.
