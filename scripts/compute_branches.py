@@ -52,7 +52,7 @@ def analyze_img(
     min_branch_length = config.get("min_branch_length", 10)
 
     print("")
-    print("=========================================")
+    print("==================================   =======")
     print(f"Analyzing {img_path.stem}...")
     print("=========================================")
 
@@ -69,8 +69,6 @@ def analyze_img(
     vis_dir = output_dir / "visualizations" / img_path.stem
     vis_dir.mkdir(parents=True, exist_ok=True)
     save_vis(img, vis_dir, "original_image.png")
-
-    print("Applying mask to image...")
 
     # Create a mask over the well and a smaller, inverted mask for pruning
     # The pruning mask is used to remove spurious branches detected near the well edge
