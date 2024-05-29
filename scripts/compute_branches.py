@@ -53,7 +53,7 @@ def analyze_img(
     min_branch_length = config.get("min_branch_length", 10)
 
     print("")
-    print("==================================   =======")
+    print("=========================================")
     print(f"Analyzing {img_path.stem}...")
     print("=========================================")
 
