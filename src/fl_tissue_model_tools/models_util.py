@@ -82,10 +82,6 @@ def save_unet_patch_segmentor_cfg(cfg: dict):
         if cfg.get(key) is None:
             raise ValueError(f"Missing required config parameter: {key}")
 
-    for key in optional_keys:
-        if cfg.get(key) is None:
-            print("Warning: Missing optional config parameter: {key}")
-
     for key in cfg.keys():
         if key not in required_keys and key not in optional_keys:
             raise ValueError(f"Invalid config parameter: {key}")
@@ -215,7 +211,6 @@ def load_y(batch_mask_paths):
 def load_x(batch_img_paths):
     # Load the input images
     x = [cv2.imread(img_path, cv2.IMREAD_ANYDEPTH) for img_path in batch_img_paths]
-    x = [rescale_intensity(_, out_range=(0, 1)) for _ in x]
     return np.array(x)
 
 
