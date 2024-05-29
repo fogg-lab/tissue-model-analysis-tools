@@ -6,6 +6,7 @@ import numpy as np
 import numpy.typing as npt
 import dask as d
 import cv2
+from skimage.exposure import rescale_intensity
 
 from numpy.random import RandomState
 
@@ -48,8 +49,8 @@ def load_inv_depth_img(path: str, img_hw: Tuple[int, int]) -> npt.NDArray:
         Preprocessed invasion depth image.
     """
     img = cv2.imread(path, cv2.IMREAD_ANYDEPTH)
-    img = prep.min_max_(cv2.resize(img, img_hw, cv2.INTER_LANCZOS4).astype(np.float32),
-                        0, defs.MAX_UINT8, 0, defs.MAX_UINT16)
+    img = cv2.resize(img, img_hw, cv2.INTER_LANCZOS4)
+    img = rescale_intensity(img)
     img = np.repeat(img[:, :, np.newaxis], 3, axis=2)
     return img
 

@@ -1,7 +1,8 @@
 import os
-import sys
 from pathlib import Path
+import shutil
 import subprocess
+import sys
 import numpy as np
 import numpy.typing as npt
 import cv2
@@ -18,7 +19,7 @@ proj_methods = {
     "max": zs.proj_max,
     "med": zs.proj_med,
     "avg": zs.proj_avg,
-    "fs": zs.proj_focus_stacking
+    "fs": zs.proj_focus_stacking,
 }
 
 
@@ -34,47 +35,14 @@ def get_zstack(zs_path: str, descending: bool) -> npt.NDArray:
         Z stack as array of images.
     """
 
-    z_paths = sorted(helper.get_img_paths(zs_path), key=zs.default_get_zpos, reverse=descending)
-    z_stack = []
-
-    for z_path in z_paths:
-        z_img = cv2.imread(z_path, cv2.IMREAD_ANYDEPTH)
-        z_img_norm = prep.min_max_(z_img, 0, defs.MAX_UINT8, 0, defs.MAX_UINT16)
-        z_stack.append(z_img_norm.round().astype(np.uint8))
-
-    return np.array(z_stack)
-
-
-def save_zproj(zproj: npt.NDArray, out_root: str, zid: str, zproj_type: str, ext: str) -> None:
-    """Save Z projected image.
-
-    Args:
-        zproj: Z projected image.
-        out_root: Path to root output directory.
-        zid: Base filename of Z projected image.
-        zproj_type: Projection type, appended to zid.
-
-    Raises:
-        OSError: Unsupported file extension supplied.
-    """
-    old_min = 0
-    old_max = defs.MAX_UINT8
-
-    cast_type = np.uint16
-    new_min = 0
-    new_max = defs.MAX_UINT16
-
-    # If interim tiff directory was created for the z stack, remove the suffix
-    if zid.endswith(zs.TIFF_INTERIM_DIR_SUFFIX):
-        zid = zid[:-len(zs.TIFF_INTERIM_DIR_SUFFIX)]
-
-    zproj_out_path = os.path.join(out_root, f"{zid}_{zproj_type}{ext}")
-    zproj_out_img = prep.min_max_(zproj, new_min, new_max, old_min, old_max).astype(cast_type)
-    cv2.imwrite(zproj_out_path, zproj_out_img)
+    z_paths = sorted(
+        helper.get_img_paths(zs_path), key=zs.default_get_zpos, reverse=descending
+    )
+    return np.array([cv2.imread(z_path, cv2.IMREAD_ANYDEPTH) for z_path in z_paths])
 
 
 def main():
-    '''Computes z projections and saves to output directory.'''
+    """Computes z projections and saves to output directory."""
 
     print(sys.argv[1:])
 
@@ -103,7 +71,10 @@ def main():
     print("Loading and computing Z stacks...")
     try:
         # zprojs: A dictionary of Z projections, keyed by Z stack ID.
-        zprojs = {Path(zsp).name: proj_method(get_zstack(zsp, descending)) for zsp in zstack_paths}
+        zprojs = {
+            Path(zsp).name: proj_method(get_zstack(zsp, descending))
+            for zsp in zstack_paths
+        }
     except OSError as error:
         print(f"{su.SFM.failure}{error}")
         sys.exit()
@@ -115,11 +86,16 @@ def main():
     # Use first extension from the input directory as the output extension
     out_ext = Path(zstack_paths[0]).suffix
     if out_ext not in (".tif", ".tiff", ".png"):
-        out_ext = ".tif"
+        out_ext = ".tiff"
 
     print(f"{os.linesep}Saving projections...")
     for z_id, zproj in zprojs.items():
-        save_zproj(zproj, args.out_root, z_id, args.method, out_ext)
+        if z_id.endswith(zs.TIFF_INTERIM_DIR_SUFFIX):
+            shutil.rmtree(os.path.join(args.in_root, z_id))
+            z_id = z_id[: -len(zs.TIFF_INTERIM_DIR_SUFFIX)]
+        cv2.imwrite(
+            os.path.join(args.out_root, f"{z_id}_{args.method}_{out_ext}"), zproj
+        )
 
     print("... Projections saved.")
     print(su.SFM.success)
@@ -133,11 +109,15 @@ def main():
 
         script_path = defs.SCRIPT_DIR / "compute_cell_area.py"
 
-        options = [arg for arg in sys.argv[1:] if arg != args.in_root and arg != args.out_root]
+        options = [
+            arg for arg in sys.argv[1:] if arg != args.in_root and arg != args.out_root
+        ]
 
         # use out_root as both in_root and out_root
-        subprocess.run([sys.executable, script_path, *options, args.out_root, args.out_root],
-                       check=True)
+        subprocess.run(
+            [sys.executable, script_path, *options, args.out_root, args.out_root],
+            check=True,
+        )
 
 
 if __name__ == "__main__":
