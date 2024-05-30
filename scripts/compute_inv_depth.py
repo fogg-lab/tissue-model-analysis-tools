@@ -81,7 +81,7 @@ def main():
     # Create the (n_pred_models) best models from the saved weights
     K.clear_session()
     inv_depth_models = [
-        models.build_ResNet50_TL(n_outputs, resnet_inp_shape,
+        models.build_ResNet50_TL(n_outputs, resnet_inp_shape, base_init_weights=None,
             base_last_layer=last_resnet_layer, base_model_trainable=False)
             for _ in range(n_pred_models)
     ]
@@ -92,7 +92,7 @@ def main():
         # Set trainable to True, load weights, then set back to False
         ith_best_idx = sorted_best_model_idx[i]
         m.trainable = True
-        weights_path = str(best_ensemble_dir / f"best_finetune_weights_{ith_best_idx}.weights.h5")
+        weights_path = str(best_ensemble_dir / f"best_finetune_weights_{ith_best_idx}.h5")
         m.load_weights(weights_path)
         m.trainable = False
         print(f"... Classifier {i} loaded.")
