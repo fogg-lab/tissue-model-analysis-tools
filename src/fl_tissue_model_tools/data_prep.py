@@ -50,7 +50,7 @@ def load_inv_depth_img(path: str, img_hw: Tuple[int, int]) -> npt.NDArray:
     """
     img = cv2.imread(path, cv2.IMREAD_ANYDEPTH)
     img = cv2.resize(img, img_hw, cv2.INTER_LANCZOS4)
-    img = rescale_intensity(img)
+    img = rescale_intensity(img, out_range=(0, 255))
     img = np.repeat(img[:, :, np.newaxis], 3, axis=2)
     return img
 
