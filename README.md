@@ -28,6 +28,8 @@ A Python package for the high-throughput analysis of cancer and endothelial cell
      - Windows SDK
    - Mac: Clang (run `xcode-select --install` in the terminal)
 
+**Note if you want to use GPU acceleration**: If you are in a Linux environment (WSL included) with an NVidia GPU, you may need to make changes to the provided environment.yml file and use a newer version of Tensorflow as well as install the right version of CUDA Toolkit, and make sure the environmental variables are set correctly for Tensorflow to recognize the GPU device. The provided environment installs a combination of versions for the dependencies that work without issues across different platforms, but unfortunately it is a CPU-only environment out-of-the-box.
+
 ### Quick setup
 
 Run the following commands in a terminal/command prompt window.
