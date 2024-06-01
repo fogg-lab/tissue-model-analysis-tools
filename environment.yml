@@ -9,6 +9,7 @@ dependencies:
   - gudhi=3.9.0
   - imagecodecs=2024.1.1
   - ipykernel=6.29.3
+  - matplotlib=3.8.4
   - networkx=3.3
   - numpy=1.26.4
   - opencv=4.9.0
