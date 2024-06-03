@@ -112,8 +112,7 @@ def configure(target_base_dir: str = ""):
         (defs.PKG_MODEL_DIR, MODEL_SUBDIR),
     ]:
         dest_dir_path = Path(target_base_dir) / dest_dir
-        if dest_dir_path.exists():
-            shutil.copytree(src_dir, dest_dir_path, dirs_exist_ok=True)
+        shutil.copytree(src_dir, dest_dir_path, dirs_exist_ok=True)
 
     if target_base_dir != prev_base_dir:
         # Update package config file with new base_dir
