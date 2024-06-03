@@ -55,19 +55,17 @@ Run the following commands in a terminal or command prompt window.
 ```bash
 pipx install git+https://github.com/fogg-lab/tissue-model-analysis-tools.git@packaging#egg=fl_tissue_model_tools
 ```
-
-1. Configure base directory to store data, scripts, and script configuration files:
+2. Configure base directory to store data, scripts, and script configuration files:
 ```bash
 tmat configure
 ```
-
-1. Note that commands will follow this layout (more details in [usage](#usage)):
+3. Note that commands will follow this layout (more details in [usage](#usage)):
 ```bash
 tmat [SUBCOMMAND] [OPTIONS]
 ```
 
+Or you can use the interactive mode:
 ```bash
-# or use the interactive prompt
 tmat
 ```
 
