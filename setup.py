@@ -98,5 +98,5 @@ setup(
         "Operating System :: OS Independent",
     ],
     license="License Notice for Free Academic Research Use",
-    python_requires=">=3.9, <3.13",
+    python_requires=">=3.9, <3.12",
 )

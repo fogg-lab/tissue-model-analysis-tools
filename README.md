@@ -19,7 +19,7 @@ Windows, MacOS, and Linux are all supported.
 
 ### Prerequisite: Install Python and pipx
 
-1. Install any [Python](https://www.python.org/) version in the range >=3.9, <3.13 (Python 3.9.x, 3.10.x, 3.11.x, or 3.12.x). Confirm that the correct Python version was installed by running each of these commands, and find out which command is recognized (it could be installed as either `python`, `python3`, or `py` depending on your system configuration):
+1. Install any [Python](https://www.python.org/) version in the range >=3.9, <3.12 (Python 3.9.x, 3.10.x, or 3.11.x). Confirm that the correct Python version was installed by running each of these commands, and find out which command is recognized (it could be installed as either `python`, `python3`, or `py` depending on your system configuration):
 ```bash
 python --version
 ```
