@@ -44,7 +44,7 @@ pipx install git+https://github.com/fogg-lab/tissue-model-analysis-tools.git@pac
 tmat configure "C:\Users\Quinn\Desktop\some_folder_name"
 ```
 
-4. The `fl_tissue_model_tools` package should now be accessible from any code within the python environment in which it was installed. Additionally, the `tissue-model-analysis-tools` (or `tmat` for short) command has been added to your terminal as an entrypoint for running the package scripts. Commands will follow this layout (more details in [usage](#usage)):
+3. Note that commands will follow this layout (more details in [usage](#usage)):
 ```bash
 tissue-model-analysis-tools [SUBCOMMAND] [OPTIONS]
 ```
