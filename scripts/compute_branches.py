@@ -16,7 +16,6 @@ from fl_tissue_model_tools import helper, models, models_util, defs
 from fl_tissue_model_tools import script_util as su
 from fl_tissue_model_tools.transforms import filter_branch_seg_mask
 from fl_tissue_model_tools.topology import MorseGraph
-from fl_tissue_model_tools.analysis import pixels_to_microns
 from fl_tissue_model_tools.well_mask_generation import (
     generate_well_mask,
     gen_superellipse_mask,
@@ -29,6 +28,20 @@ DEFAULT_CONFIG_PATH = str(defs.SCRIPT_CONFIG_DIR / "default_branching_computatio
 def save_vis(img, save_dir, filename):
     img = rescale_intensity(img, out_range=(0, 255))
     cv2.imwrite(os.path.join(save_dir, filename), img)
+
+
+def pixels_to_microns(
+    num_pixels: float, im_width_px: int, im_width_microns: float
+) -> float:
+    """Convert pixels to microns in specified resolution.
+
+    Args:
+        num_pixels: Number of pixels to convert to microns.
+        im_width_px: Width of image in pixels.
+        im_width_microns: Physical width of image region in microns.
+    """
+
+    return (im_width_microns / im_width_px) * num_pixels
 
 
 def analyze_img(
