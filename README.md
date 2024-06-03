@@ -82,7 +82,7 @@ The `tmat` command-line utility consists of four separate automated image analys
 
 To use `tmat`, open a terminal or command prompt window and execute commands in the following format:
 ```bash
-# For non-interactive use, specify all arguments a single command
+# For non-interactive use, specify all arguments in a single command
 tmat [command_script] [-flags] [arguments]
 ```
 
@@ -110,14 +110,14 @@ tmat
 #### Cell Area
 **Basic usage (accept the default configuration)**
 ```bash
-tmat compute_cell_area "path/to/input/folder" "path/to/output/folder"
+tmat compute_cell_area "/path/to/input/folder" "/path/to/output/folder"
 ```
 
-Here, `path/to/input/folder` is the full path to a directory of images which will be analyzed.
+Here, `/path/to/input/folder` is the full path to a directory of images which will be analyzed.
 
 If your images are not cropped to the region inside the well, you can have the script automatically detect the well region by adding the `--detect-well` flag (or `-w` for short). For instance, if your wells are circular and you add the `--detect-well` flag, the script will detect and mask out the region outside of this circular well. Also works for "squircle" shaped (i.e. square with rounded corners) wells. Example usage:
 ```bash
-tmat compute_cell_area --detect-well "path/to/input/folder" "path/to/output/folder"
+tmat compute_cell_area --detect-well "/path/to/input/folder" "/path/to/output/folder"
 ```
 
 **Custom usage (customize the analysis configuration)**
@@ -130,15 +130,15 @@ tmat compute_cell_area --detect-well "path/to/input/folder" "path/to/output/fold
 
 **Run with custom configuration file:**
 ```bash
-tmat compute_cell_area --config "path/to/config/file.json" "path/to/input/folder" "path/to/output/folder"
+tmat compute_cell_area --config "/path/to/config/file.json" "/path/to/input/folder" "/path/to/output/folder"
 ```
 
 #### Z Projection
 **Basic usage (accept the default configuration)**
 ```bash
-tmat compute_zproj "path/to/input/directory" "path/to/output/folder"
+tmat compute_zproj "/path/to/input/directory" "/path/to/output/folder"
 ```
-Here, "path/to/input/directory" is the full path to a directory of Z stacks. Each Z stack should either be an OME-TIFF format file, or subdirectory of individual TIFF format files. 
+Here, "/path/to/input/directory" is the full path to a directory of Z stacks. Each Z stack should either be an OME-TIFF format file, or subdirectory of individual TIFF format files. 
 
 If you create subdirectories of indidual TIFFs for each Z stack, you need to assign filenames to the images containing the following pattern: `...Z[pos]_...` to indicate the Z position for each image. For example `...Z01_...` denotes Z position 1 for a given image (or you can start at 0 if you like).
 
@@ -165,7 +165,7 @@ Root directory
 
 **To compute Z-projections and their cell area, add the --area flag:**
 ```bash
-tmat compute_zproj --area "path/to/input/folder" "path/to/output/folder"
+tmat compute_zproj --area "/path/to/input/folder" "/path/to/output/folder"
 ```
 
 * Use the `--method` flag to select custom Z projection method, from:
@@ -177,7 +177,7 @@ tmat compute_zproj --area "path/to/input/folder" "path/to/output/folder"
 
 **Example: Compute Z projections and cell coverage area with the focus stacking method**
 ```bash
-tmat compute_zproj --area --method fs "path/to/input/folder" "path/to/output/folder"
+tmat compute_zproj --area --method fs "/path/to/input/folder" "/path/to/output/folder"
 ```
 
 See [Capabilities](#capabilities) for details.
@@ -185,7 +185,7 @@ See [Capabilities](#capabilities) for details.
 #### Invasion Depth
 **Usage**
 ```
-tmat compute_inv_depth "path/to/input/folder" "path/to/output/folder"
+tmat compute_inv_depth "/path/to/input/folder" "/path/to/output/folder"
 ```
 
 For a description of the input directory structure, see [Z Projection](#z-projection).
@@ -193,14 +193,14 @@ For a description of the input directory structure, see [Z Projection](#z-projec
 #### Branches (quantify vessel formation)
 **Basic usage (accept the default configuration)**
 ```bash
-tmat compute_branches "path/to/input/folder" "path/to/output/folder"
+tmat compute_branches "/path/to/input/folder" "/path/to/output/folder"
 ```
 
-Here, `path/to/input/folder` is the full path to a directory of images which will be analyzed.
+Here, `/path/to/input/folder` is the full path to a directory of images which will be analyzed.
 
 If your images are not cropped to the region inside the well, you can have the script automatically detect the well region by adding the `--detect-well` flag (or `-w` for short). For instance, if your wells are circular and you add the `--detect-well` flag, the script will detect and mask out the region outside of this circular well. Also works for "squircle" shaped (i.e. square with rounded corners; lens) wells. Example usage:
 ```bash
-tmat compute_branches --detect-well "path/to/input/folder" "path/to/output/folder"
+tmat compute_branches --detect-well "/path/to/input/folder" "/path/to/output/folder"
 ```
 
 **Custom usage (customize the analysis configuration)**
