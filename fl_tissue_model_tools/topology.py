@@ -156,7 +156,7 @@ class MorseGraph:
                 Array where ith row stores 2d coordinate of ith vertex of a graph.
         """
 
-        G, vertices = self.__compute_nx_graph(img, *thresholds, method=self.method)
+        G, vertices = self.__compute_nx_graph(img, *thresholds)
 
         # Smooth vertices in the graph
         vertices = self.__smooth_graph(G, vertices, self.smoothing_window)
@@ -383,7 +383,6 @@ class MorseGraph:
         im: npt.NDArray,
         threshold1: Number = 0.5,
         threshold2: Number = 0.0,
-        method=0,
     ):
         """Fit a Morse skeleton to the image `im`.
         Args:
@@ -399,9 +398,6 @@ class MorseGraph:
 
         # Compute the Morse skeleton
         V, E = compute_dmt_graph(im.astype(np.float32), threshold1, threshold2)
-
-        print(f"{V.shape=}, {V.dtype=}")
-        print(f"{E.shape=}, {E.dtype=}")
 
         G = MorseGraph.__convert_to_networkx_graph(E)
 
