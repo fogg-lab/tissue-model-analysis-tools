@@ -8,14 +8,6 @@ setup_cfg = configparser.ConfigParser()
 setup_cfg.read("setup.cfg")
 
 pkg_name = setup_cfg["metadata"]["name"]
-
-entrypoint_commands = [
-    "tissue-model-analysis-tools",
-    "tmat",
-    pkg_name,
-    pkg_name.replace("_", "-"),
-]
-
 pkg_root = Path(pkg_name).resolve()
 cfg_file = pkg_root / "package.cfg"
 project_root = pkg_root.parent
@@ -89,9 +81,7 @@ setup(
     ],
     extras_require={"and-cuda": ["tensorflow[and-cuda]==2.15.1"]},
     entry_points={
-        "console_scripts": [
-            f"{command}={pkg_name}.cli:main" for command in entrypoint_commands
-        ]
+        "console_scripts": [f"tmat={pkg_name}.cli:main"]
     },
     classifiers=[
         "Programming Language :: Python :: 3",
