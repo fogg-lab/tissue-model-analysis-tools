@@ -82,7 +82,11 @@ pipx uninstall fl_tissue_model_tools
 ---
 
 #### Update `fl_tissue_model_tools` package
-To update `tmat`, run the setup commands again.
+To update `tmat`, run these two commands:
+```bash
+pipx install git+https://github.com/fogg-lab/tissue-model-analysis-tools.git@packaging --force
+tmat configure
+```
 
 ## Capabilities
 
