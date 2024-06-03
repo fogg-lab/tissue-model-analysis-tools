@@ -1,8 +1,6 @@
 from typing import Tuple
 import math
 from numbers import Number
-from itertools import zip_longest
-#from time import perf_counter_ns
 
 import numpy as np
 import numpy.typing as npt
@@ -11,15 +9,22 @@ from matplotlib.collections import LineCollection
 import matplotlib.pyplot as plt
 from cv2 import cvtColor, COLOR_HSV2BGR
 
-from pydmtgraph.dmtgraph import DMTGraph
+from fl_tissue_model_tools.dmtgraph import compute_dmt_graph
 
 
 class MorseGraph:
     """Morse skeleton of an image represented as a forest. Each tree is a connected component."""
 
-    def __init__(self, img: npt.NDArray, thresholds: Tuple[Number, Number]=(1,4),
-                 min_branch_length: int=15, smoothing_window: int=15,
-                 pruning_mask: npt.NDArray=None):
+    def __init__(
+        self,
+        img: npt.NDArray,
+        thresholds: Tuple[Number, Number] = (1, 4),
+        min_branch_length: int = 15,
+        smoothing_window: int = 15,
+        pruning_mask: npt.NDArray = None,
+        method=0,
+    ):
+        self.method = method
         self.smoothing_window = smoothing_window
         self.thresholds = thresholds
         self.min_branch_length = min_branch_length
@@ -40,15 +45,12 @@ class MorseGraph:
         self.__compute_branches_and_barcode()
         self.__filter_graph()
 
-
     ### Public methods ###
-
 
     def get_total_branch_length(self) -> float:
         """Get the sum of persistence interval lengths of a barcode."""
         bar_lengths = self.__barcode_interval_lengths()
         return np.sum(bar_lengths)
-
 
     def get_average_branch_length(self) -> float:
         """Return the average bar length of a barcode."""
@@ -58,9 +60,8 @@ class MorseGraph:
             return 0
         return bar_sum / len(bar_lengths)
 
-
     def plot_colored_barcode(self, ax=None, **kwargs):
-        """ Plot a colored barcode computed by `compute_colored_tree_and_barcode`.
+        """Plot a colored barcode computed by `compute_colored_tree_and_barcode`.
 
         Args:
             barcode_and_colors (list): list of bars and colors in the format returned
@@ -83,7 +84,9 @@ class MorseGraph:
         ax = ax if ax_provided else plt.gca()
         if self._barcode_and_colors:
             # sort bars in ascending order by birth time
-            return_first_element = lambda pair : pair[0] # only use first element of tuple to sort
+            return_first_element = lambda pair: pair[
+                0
+            ]  # only use first element of tuple to sort
             self._barcode_and_colors.sort(reverse=True, key=return_first_element)
             # prepare args for bar plot
             heights = [*range(len(self._barcode_and_colors))]
@@ -101,9 +104,8 @@ class MorseGraph:
         if not ax_provided:
             plt.show()
 
-
     def plot_colored_tree(self, ax=None, **kwargs):
-        """ Plot a colored tree computed by `compute_colored_tree_and_barcode`
+        """Plot a colored tree computed by `compute_colored_tree_and_barcode`
 
         Args:
             edges_and_colors (list): List of edges and colors.
@@ -142,34 +144,32 @@ class MorseGraph:
         if not ax_provided:
             plt.show()
 
-
     ### Private methods ###
-
 
     def __compute_graph(self, img, thresholds) -> Tuple[nx.Graph, np.ndarray]:
         """Get morse skeleton graph and initialize attributes for the graph.
-            Initializes:
-                self._parent (dict): Maps each vertex to its parent in the tree.
-                self._dist_to_root (dict): Maps each vertex to its distance to the root of its tree.
-                self._G (nx.Graph): Graph of the morse skeleton (a forest).
-                self._vertices (V x 2 numpy array of floats):
-                    Array where ith row stores 2d coordinate of ith vertex of a graph.
+        Initializes:
+            self._parent (dict): Maps each vertex to its parent in the tree.
+            self._dist_to_root (dict): Maps each vertex to its distance to the root of its tree.
+            self._G (nx.Graph): Graph of the morse skeleton (a forest).
+            self._vertices (V x 2 numpy array of floats):
+                Array where ith row stores 2d coordinate of ith vertex of a graph.
         """
 
-        G, vertices = self.__compute_nx_graph(img, *thresholds)
+        G, vertices = self.__compute_nx_graph(img, *thresholds, method=self.method)
 
         # Smooth vertices in the graph
         vertices = self.__smooth_graph(G, vertices, self.smoothing_window)
 
         # Remove segments of vertices inside the pruning mask
-        G = self.__trim_graph(G, vertices, self.min_branch_length, self._shape,
-                              self.pruning_mask)
+        G = self.__trim_graph(
+            G, vertices, self.min_branch_length, self._shape, self.pruning_mask
+        )
 
         # Compute minimum spanning forest of the graph
         self._G, self._parent, self._dist_to_root = self.__get_forest(G, vertices)
 
         self._vertices = vertices
-
 
     def __get_branch_labels(self):
         """Label each vertex with its branch.
@@ -188,8 +188,8 @@ class MorseGraph:
         parent = self._parent
         verts = self._vertices
         leaves = [n for n in self._G.nodes if self._G.degree[n] == 1]
-        max_dist_to_leaf = { v : -np.inf for v in self._G.nodes }
-        branch_label = { }
+        max_dist_to_leaf = {v: -np.inf for v in self._G.nodes}
+        branch_label = {}
         for leaf in leaves:
             current_vertex = leaf
             current_parent = parent[current_vertex]
@@ -198,7 +198,9 @@ class MorseGraph:
             # This while loop follows the unique path from
             # a leaf to the root.
             while current_parent != current_vertex:
-                current_distance += np.linalg.norm(verts[current_parent] - verts[current_vertex])
+                current_distance += np.linalg.norm(
+                    verts[current_parent] - verts[current_vertex]
+                )
                 if current_distance < max_dist_to_leaf[current_parent]:
                     # We've reached a vertex that has a descendant leaf that is
                     # further away, so it is part of another branch.
@@ -212,9 +214,8 @@ class MorseGraph:
         self._leaves = leaves
         self._branch_label = branch_label
 
-
     def __compute_branches_and_barcode(self) -> None:
-        """ Compute the branches and barcodes of the forest.
+        """Compute the branches and barcodes of the forest.
 
         Initializes:
             self._branches (list): A list of the branches of the tree.
@@ -242,7 +243,9 @@ class MorseGraph:
             while current_label == leaf and current_vertex != current_parent:
                 # update distance from `leaf`.
                 # this is used after the loop finishes to compute the barcode
-                current_distance += self.__edge_len(verts, current_parent, current_vertex)
+                current_distance += self.__edge_len(
+                    verts, current_parent, current_vertex
+                )
                 # add current edge to list of returned edges
                 current_branch.append((current_vertex, current_parent))
                 # update pointers for next iteration of loop
@@ -260,15 +263,14 @@ class MorseGraph:
         self._branches = branches
         self.barcode = barcode
 
-
     def __smooth_graph(self, G, vertices, window_size):
-        """ Smooth a graph's vertex positions using sliding window smoothing.
-            Args:
-                G (nx.Graph): Graph to smooth vertices of.
-                vertices (np.ndarray): Array of vertex positions.
-                window_size (int): Size of the window to use for smoothing.
-            Returns:
-                np.ndarray: Smoothed vertex positions.
+        """Smooth a graph's vertex positions using sliding window smoothing.
+        Args:
+            G (nx.Graph): Graph to smooth vertices of.
+            vertices (np.ndarray): Array of vertex positions.
+            window_size (int): Size of the window to use for smoothing.
+        Returns:
+            np.ndarray: Smoothed vertex positions.
         """
 
         if window_size <= 1:
@@ -278,7 +280,7 @@ class MorseGraph:
 
         # Fix the position of all leaves and junctions
         fixed_verts = {v for v in G.nodes if G.degree[v] != 2}
-        visited = set()     # visited vertices
+        visited = set()  # visited vertices
 
         for fixed_vert_start in fixed_verts:
             for segment_base_vert in G.neighbors(fixed_vert_start):
@@ -289,22 +291,25 @@ class MorseGraph:
                 branch_verts_visited = set()
                 while G.degree[branch_vert] == 2:
                     neighbors = list(G.neighbors(branch_vert))
-                    next_vert = neighbors[0] if neighbors[0] != branch_vert else neighbors[1]
+                    next_vert = (
+                        neighbors[0] if neighbors[0] != branch_vert else neighbors[1]
+                    )
                     if next_vert in branch_verts_visited:
                         break
                     branch_vert = next_vert
                     branch_verts_visited.add(branch_vert)
                     segment_vertices.append(branch_vert)
                 segment_vertices_pos = vertices[segment_vertices]
-                smoothed_verts = self.__moving_average_fixed_ends(segment_vertices_pos, window_size)
+                smoothed_verts = self.__moving_average_fixed_ends(
+                    segment_vertices_pos, window_size
+                )
                 vertices[segment_vertices] = smoothed_verts
                 visited.update([segment_vertices[0], segment_vertices[-1]])
 
         return vertices
 
-
     def __filter_graph(self):
-        """ Remove all branches from the graph that are shorted min_branch_length.
+        """Remove all branches from the graph that are shorted min_branch_length.
 
         Args:
             min_branch_length (int):
@@ -343,9 +348,8 @@ class MorseGraph:
         bar_lengths = bar_lengths[~np.isinf(bar_lengths)]
         return bar_lengths
 
-
     def __compute_colored_tree_and_barcode(self):
-        """ Compute a tree and barcode colored according to branches.
+        """Compute a tree and barcode colored according to branches.
 
         Initialize the following attributes:
             edges_and_colors (list): List of edges and colors.
@@ -372,36 +376,38 @@ class MorseGraph:
         self._edges_and_colors = edges_and_colors
         self._barcode_and_colors = barcode_and_colors
 
-
     ### Utilities ###
 
     @staticmethod
-    def __compute_nx_graph(im: npt.NDArray, threshold1: Number=0.5, threshold2: Number=0.0):
+    def __compute_nx_graph(
+        im: npt.NDArray,
+        threshold1: Number = 0.5,
+        threshold2: Number = 0.0,
+        method=0,
+    ):
         """Fit a Morse skeleton to the image `im`.
-            Args:
-                im (npt.NDArray[np.float64]): Grayscale image
-                threshold1 (float): threshold for the Morse skeleton simplification step. See paper.
-                threshold2 (float): threshold for the edges. We only take the 1-unstable manifold of edges
-                                    with value > threshold2. The higher the value, the more disconnected
-                                    the graph will be
-            Returns:
-                G (nx.Graph): Graph of the Morse skeleton.
-                verts (V x 2 numpy array of floats): vertices of DMTGraph generated from image
+        Args:
+            im (npt.NDArray[np.float64]): Grayscale image
+            threshold1 (float): threshold for the Morse skeleton simplification step. See paper.
+            threshold2 (float): threshold for the edges. We only take the 1-unstable manifold of edges
+                                with value > threshold2. The higher the value, the more disconnected
+                                the graph will be
+        Returns:
+            G (nx.Graph): Graph of the Morse skeleton.
+            verts (V x 2 numpy array of floats): vertices of DMTGraph generated from image
         """
 
         # Compute the Morse skeleton
-        if im.dtype != np.double:
-            im = im.astype(np.double)
-        dmtG = DMTGraph(im)
-        #print(f"Thresholding at {threshold1} and {threshold2}")
-        verts, edges = dmtG.computeGraph(threshold1, threshold2)
+        V, E = compute_dmt_graph(im.astype(np.float32), threshold1, threshold2)
 
-        G = MorseGraph.__convert_to_networkx_graph(edges)
+        print(f"{V.shape=}, {V.dtype=}")
+        print(f"{E.shape=}, {E.dtype=}")
 
-        verts = verts.astype(float)
+        G = MorseGraph.__convert_to_networkx_graph(E)
 
-        return G, verts
+        V = V.astype(np.float32)
 
+        return G, V
 
     @staticmethod
     def __prep_moving_avg_fixed_endpoints(A: npt.ArrayLike, n: int) -> npt.NDArray:
@@ -420,25 +426,25 @@ class MorseGraph:
         assert n >= 2
 
         # make sure first and last window don't overlap more than 1 element at most
-        assert min(n, math.ceil(len(A)/2)) == n
+        assert min(n, math.ceil(len(A) / 2)) == n
 
         # Elements less than window size from either end will not be repeated
-        A_transformed = A[n-1:-(n-1)]
-        for i in reversed(range(n-1)):
-            idx1, idx2 = i, -i-1
+        A_transformed = A[n - 1 : -(n - 1)]
+        for i in reversed(range(n - 1)):
+            idx1, idx2 = i, -i - 1
             repeat = n - i
-            A_transformed = np.concatenate(([A[idx1]]*repeat, A_transformed, [A[idx2]]*repeat))
+            A_transformed = np.concatenate(
+                ([A[idx1]] * repeat, A_transformed, [A[idx2]] * repeat)
+            )
 
         return A_transformed
 
-
     @staticmethod
     def __moving_average(A, n=3):
-        """ Computes moving average of array `A` with window size `n` """
+        """Computes moving average of array `A` with window size `n`"""
         ret = np.cumsum(A, axis=0, dtype=float)
         ret[n:] = ret[n:] - ret[:-n]
-        return ret[n-1:] / n
-
+        return ret[n - 1 :] / n
 
     @staticmethod
     def __moving_average_fixed_ends(A: npt.ArrayLike, n: int) -> npt.NDArray:
@@ -449,18 +455,17 @@ class MorseGraph:
         """
 
         # make sure first and last window don't overlap more than 1 element at most
-        n = min(n, math.ceil(len(A)/2))
+        n = min(n, math.ceil(len(A) / 2))
 
         assert n != 0
 
-        if n==1:
+        if n == 1:
             return A
 
         A_transformed = MorseGraph.__prep_moving_avg_fixed_endpoints(A, n)
         moving_avg = MorseGraph.__moving_average(A_transformed, n)
 
         return MorseGraph.__interp_n_verts_uniform_spacing(moving_avg, len(A))
-
 
     @staticmethod
     def __interp_n_verts_uniform_spacing(verts: npt.ArrayLike, n: int) -> npt.NDArray:
@@ -485,13 +490,15 @@ class MorseGraph:
         # The first vertex is fixed to the the first vertex of the original sequence
         interp_verts = [verts[0]]
 
-        for i in range(1, n-1):
+        for i in range(1, n - 1):
             interp_dist = i * interp_step
-            idx = np.searchsorted(accum_dists, interp_dist, side='right') - 1
+            idx = np.searchsorted(accum_dists, interp_dist, side="right") - 1
             # Interpolate between vertices[idx] and vertices[idx+1]
             # The new vertex is a weighted average of the two vertices around it
-            lineseg_travel_prop = (interp_dist - accum_dists[idx]) / (accum_dists[idx+1] - accum_dists[idx])
-            new_vert = verts[idx] + (verts[idx+1] - verts[idx]) * lineseg_travel_prop
+            lineseg_travel_prop = (interp_dist - accum_dists[idx]) / (
+                accum_dists[idx + 1] - accum_dists[idx]
+            )
+            new_vert = verts[idx] + (verts[idx + 1] - verts[idx]) * lineseg_travel_prop
             interp_verts.append(new_vert)
 
         # The last vertex is fixed to the the last vertex of the original sequence
@@ -499,20 +506,21 @@ class MorseGraph:
 
         return np.array(interp_verts)
 
-
     @staticmethod
     def __random_color(i: int):
-        """ Convert an int to a random color """
+        """Convert an int to a random color"""
 
         phi = 0.618033988749895
-        step = 180*phi
+        step = 180 * phi
 
-        return cvtColor(np.array([[[step*i, 220, 255]]], np.uint8), COLOR_HSV2BGR)[0][0] / 255
-
+        return (
+            cvtColor(np.array([[[step * i, 220, 255]]], np.uint8), COLOR_HSV2BGR)[0][0]
+            / 255
+        )
 
     @staticmethod
     def __convert_to_networkx_graph(edges) -> nx.Graph:
-        """ Convert a dmtgraph to a Networkx graph """
+        """Convert a dmtgraph to a Networkx graph"""
         G = nx.Graph()
         for vertex0, vertex1 in edges:
             # Each row in `edges` is an array [i, j],
@@ -522,10 +530,9 @@ class MorseGraph:
             G.add_edge(vertex0, vertex1)
         return G
 
-
     @staticmethod
     def __get_forest(G: nx.Graph, verts: np.ndarray) -> Tuple[nx.Graph, dict, dict]:
-        """ Get a minimum spanning forest of the graph `G`, node parents,
+        """Get a minimum spanning forest of the graph `G`, node parents,
             and node distances to the root node of each tree.
         Args:
             G: Graph to get the minimum spanning forest of.
@@ -537,7 +544,7 @@ class MorseGraph:
 
         forest = nx.Graph()
         parent = {n: None for n in G.nodes()}
-        dist_to_root = {}   # each node's distance to the root of its tree
+        dist_to_root = {}  # each node's distance to the root of its tree
 
         skipped_vertices = set()
 
@@ -545,7 +552,7 @@ class MorseGraph:
             root, max_degree = max(g.degree, key=lambda x: x[1])
             if max_degree <= 2:
                 skipped_vertices.update(g.nodes())
-                continue   # skip isolated branches
+                continue  # skip isolated branches
             # create a dict where each vertex points to its parent in the tree.
             # we set parents with a bfs starting at the root.
             # we also use the bfs to compute distance to root.
@@ -558,7 +565,9 @@ class MorseGraph:
                     if parent[n] is None:
                         forest.add_edge(v, n)
                         parent[n] = v
-                        dist_to_root[n] = dist_to_root[v] + MorseGraph.__edge_len(verts, v, n)
+                        dist_to_root[n] = dist_to_root[v] + MorseGraph.__edge_len(
+                            verts, v, n
+                        )
                         unvisited_vertices.append(n)
 
         # check that the parents were set properly
@@ -569,16 +578,19 @@ class MorseGraph:
 
         return forest, parent, dist_to_root
 
-
     @staticmethod
     def __edge_len(verts, v1_idx, v2_idx):
-        """ Compute the Euclidean distance between two vertices """
+        """Compute the Euclidean distance between two vertices"""
         return np.linalg.norm(verts[v1_idx] - verts[v2_idx])
 
-
     @staticmethod
-    def __trim_graph(G: nx.Graph(), vertices: npt.NDArray, min_branch_length: int,
-                     shape: Tuple[int,int], pruning_mask: npt.NDArray = None) -> nx.Graph():
+    def __trim_graph(
+        G: nx.Graph,
+        vertices: npt.NDArray,
+        min_branch_length: int,
+        shape: Tuple[int, int],
+        pruning_mask: npt.NDArray = None,
+    ) -> nx.Graph:
         """Remove branches that are too short or are positioned inside the pruning mask.
         Args:
             G: Graph to trim.
@@ -587,10 +599,6 @@ class MorseGraph:
         Returns:
             nx.Graph: Pruned graph.
         """
-
-        # TODO: use vectorized operations on G.to_numpy_array() instead of loops
-
-        #start = perf_counter_ns()
 
         G = G.copy()
 
@@ -601,7 +609,9 @@ class MorseGraph:
 
         def get_segment_length(segment):
             # segment is an edge-connected sequence of nodes that aren't junctions
-            edge_lengths = [MorseGraph.__edge_len(vertices, n1, n2) for n1, n2 in G.edges(segment)]
+            edge_lengths = [
+                MorseGraph.__edge_len(vertices, n1, n2) for n1, n2 in G.edges(segment)
+            ]
             return sum(edge_lengths)
 
         # Remove segments that are too short or are positioned inside the mask.
@@ -616,32 +626,47 @@ class MorseGraph:
         while not pruning_complete:
 
             junctions = {n for n in G.nodes if G.degree[n] > 2}
-            base_nodes = {n for n in G.nodes if G.degree[n] == 1} if pass_num == 1 else junctions
+            base_nodes = (
+                {n for n in G.nodes if G.degree[n] == 1} if pass_num == 1 else junctions
+            )
             unmarked_nodes = {n for n in G.nodes if n not in junctions}
             segments = []
             short_segments = []
 
             while base_nodes:
                 starting_node = base_nodes.pop()
-                neighbors = {n for n in G.neighbors(starting_node) if n in unmarked_nodes}
+                neighbors = {
+                    n for n in G.neighbors(starting_node) if n in unmarked_nodes
+                }
                 while neighbors:
                     node = neighbors.pop()
                     segment = [node]
-                    while (neighbor := [n for n in G.neighbors(node) if n in unmarked_nodes]):
-                        node=neighbor[0]
+                    while neighbor := [
+                        n for n in G.neighbors(node) if n in unmarked_nodes
+                    ]:
+                        node = neighbor[0]
                         segment.append(node)
                         unmarked_nodes.remove(node)
                     # if one of the segment's endpoints is a leaf, consider removal based on length
-                    segment_has_leaf = G.degree[segment[0]] == 1 or G.degree[segment[-1]] == 1
-                    if segment_has_leaf and get_segment_length(segment) < min_branch_length:
+                    segment_has_leaf = (
+                        G.degree[segment[0]] == 1 or G.degree[segment[-1]] == 1
+                    )
+                    if (
+                        segment_has_leaf
+                        and get_segment_length(segment) < min_branch_length
+                    ):
                         short_segments.append(segment)
                     else:
                         segments.append(segment)
 
             if segments:
-                segment_pos = [np.round(np.median(vertices[s], axis=0)).astype(int)
-                               for s in segments]
-                segments_remove_idx = np.argwhere(pruning_mask[tuple(zip(*segment_pos))]).flatten()
+                segment_pos = [
+                    np.round(np.median(vertices[s], axis=0)).astype(int)
+                    for s in segments
+                ]
+                segments_remove_idx = np.argwhere(
+                    pruning_mask[tuple(zip(*segment_pos))]
+                ).flatten()
                 segments_to_remove = [segments[i] for i in segments_remove_idx]
             else:
                 segments_to_remove = []
@@ -656,7 +681,7 @@ class MorseGraph:
             pruning_complete = pass_num == 2 and not segments_to_remove
             pass_num = 2 if pass_num == 1 else 1
 
-        #end = perf_counter_ns()
-        #print(f"Pruning took {round((end - start) / 1e6)} ms")
+        # end = perf_counter_ns()
+        # print(f"Pruning took {round((end - start) / 1e6)} ms")
 
         return G
