@@ -79,7 +79,7 @@ setup(
         "pyometiff==1.0.0",
         "tensorflow==2.14.1",
     ],
-    extras_require={"and-cuda": ["tensorflow[and-cuda]==2.15.1"]},
+    extras_require={"and-cuda": ["tensorflow[and-cuda]==2.14.1"]},
     entry_points={
         "console_scripts": [f"tmat={pkg_name}.cli:main"]
     },
