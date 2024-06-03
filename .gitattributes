@@ -2,4 +2,4 @@ notebooks/*.ipynb linguist-vendored
 notebooks/invasion_depth_training/*.ipynb linguist-vendored
 notebooks/microvessels_segmentation_training/*.ipynb linguist-vendored
 notebooks/topology/*.ipynb linguist-vendored
-src/pydmtgraph/src/pydmtgraph/dmtgraph/* linguist-detectable
+pydmtgraph/src/pydmtgraph/dmtgraph/* linguist-detectable
