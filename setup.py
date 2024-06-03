@@ -87,6 +87,7 @@ setup(
         "pyometiff==1.0.0",
         "tensorflow==2.15.1",
     ],
+    extras_require={"and-cuda": ["tensorflow[and-cuda]==2.15.1"]},
     entry_points={
         "console_scripts": [
             f"{command}={pkg_name}.cli:main" for command in entrypoint_commands
@@ -97,5 +98,5 @@ setup(
         "Operating System :: OS Independent",
     ],
     license="License Notice for Free Academic Research Use",
-    python_requires=">=3.9, <3.13",
+    python_requires=">=3.9, <3.12",
 )
