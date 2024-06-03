@@ -18,10 +18,9 @@ entrypoint_commands = [
 
 pkg_root = Path(pkg_name).resolve()
 cfg_file = pkg_root / "package.cfg"
-cwd = Path(".").resolve()
+project_root = pkg_root.parent
 
 # copy scripts, model_training and config directories to package directory
-project_root = cwd.parent
 for dir_name in ["scripts", "model_training", "config"]:
     src_dir = project_root / dir_name
     dest_dir = Path(pkg_name) / dir_name
