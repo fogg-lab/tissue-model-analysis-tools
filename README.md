@@ -19,7 +19,7 @@ Windows, MacOS, and Linux are all supported.
 
 ### Prerequisite: Install Python and pipx
 
-1. Install a version of Python in the range >=3.9,<3.12 (such as [Python 3.11.9](https://www.python.org/downloads/release/python-3119)). Confirm that the correct Python version was installed by running each of these commands, and find out which command is recognized (it could be installed as either `python`, `python3`, or `py` depending on your system configuration):
+1. Install a version of Python in the range >=3.9,<3.12 (such as [Python 3.11.9](https://www.python.org/downloads/release/python-3119)). Confirm that the correct Python version was installed by running each of these commands in a terminal or command prompt window, and find out which command is recognized (it could be installed as either `python`, `python3`, or `py` depending on your system configuration):
 ```bash
 python --version
 ```
@@ -29,17 +29,15 @@ python3 --version
 ```bash
 py --version
 ```
-2. Install [pipx](https://github.com/pypa/pipx) by running the following two commands in your terminal or command prompt (replace `python` with `python3` or `py` if necessary):
+2. In your terminal or command prompt window, install [pipx](https://github.com/pypa/pipx). To do so, run the two commands below that correspond to your Python installation (either `python -m ...`, `python3 -m ...`, or `py -m ...`):
 ```bash
 python -m pip install --user pipx
 python -m pipx ensurepath
 ```
-or
 ```bash
 python3 -m pip install --user pipx
 python3 -m pipx ensurepath
 ```
-or
 ```bash
 py -m pip install --user pipx
 py -m pipx ensurepath
