@@ -19,22 +19,27 @@ Windows, MacOS, and Linux are all supported.
 
 ### Prerequisite: Install Python and pipx
 
-1. Install any [Python](https://www.python.org/) version in the range >=3.9, <3.13 (Python 3.9.x, 3.10.x, 3.11.x, or 3.12.x).
-2. Install [pipx](https://github.com/pypa/pipx) by running the following two commands in your terminal or command prompt:
+1. Install any [Python](https://www.python.org/) version in the range >=3.9, <3.13 (Python 3.9.x, 3.10.x, 3.11.x, or 3.12.x). Confirm that the correct Python version was installed by running each of these commands, and find out which command is recognized (it could be installed as either `python`, `python3`, or `py` depending on your system configuration):
+```bash
+python --version
+```
+```bash
+python3 --version
+```
+```bash
+py --version
+```
+2. Install [pipx](https://github.com/pypa/pipx) by running the following two commands in your terminal or command prompt (replace `python` with `python3` or `py` if necessary):
 ```bash
 python -m pip install --user pipx
 python -m pipx ensurepath
 ```
-If that doesn't work, try:
-```bash
-python3 -m pip install --user pipx
-python3 -m pipx ensurepath
-```
-After you run these commands, close the terminal window or log out. `pipx` will be available the next time you log back in and open a terminal or command prompt window. 
+
+After you run these commands, close the terminal or command prompt window. `pipx` will be available the next time you open a terminal or command prompt window, and you can proceed with the setup.
 
 ### Setup
 
-Run the following commands in a terminal/command prompt window.
+Run the following commands in a terminal or command prompt window.
 
 1. Install `fl_tissue_model_tools` command-line utility (`tmat`).
 ```bash
