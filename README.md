@@ -46,7 +46,7 @@ tmat configure "C:\Users\Quinn\Desktop\some_folder_name"
 
 3. Note that commands will follow this layout (more details in [usage](#usage)):
 ```bash
-tissue-model-analysis-tools [SUBCOMMAND] [OPTIONS]
+tmat [SUBCOMMAND] [OPTIONS]
 ```
 
 ```bash
