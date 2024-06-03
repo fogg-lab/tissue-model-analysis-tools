@@ -15,10 +15,12 @@ A Python package for the high-throughput analysis of cancer and endothelial cell
 
 ## Setup
 
+Windows, MacOS, and Linux are all supported.
+
 ### Prerequisite: Install Python and pipx
 
-1. Install any Python version in the range >=3.9, <3.13 (Python 3.9.x, 3.10.x, 3.11.x, or 3.12.x). You can install it either from python.org, Windows store, or other software repositories supported by your operating system.
-2. Install `pipx` (if you don't have it already) by running the following two commands in your terminal or command prompt:
+1. Install any [Python](https://www.python.org/) version in the range >=3.9, <3.13 (Python 3.9.x, 3.10.x, 3.11.x, or 3.12.x).
+2. Install [pipx](https://github.com/pypa/pipx) by running the following two commands in your terminal or command prompt:
 ```bash
 python -m pip install --user pipx
 python -m pipx ensurepath
