@@ -34,14 +34,13 @@ After you run these commands, close the terminal window or log out. `pipx` will 
 
 Run the following commands in a terminal/command prompt window.
 
+1. Install `fl_tissue_model_tools` command-line utility (`tmat`).
 ```bash
-
+pipx install git+https://github.com/fogg-lab/tissue-model-analysis-tools.git@packaging#egg=fl_tissue_model_tools
 ```
 
-3. Configure base directory to store data, scripts, and script configuration files:
-
+2. Configure base directory to store data, scripts, and script configuration files, example command:
 ```bash
-# example
 tmat configure "C:\Users\Quinn\Desktop\some_folder_name"
 ```
 
