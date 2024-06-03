@@ -85,7 +85,7 @@ setup(
         "tqdm==4.66.4",
         "keras-tuner==1.4.7",
         "pyometiff==1.0.0",
-        "tensorflow==2.15.1",
+        "tensorflow==2.14.1",
     ],
     extras_require={"and-cuda": ["tensorflow[and-cuda]==2.15.1"]},
     entry_points={
