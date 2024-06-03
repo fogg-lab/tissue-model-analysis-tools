@@ -9,6 +9,66 @@ from numba import njit
 import numpy as np
 from numpy.typing import NDArray
 
+
+def compute_dmt_graph(img: NDArray[np.float32], delta1: float, delta2: float = 0.0):
+    """
+    Computes the Discrete Morse Theory (DMT) graph for a given grayscale image.
+
+    This function creates simplices, computes persistence, and constructs the DMT graph.
+
+    The original C++ code by Mitchell Black can be found at this URL:
+    https://github.com/blackmit/pydmtgraph/tree/main
+
+    Args:
+        img (NDArray[np.float32]): A 2D array representing a grayscale image.
+        delta1 (float): The persistence threshold for edges in the graph.
+        delta2 (float, optional): The persistence threshold for vertices in the graph. Default is 0.0.
+
+    Returns:
+        tuple: A tuple containing:
+            - vertices (NDArray[np.int32]): An array of vertex positions.
+            - edges (NDArray[np.int32]): An array of edge indices.
+    """
+    deltas = np.array([delta1, delta2], dtype=np.float32)
+
+    ### Create simplices
+    nrows, ncols = img.shape
+    n_verts = nrows * ncols
+    n_dual_verts = ((nrows - 1) * (ncols - 1) * 2) + 1
+    n_edges = (nrows - 1) * ncols + nrows * (ncols - 1) + (nrows - 1) * (ncols - 1)
+    V = np.full((n_verts, 9), -1, dtype=np.float32)
+    DV = np.full((n_dual_verts, 9), -1, dtype=np.float32)
+    E = np.full((n_edges, 7), -1, dtype=np.float32)
+    img = -img
+    create_vertices(img, V)
+    n_dual_verts = create_dual_vertices(img, DV)
+    create_edges(img, E, n_dual_verts)
+
+    ### Compute persistence
+    edge_v1_indices = E[:, V1_IDX].astype(np.int32)
+    edge_v2_indices = E[:, V2_IDX].astype(np.int32)
+    edge_v1_values = V[edge_v1_indices, VALUE]
+    edge_v2_values = V[edge_v2_indices, VALUE]
+    edge_max_val = np.maximum(edge_v1_values, edge_v2_values)
+    edges_index = np.arange(len(E))
+    # Sort edges by edge_max_val, then index to break ties
+    sort_perm = np.lexsort((edges_index, edge_max_val))
+    edges_index = edges_index[sort_perm]
+    edge_max_val = edge_max_val[sort_perm]
+    E = E[sort_perm]
+    compute_persistence_1(E, V, edge_max_val)
+    # Sort edges by -edge_val, then -index to break ties
+    sort_perm = np.lexsort((-edges_index, -edge_max_val))
+    edge_max_val = edge_max_val[sort_perm]
+    E = E[sort_perm]
+    compute_persistence_2(E, DV, edge_max_val)
+
+    ### Construct the graph
+    vertices, edges = collect(deltas, E, V)
+
+    return vertices, edges
+
+
 # Names for data members of Vertex stored as an ndarray
 X = 0
 Y = 1
@@ -391,44 +451,3 @@ def collect(
     vertex_positions = vertex_positions[:vertex_positions_idx]
 
     return vertex_positions[:vertex_positions_idx], edge_indices
-
-
-def compute_dmt_graph(img: NDArray[np.float32], delta1: float, delta2: float = 0.0):
-    deltas = np.array([delta1, delta2], dtype=np.float32)
-
-    ### Create simplices
-    nrows, ncols = img.shape
-    n_verts = nrows * ncols
-    n_dual_verts = ((nrows - 1) * (ncols - 1) * 2) + 1
-    n_edges = (nrows - 1) * ncols + nrows * (ncols - 1) + (nrows - 1) * (ncols - 1)
-    V = np.full((n_verts, 9), -1, dtype=np.float32)
-    DV = np.full((n_dual_verts, 9), -1, dtype=np.float32)
-    E = np.full((n_edges, 7), -1, dtype=np.float32)
-    img = -img
-    create_vertices(img, V)
-    n_dual_verts = create_dual_vertices(img, DV)
-    create_edges(img, E, n_dual_verts)
-
-    ### Compute persistence
-    edge_v1_indices = E[:, V1_IDX].astype(np.int32)
-    edge_v2_indices = E[:, V2_IDX].astype(np.int32)
-    edge_v1_values = V[edge_v1_indices, VALUE]
-    edge_v2_values = V[edge_v2_indices, VALUE]
-    edge_max_val = np.maximum(edge_v1_values, edge_v2_values)
-    edges_index = np.arange(len(E))
-    # Sort edges by edge_max_val, then index to break ties
-    sort_perm = np.lexsort((edges_index, edge_max_val))
-    edges_index = edges_index[sort_perm]
-    edge_max_val = edge_max_val[sort_perm]
-    E = E[sort_perm]
-    compute_persistence_1(E, V, edge_max_val)
-    # Sort edges by -edge_val, then -index to break ties
-    sort_perm = np.lexsort((-edges_index, -edge_max_val))
-    edge_max_val = edge_max_val[sort_perm]
-    E = E[sort_perm]
-    compute_persistence_2(E, DV, edge_max_val)
-
-    ### Construct the graph
-    vertices, edges = collect(deltas, E, V)
-
-    return vertices, edges
