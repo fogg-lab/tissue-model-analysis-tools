@@ -34,6 +34,16 @@ py --version
 python -m pip install --user pipx
 python -m pipx ensurepath
 ```
+or
+```bash
+python3 -m pip install --user pipx
+python3 -m pipx ensurepath
+```
+or
+```bash
+py -m pip install --user pipx
+py -m pipx ensurepath
+```
 
 After you run these commands, close the terminal or command prompt window. `pipx` will be available the next time you open a terminal or command prompt window, and you can proceed with the setup.
 
