@@ -52,7 +52,9 @@ After you run these commands, close the terminal or command prompt window. `pipx
 Run the following commands in a terminal or command prompt window.
 
 **1**. Install `fl_tissue_model_tools` command-line utility, `tmat` for short (est. time 5 minutes):
+
 **Note**: You need to use the "Regular Installation" option unless you have an NVidia GPU and are running in Linux or Windows Subsystem for Linux (WSL).
+
 **Regular Installation**
 ```bash
 pipx install git+https://github.com/fogg-lab/tissue-model-analysis-tools.git@#egg=fl_tissue_model_tools
