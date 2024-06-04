@@ -1,6 +1,6 @@
 # Fogg Lab Tissue Model Analysis Tools
 
-A Python package for the high-throughput analysis of cancer and endothelial cell dynamics in hydrogels.
+A command-line application for automated high-throughput analysis of cancer and endothelial cell dynamics in hydrogels.
 
 **Try the standalone interactive demo notebook in Google Colab**
 
@@ -52,8 +52,14 @@ After you run these commands, close the terminal or command prompt window. `pipx
 Run the following commands in a terminal or command prompt window.
 
 **1**. Install `fl_tissue_model_tools` command-line utility, `tmat` for short (est. time 5 minutes):
+**Note**: You need to use the "Regular Installation" option unless you have an NVidia GPU and are running in Linux or Windows Subsystem for Linux (WSL).
+**Regular Installation**
 ```bash
-pipx install git+https://github.com/fogg-lab/tissue-model-analysis-tools.git@packaging#egg=fl_tissue_model_tools
+pipx install git+https://github.com/fogg-lab/tissue-model-analysis-tools.git@#egg=fl_tissue_model_tools
+```
+**Installation with CUDA (GPU Acceleration)**
+```bash
+pipx install 'git+https://github.com/fogg-lab/tissue-model-analysis-tools.git@#egg=fl_tissue_model_tools[and-cuda]'
 ```
 **2**. Configure base directory to store data, scripts, and script configuration files:
 ```bash
