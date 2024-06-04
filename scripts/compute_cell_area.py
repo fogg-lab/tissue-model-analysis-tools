@@ -11,7 +11,6 @@ from skimage.exposure import rescale_intensity
 
 from fl_tissue_model_tools import defs
 from fl_tissue_model_tools import preprocessing as prep
-from fl_tissue_model_tools import analysis as an
 from fl_tissue_model_tools import script_util as su
 from fl_tissue_model_tools.well_mask_generation import generate_well_mask
 
@@ -82,10 +81,7 @@ def prep_images(img_paths: Sequence[str], dsamp_size: int) -> List[npt.NDArray]:
 
     """
     gs_ds_imgs = d.compute(
-        [
-            d.delayed(load_img)(img_p, dsamp_size=dsamp_size)
-            for img_p in img_paths
-        ]
+        [d.delayed(load_img)(img_p, dsamp_size=dsamp_size) for img_p in img_paths]
     )[0]
     return gs_ds_imgs
 
@@ -137,6 +133,23 @@ def threshold_images(
     return gmm_thresh_all
 
 
+def compute_area_prop(img: npt.NDArray, ref_area: Optional[int] = None) -> float:
+    """Computes the proportion of pixels that are thresholded in circular area.
+
+    Args:
+        img: A masked and thresholded image. Background pixels are 0.
+        ref_area: Number of pixels in the circular mask area applied to the image.
+            Default is None, equivalent to `ref_area=img.size` (all pixels).
+        min_val: This parameter is currently unused. Defaults to 0.
+
+    Returns:
+        Proportion of pixels in circular mask area that are thresholded.
+    """
+    if ref_area is None:
+        ref_area = img.size
+    return np.sum(img > 0) / ref_area
+
+
 def compute_areas(
     imgs: List[npt.NDArray], well_pix_area: List[Optional[int]]
 ) -> npt.NDArray:
@@ -152,7 +165,7 @@ def compute_areas(
     """
     area_prop = d.compute(
         [
-            d.delayed(an.compute_area_prop)(img, well_pix_area[i])
+            d.delayed(compute_area_prop)(img, well_pix_area[i])
             for i, img in enumerate(imgs)
         ]
     )[0]
