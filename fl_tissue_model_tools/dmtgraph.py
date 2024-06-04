@@ -10,6 +10,32 @@ import numpy as np
 from numpy.typing import NDArray
 
 
+# Names for data members of Vertex stored as an ndarray
+X = 0
+Y = 1
+VALUE = 2
+PARENT = 3
+MORSE_PARENT = 4
+NEIGHBOR_1 = 5
+NEIGHBOR_2 = 6
+NEIGHBOR_3 = 7
+NEIGHBOR_4 = 8
+
+# Names for data members of Edge stored as an ndarray
+INDEX = 0
+V1_IDX = 1
+V2_IDX = 2
+DV1_IDX = 3
+DV2_IDX = 4
+PAIR_TYPE = 5
+PERSISTENCE = 6
+
+# Pair types (names that map to values stored in an ndarray)
+UNKNOWN_PAIR_TYPE = 0
+VERTEX_EDGE_PAIR = 1
+EDGE_TRIANGLE_PAIR = 2
+
+
 def compute_dmt_graph(img: NDArray[np.float32], delta1: float, delta2: float = 0.0):
     """
     Computes the Discrete Morse Theory (DMT) graph for a given grayscale image.
@@ -67,33 +93,6 @@ def compute_dmt_graph(img: NDArray[np.float32], delta1: float, delta2: float = 0
     vertices, edges = collect(deltas, E, V)
 
     return vertices, edges
-
-
-# Names for data members of Vertex stored as an ndarray
-X = 0
-Y = 1
-VALUE = 2
-PARENT = 3
-MORSE_PARENT = 4
-NEIGHBOR_1 = 5
-NEIGHBOR_2 = 6
-NEIGHBOR_3 = 7
-NEIGHBOR_4 = 8
-
-# Names for data members of Edge stored as an ndarray
-INDEX = 0
-V1_IDX = 1
-V2_IDX = 2
-DV1_IDX = 3
-DV2_IDX = 4
-PAIR_TYPE = 5
-PERSISTENCE = 6
-
-
-# Pair types (names that map to values stored in an ndarray)
-UNKNOWN_PAIR_TYPE = 0
-VERTEX_EDGE_PAIR = 1
-EDGE_TRIANGLE_PAIR = 2
 
 
 @njit(cache=True)
