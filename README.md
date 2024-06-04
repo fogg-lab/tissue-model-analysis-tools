@@ -2,7 +2,7 @@
 
 A command-line application for automated high-throughput analysis of cancer and endothelial cell dynamics in hydrogels.
 
-**Try the standalone interactive demo notebook in Google Colab**
+**Try the interactive demo notebook in Google Colab**
 
 <a target="_blank" href="https://colab.research.google.com/github/fogg-lab/tissue-model-analysis-tools/blob/main/notebooks/analysis_demo.ipynb">
   <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
