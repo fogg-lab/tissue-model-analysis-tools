@@ -21,7 +21,7 @@ Windows, MacOS, and Linux are all supported for regular installation. Installati
 
 _Note: As an alternative option to using `pipx`, you could install Tissue Model Analysis Tools in a Conda environment. Otherwise, follow the instructions below._
 
-**1**. Install a version of Python in the range **>=3.9,<3.12** (such as [Python 3.11.9](https://www.python.org/downloads/release/python-3119)). Confirm that the correct Python version was installed by running each of these commands in a terminal or command prompt window, and find out which command is recognized (it could be installed as either `python`, `python3`, or `py`, or something version-specific such as `python3.10` depending on your system configuration):
+**1**. Install a version of Python in the range **>=3.9,<3.12** (such as [Python 3.11.9](https://www.python.org/downloads/release/python-3119)). Confirm that the correct Python version was installed by running each of these commands in a terminal or command prompt window, and find out which command is recognized (depending on your system configuration, it could be installed as either `python`, `python3`, or `py`, or something version-specific such as `python3.10`):
 ```bash
 python --version
 ```
