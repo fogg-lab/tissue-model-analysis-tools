@@ -31,7 +31,7 @@ python3 --version
 ```bash
 py --version
 ```
-**2**. In your terminal or command prompt window, install [pipx](https://github.com/pypa/pipx). To do so, run the two commands below that correspond to your Python installation (either `python -m ...`, `python3 -m ...`, or `py -m ...`):
+**2**. In your terminal or command prompt window, install [pipx](https://github.com/pypa/pipx). To do so, run the two commands below that correspond to your Python installation (starting with either `python -m ...`, `python3 -m ...`, or `py -m ...`):
 ```bash
 python -m pip install --user pipx
 python -m pipx ensurepath
