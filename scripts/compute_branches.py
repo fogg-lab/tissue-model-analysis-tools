@@ -185,11 +185,13 @@ def analyze_img(
             param_str_fmts[k] = "{}"
 
     # For each configuration, construct and analyze embedded graph
+    pred_orig = pred.copy()
     for cfg in cfgs:
+        pred = pred_orig.copy()
         tuned_str = "".join(
-            f"_{k}{param_str_fmts[k].format(v)}" for k, v in cfg.items() if k in tuned
+            f"_{k}_{param_str_fmts[k].format(v)}" for k, v in cfg.items() if k in tuned
         )
-        tuned_str = f"_CONFIG_{tuned_str}" if tuned_str else ""
+        tuned_str = f"_CONFIG{tuned_str}" if tuned_str else ""
 
         # Apply vessel probability threshold to get segmentation mask
         seg_mask = pred > cfg["vesselP"]
