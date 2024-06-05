@@ -197,10 +197,10 @@ tmat compute_zproj --area "/path/to/input/folder" "/path/to/output/folder"
 
 * Use the `--method` flag to select custom Z projection method, from:
     * Minimum: Minimum intensity projection, use `--method min`
-    * Maximum: Maximum intensity projection, use `--method max`
+    * Maximum (**default**): Maximum intensity projection, use `--method max`
     * Median: Median intensity projection, use `--method med`
     * Average: Average intensity projection, use `--method avg`
-    * Focus Stacking (default): Focus stacking projection, use `--method fs` or don't specify a method, as it is the default.
+    * Focus Stacking: Focus stacking projection, use `--method fs`.
 
 **Example: Compute Z projections and cell coverage area with the focus stacking method**
 ```bash
