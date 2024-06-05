@@ -234,13 +234,27 @@ tmat compute_branches --detect-well "/path/to/input/folder" "/path/to/output/fol
 
 Customize configuration variables (you can edit `config/default_branching_computation.json` in your base directory, or refer to `src/fl_tissue_model_tools/config` in this repository):
 
-- `well_width_microns` (float): Physical width of the image in microns.
-- `use_latest_model_cfg` (boolean): If `True`, the most recently trained model in the `model_training` folder will be used. If `False`, the model specified in `model_cfg_path` will be used.
-- `model_cfg_path` (string): Path to the configuration file of the segmentation model. You can leave this blank (`''`) to use the most recently trained model in the `model_training` folder.
-- `vessel_probability_thresh` (float): May require some experimentation to find the best value for your data. This is the segmentation probability threshold above which a pixel will be classified as part of a microvessel. The default is 0.5. Lower values such as 0.25 may work well if you want to detect vessels that are visibly faint, dim, or have dark spots along them. Higher values such as 0.75 may work well if the script is detecting too many objects as vessels. In some cases, a very low value (e.g. 0.05) or very high value (e.g. 0.95) might be appropriate.
-- `graph_thresh_1` (float): May require some experimentation to find the best value for your data. This threshold controls how much of the morse graph is used to compute the number of branches. Lower values include more of the graph, and more branches are detected. Higher values include less of the graph, and fewer branches are detected. If the default value does not work well, try different values like 0.25, 0.5, 1, 2, 4, etc. up to around 64.
-- `graph_thresh_2` (float): Also could use some tuning. This is the threshold for connecting branches, e.g. where it is ambiguous whether two branches are part of the same component. Lower values result in more connected branches, and higher values result in more disconnections. If the default value does not work well, try values like 0.0, 0.25, 0.5, 1, 2, 4, etc. up to around 64.
-- `graph_smoothing_window` (integer): This is the window size (in pixels) for smoothing the branch paths. Values in the range of 5-20 tend to work well.
-- `min_branch_length` (integer): The minimum branch length (in microns) to consider.
-- `max_branch_length` (integer): The maximum branch length (in microns) to consider. By default, this parameter is not included in the configuration file. If it is not in the configuration, no maximum branch length will be enforced.
-- `remove_isolated_branches` (boolean): Whether to remove branches that are not connected to any other branches *after* the network is trimmed per the branch length constraints (enforcing minimum and maximum branch lengths might isolate some branches, which may or may not be desired).
+- `image_width_microns` (float): Physical width in microns of the region captured by each image. For instance, if 1 pixel in the image corresponds to 0.8 microns, this value should equal to 0.8x the horizontal resolution of the image. The default is 1000.0. **Important**: Make sure that the value for `image_width_microns` is set to the correct value for your images. If it is not, the branch lengths and other length-based configuration parameters will be not be accurate.
+- `model_cfg_path` (string): Optional. This is the path to the configuration file of the segmentation model. This parameter is not included in the default configuration file. If it is not specified, the latest pretrained model in the `model_training` folder will be used.
+- `vessel_probability_thresh` (float): May require some experimentation to find the best value for your data. This is the segmentation probability threshold above which a pixel will be classified as part of a microvessel. The default is 0.5. Lower values such as 0.1 may work well if you want to detect vessels that are visibly faint, dim, or have dark spots along them. Higher values such as 0.9 may work well if the script is detecting too many objects as vessels. *Tunable*\*
+- `graph_thresh_1` (float): May require some experimentation to find the best value for your data. This threshold controls how much of the morse graph is used to compute the number of branches. Lower values include more of the graph, and more branches are detected. Higher values include less of the graph, and fewer branches are detected. The default is 2. If the default value does not work well, try different values like 0.25, 0.5, 1, 2, 4, etc. up to around 64. *Tunable*\*
+- `graph_thresh_2` (float): Also could use some tuning. This is the threshold for connecting branches, e.g. where it is ambiguous whether two branches are part of the same component. Lower values result in more connected branches, and higher values result in more disconnections. The default is 4. If the default value does not work well, try values like 0.0, 0.25, 0.5, 1, 2, 4, etc. up to around 64. *Tunable*\*
+- `min_branch_length` (integer): The minimum branch length (in microns) to consider. The default is 10. *Tunable*\*
+- `max_branch_length` (integer): Optional. This is the maximum branch length (in microns) to consider. By default, this parameter is not included in the configuration file. If it is not in the configuration, no maximum branch length will be enforced. *Tunable*\*
+- `remove_isolated_branches` (boolean): Whether to remove branches that are not connected to any other branches *after* the network is trimmed per the branch length constraints (enforcing minimum and maximum branch lengths might isolate some branches, which may or may not be desired). The default is "false". To tune this parameter, you can simply leave it at "false", run the analysis, and then inspect the Morse tree visualization to see whether or not it should be set to "true" instead. *Tunable*\*
+- `graph_smoothing_window` (float): This is the window size (in microns) for smoothing the branch paths. The default is 10. *Tunable*\*
+
+\*Trying out a few different values for the tunable parameters tends to yield more accurate quantification of vessel formation. An efficient way to do this is to specify a list of values directly in the configuration file, for example:
+```json
+{
+    "image_width_microns": 1000.0,
+    "vessel_probability_thresh": [0.02, 0.1, 0.5],
+    "graph_thresh_1": [0.5, 2, 10],
+    "graph_thresh_2": [0, 4, 16],
+    "graph_smoothing_window": 12,
+    "min_branch_length": [10, 25],
+    "remove_isolated_branches": false
+}
+```
+
+The example configuration above runs the analysis for all 54 parameter combinations.
