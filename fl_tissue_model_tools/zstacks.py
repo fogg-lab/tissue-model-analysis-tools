@@ -92,7 +92,6 @@ def save_tiff_zstack(image_stack: npt.NDArray, output_dir: str) -> None:
         output_dir: Directory to save the TIFF files.
     """
     for i, image in enumerate(image_stack):
-        print(image.shape)
         output_path = osp.join(output_dir, f"Z{str(i+1).zfill(5)}.tiff")
         tifffile.imsave(output_path, image)
 

@@ -44,8 +44,6 @@ def get_zstack(zs_path: str, descending: bool) -> npt.NDArray:
 def main():
     """Computes z projections and saves to output directory."""
 
-    print(sys.argv[1:])
-
     args = su.parse_zproj_args()
     compute_cell_area = args.area
 
