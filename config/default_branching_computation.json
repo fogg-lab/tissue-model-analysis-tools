@@ -1,10 +1,9 @@
 {
-    "well_width_microns": 1000.0,
-    "model_cfg_path": "",
-    "use_latest_model_cfg": true,
+    "image_width_microns": 1000.0,
     "vessel_probability_thresh": 0.5,
     "graph_thresh_1": 2,
     "graph_thresh_2": 4,
-    "graph_smoothing_window": 12,
-    "min_branch_length": 12
+    "graph_smoothing_window": 10,
+    "min_branch_length": 10,
+    "remove_isolated_branches": false
 }
