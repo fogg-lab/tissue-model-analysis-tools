@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Optional, Tuple
 import math
 from numbers import Number
 
@@ -20,6 +20,8 @@ class MorseGraph:
         img: npt.NDArray,
         thresholds: Tuple[Number, Number] = (1, 4),
         min_branch_length: int = 15,
+        max_branch_length: Optional[int] = None,
+        remove_isolated_branches: bool = False,
         smoothing_window: int = 15,
         pruning_mask: npt.NDArray = None,
         method=0,
@@ -28,6 +30,8 @@ class MorseGraph:
         self.smoothing_window = smoothing_window
         self.thresholds = thresholds
         self.min_branch_length = min_branch_length
+        self.max_branch_length = max_branch_length
+        self.remove_isolated_branches = remove_isolated_branches
         self.pruning_mask = pruning_mask
         self._shape = img.shape[:2]
         self.barcode = None
@@ -163,11 +167,18 @@ class MorseGraph:
 
         # Remove segments of vertices inside the pruning mask
         G = self.__trim_graph(
-            G, vertices, self.min_branch_length, self._shape, self.pruning_mask
+            G,
+            vertices,
+            self._shape,
+            self.min_branch_length,
+            self.max_branch_length,
+            self.pruning_mask,
         )
 
         # Compute minimum spanning forest of the graph
-        self._G, self._parent, self._dist_to_root = self.__get_forest(G, vertices)
+        self._G, self._parent, self._dist_to_root = self.__get_forest(
+            G, vertices, self.remove_isolated_branches
+        )
 
         self._vertices = vertices
 
@@ -527,12 +538,15 @@ class MorseGraph:
         return G
 
     @staticmethod
-    def __get_forest(G: nx.Graph, verts: np.ndarray) -> Tuple[nx.Graph, dict, dict]:
+    def __get_forest(
+        G: nx.Graph, verts: np.ndarray, remove_isolated_branches: bool
+    ) -> Tuple[nx.Graph, dict, dict]:
         """Get a minimum spanning forest of the graph `G`, node parents,
             and node distances to the root node of each tree.
         Args:
             G: Graph to get the minimum spanning forest of.
             verts: Vertices of the graph.
+            remove_isolated_branches: Whether to remove branches with degree <= 2.
         Returns:
             Tuple[nx.Graph, dict, dict]: The minimum spanning forest of `G`,
                 node parents, and node distances to the root node of each tree.
@@ -542,13 +556,10 @@ class MorseGraph:
         parent = {n: None for n in G.nodes()}
         dist_to_root = {}  # each node's distance to the root of its tree
 
-        skipped_vertices = set()
-
         for g in [G.subgraph(c) for c in nx.connected_components(G)]:
             root, max_degree = max(g.degree, key=lambda x: x[1])
-            if max_degree <= 2:
-                skipped_vertices.update(g.nodes())
-                continue  # skip isolated branches
+            if remove_isolated_branches and max_degree <= 2:
+                continue
             # create a dict where each vertex points to its parent in the tree.
             # we set parents with a bfs starting at the root.
             # we also use the bfs to compute distance to root.
@@ -566,12 +577,6 @@ class MorseGraph:
                         )
                         unvisited_vertices.append(n)
 
-        # check that the parents were set properly
-        # assert all([parent[n] is not None for n in G.nodes if n not in skipped_vertices])
-
-        # check that the resulting graph is a forest
-        # assert nx.is_forest(forest)
-
         return forest, parent, dist_to_root
 
     @staticmethod
@@ -583,8 +588,9 @@ class MorseGraph:
     def __trim_graph(
         G: nx.Graph,
         vertices: npt.NDArray,
-        min_branch_length: int,
         shape: Tuple[int, int],
+        min_branch_length: int,
+        max_branch_length: Optional[int] = None,
         pruning_mask: npt.NDArray = None,
     ) -> nx.Graph:
         """Remove branches that are too short or are positioned inside the pruning mask.
@@ -628,6 +634,7 @@ class MorseGraph:
             unmarked_nodes = {n for n in G.nodes if n not in junctions}
             segments = []
             short_segments = []
+            long_segments = []
 
             while base_nodes:
                 starting_node = base_nodes.pop()
@@ -644,14 +651,16 @@ class MorseGraph:
                         segment.append(node)
                         unmarked_nodes.remove(node)
                     # if one of the segment's endpoints is a leaf, consider removal based on length
-                    segment_has_leaf = (
-                        G.degree[segment[0]] == 1 or G.degree[segment[-1]] == 1
-                    )
-                    if (
-                        segment_has_leaf
-                        and get_segment_length(segment) < min_branch_length
-                    ):
-                        short_segments.append(segment)
+                    if G.degree[segment[0]] == 1 or G.degree[segment[-1]] == 1:
+                        if get_segment_length(segment) < min_branch_length:
+                            short_segments.append(segment)
+                        elif (
+                            max_branch_length
+                            and get_segment_length(segment) > max_branch_length
+                        ):
+                            long_segments.append(segment)
+                        else:
+                            segments.append(segment)
                     else:
                         segments.append(segment)
 
@@ -667,6 +676,7 @@ class MorseGraph:
             else:
                 segments_to_remove = []
             segments_to_remove.extend(short_segments)
+            segments_to_remove.extend(long_segments)
 
             for segment in segments_to_remove:
                 G.remove_edges_from(set(G.edges(segment)))
