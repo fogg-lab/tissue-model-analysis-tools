@@ -259,6 +259,7 @@ def analyze_img(
         ax.imshow(rescale_intensity(img, out_range=(0, 255)), cmap="gray")
         morse_graph.plot_colored_tree(ax=ax)
         plt.savefig(save_path, dpi=300, bbox_inches="tight", pad_inches=0)
+        plt.close("all")
 
         print("\nComputing branch statistics...")
 
