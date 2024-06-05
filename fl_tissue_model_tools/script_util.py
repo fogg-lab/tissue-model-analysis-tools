@@ -205,10 +205,10 @@ def parse_zproj_args() -> argparse.Namespace:
         "-m",
         "--method",
         type=str,
-        default="fs",
+        default="max",
         choices=["min", "max", "med", "avg", "fs"],
         help=(
-            "Z projection method. If no argument supplied, defaults to 'fs' "
+            "Z projection method. If no argument supplied, defaults to 'max' "
             "(focus stacking)."
         ),
     )
