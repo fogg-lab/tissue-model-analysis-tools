@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 import json
 import csv
+from itertools import product
 
 import numpy as np
 import cv2
@@ -25,6 +26,24 @@ from fl_tissue_model_tools.well_mask_generation import (
 DEFAULT_CONFIG_PATH = str(defs.SCRIPT_CONFIG_DIR / "default_branching_computation.json")
 
 
+def create_output_csv(output_file: Path):
+    """Create output csv file for branch analysis results.
+
+    Args:
+        output_file (pathlib.Path): Path to output csv file.
+    """
+
+    fields = [
+        "Image",
+        "Total # of branches",
+        "Total branch length (µm)",
+        "Average branch length (µm)",
+    ]
+    with open(output_file, "w", encoding="utf-16") as f:
+        writer = csv.writer(f, lineterminator="\n")
+        writer.writerow(fields)
+
+
 def save_vis(img, save_dir, filename):
     img = rescale_intensity(img, out_range=(0, 255))
     cv2.imwrite(os.path.join(save_dir, filename), img)
@@ -44,6 +63,20 @@ def pixels_to_microns(
     return (im_width_microns / im_width_px) * num_pixels
 
 
+def microns_to_pixels(
+    num_microns: float, im_width_px: int, im_width_microns: float
+) -> float:
+    """Convert microns to pixels in specified resolution.
+
+    Args:
+        num_microns: Number of microns to convert to pixels.
+        im_width_px: Width of image in pixels.
+        im_width_microns: Physical width of image region in microns.
+    """
+
+    return (im_width_px / im_width_microns) * num_microns
+
+
 def analyze_img(
     img_path: Path,
     model: models.UNetXceptionPatchSegmentor,
@@ -59,9 +92,10 @@ def analyze_img(
         output_dir (pathlib.Path): Directory to save results to.
     """
 
-    well_width_microns = config.get("well_width_microns", 1000.0)
+    image_width_microns = config.get("image_width_microns", 1000.0)
     vessel_p_thresh = config.get("vessel_probability_thresh", 0.5)
-    morse_thresholds = config.get("graph_thresh_1", 2), config.get("graph_thresh_2", 4)
+    graph_thresh_1 = config.get("graph_thresh_1", 2)
+    graph_thresh_2 = config.get("graph_thresh_2", 4)
     graph_smoothing_window = config.get("graph_smoothing_window", 10)
     min_branch_length = config.get("min_branch_length", 10)
     max_branch_length = config.get("max_branch_length", None)
@@ -73,7 +107,6 @@ def analyze_img(
     print("=========================================")
 
     img = cv2.imread(str(img_path), cv2.IMREAD_ANYDEPTH)
-    img_width_px = img.shape[1]
     img = rescale_intensity(img, out_range=(0, 1)).astype(np.float32)
 
     # downsample image with Lanczos interpolation
@@ -81,6 +114,7 @@ def analyze_img(
         np.round(np.multiply(img.shape[:2], model.ds_ratio)).astype(int)
     )
     img = cv2.resize(img, target_shape, interpolation=cv2.INTER_LANCZOS4)
+    image_width_px = img.shape[1]
 
     # Create directory for intermediate outputs and save original image
     vis_dir = output_dir / "visualizations" / img_path.stem
@@ -115,82 +149,146 @@ def analyze_img(
     print("Segmenting image...")
 
     pred = model.predict(img * well_mask, auto_resample=False)
-    seg_mask = pred > vessel_p_thresh
 
     # Save pred and save well mask if needed
     save_vis(pred, vis_dir, "prediction.png")
     if use_well_mask:
         cv2.imwrite(os.path.join(vis_dir, "well_mask.png"), well_mask * 255)
 
-    # filter out non-branching structures from segmentation mask
-    seg_mask = filter_branch_seg_mask(seg_mask * well_mask).astype(float)
+    embed_graph_params = {
+        "vesselP": np.atleast_1d(vessel_p_thresh).tolist(),
+        "thresh1": np.atleast_1d(graph_thresh_1).tolist(),
+        "thresh2": np.atleast_1d(graph_thresh_2).tolist(),
+        "smoothing": np.atleast_1d(graph_smoothing_window).tolist(),
+        "minLength": np.atleast_1d(min_branch_length).tolist(),
+        "maxLength": np.atleast_1d(max_branch_length).tolist(),
+        "trimIsolated": np.atleast_1d(remove_isolated_branches).tolist(),
+    }
+    param_names, param_vals = zip(*embed_graph_params.items())
+    param_combinations = product(*param_vals)
+    cfgs = [dict(zip(param_names, comb)) for comb in param_combinations]
+    tuned = [k for k, v in embed_graph_params.items() if len(v) > 1]
 
-    # Enhance centerlines
-    skel, dist = medial_axis(seg_mask, return_distance=True)
-    centerline_dt = distance_transform_edt(np.logical_not(skel))
-    relative_dt = dist / (dist + centerline_dt)
+    # Define zero padding for numeric parameters for file naming
+    param_str_fmts = {}
+    for k, v in embed_graph_params.items():
+        if all(isinstance(x, (int, float)) for x in v):
+            if all(isinstance(x, int) for x in v):
+                fixed_width = max(len(str(x)) for x in v)
+                param_str_fmts[k] = f"{{:0{fixed_width}d}}"
+            else:
+                width_left = max(str(float(x)).find(".") for x in v)
+                width_right = max(len(str(float(x)).split(".")[1]) for x in v)
+                fixed_width = width_left + 1 + width_right  # +1 for decimal point
+                param_str_fmts[k] = f"{{:0{fixed_width}.{width_right}f}}"
+        else:
+            param_str_fmts[k] = "{}"
 
-    pred = pred * relative_dt
-
-    # Save seg mask and distance transform result
-    save_vis(seg_mask, vis_dir, "segmentation_mask.png")
-    save_vis(pred, vis_dir, "distance_transform.png")
-
-    pred = rescale_intensity(pred, out_range=(0, 255))
-    pred = pred.astype(np.double)
-
-    print("\nComputing graph and barcode...")
-
-    try:
-        morse_graph = MorseGraph(
-            pred,
-            thresholds=morse_thresholds,
-            smoothing_window=graph_smoothing_window,
-            min_branch_length=min_branch_length,
-            max_branch_length=max_branch_length,
-            remove_isolated_branches=remove_isolated_branches,
-            pruning_mask=pruning_mask,
+    # For each configuration, construct and analyze embedded graph
+    for cfg in cfgs:
+        tuned_str = "".join(
+            f"_{k}{param_str_fmts[k].format(v)}" for k, v in cfg.items() if k in tuned
         )
-    except nxPointlessConceptException:
-        print(f"No branches found for {img_path.stem}.")
-        return
+        tuned_str = f"_CONFIG_{tuned_str}" if tuned_str else ""
 
-    # Save barcode and Morse tree visualization
-    save_path = str(vis_dir / "barcode.png")
-    plt.figure(figsize=(6, 6))
-    plt.margins(0)
-    ax = plt.gca()
-    morse_graph.plot_colored_barcode(ax=ax)
-    plt.savefig(save_path, dpi=300, bbox_inches="tight", pad_inches=0)
-    save_path = str(vis_dir / "morse_tree.png")
-    plt.figure(figsize=(10, 10))
-    plt.margins(0)
-    ax = plt.gca()
-    ax.imshow(rescale_intensity(img, out_range=(0, 255)), cmap="gray")
-    morse_graph.plot_colored_tree(ax=ax)
-    plt.savefig(save_path, dpi=300, bbox_inches="tight", pad_inches=0)
+        # Apply vessel probability threshold to get segmentation mask
+        seg_mask = pred > cfg["vesselP"]
 
-    print("\nComputing branch statistics...")
+        # Filter out non-branching structures from segmentation mask
+        seg_mask = filter_branch_seg_mask(seg_mask * well_mask).astype(float)
 
-    # Get total and average branch length
-    total_branch_length = morse_graph.get_total_branch_length()
-    avg_branch_length = morse_graph.get_average_branch_length()
-    total_num_branches = len(morse_graph.barcode)
+        # Enhance centerlines
+        skel, dist = medial_axis(seg_mask, return_distance=True)
+        centerline_dt = distance_transform_edt(np.logical_not(skel))
+        relative_dt = dist / (dist + centerline_dt)
 
-    total_branch_length = pixels_to_microns(
-        total_branch_length, img_width_px, well_width_microns
-    )
-    avg_branch_length = pixels_to_microns(
-        avg_branch_length, img_width_px, well_width_microns
-    )
+        pred = pred * relative_dt
 
-    # Write results to csv file
-    fields = [img_path.stem, total_num_branches, total_branch_length, avg_branch_length]
-    with open(output_dir / "branching_analysis.csv", "a", encoding="utf-16") as f:
-        writer = csv.writer(f, lineterminator="\n")
-        writer.writerow(fields)
+        # Save seg mask and distance transform result
+        save_vis(seg_mask, vis_dir, f"segmentation_mask{tuned_str}.png")
+        save_vis(pred, vis_dir, f"distance_transform{tuned_str}.png")
 
-    print(f"Results saved to {output_dir / 'branching_analysis.csv'}.")
+        pred = rescale_intensity(pred, out_range=(0, 255))
+        pred = pred.astype(np.double)
+
+        print("\nComputing graph and barcode...")
+
+        min_branch_length_px = microns_to_pixels(
+            cfg["minLength"], image_width_px, image_width_microns
+        )
+        min_branch_length_px = round(min_branch_length_px)
+        max_branch_length_px = (
+            None
+            if cfg["maxLength"] is None
+            else microns_to_pixels(
+                cfg["maxLength"], image_width_px, image_width_microns
+            )
+        )
+        if max_branch_length_px is not None:
+            max_branch_length_px = round(max(1, max_branch_length_px))
+        smoothing_window_px = microns_to_pixels(
+            cfg["smoothing"], image_width_px, image_width_microns
+        )
+        smoothing_window_px = round(max(1, smoothing_window_px))
+
+        try:
+            morse_graph = MorseGraph(
+                pred,
+                thresholds=(cfg["thresh1"], cfg["thresh2"]),
+                smoothing_window=smoothing_window_px,
+                min_branch_length=min_branch_length_px,
+                max_branch_length=max_branch_length_px,
+                remove_isolated_branches=cfg["trimIsolated"],
+                pruning_mask=pruning_mask,
+            )
+        except nxPointlessConceptException:
+            print(f"No branches found for {img_path.stem}.")
+            return
+
+        # Save barcode and Morse tree visualization
+        save_path = str(vis_dir / f"barcode{tuned_str}.png")
+        plt.figure(figsize=(6, 6))
+        plt.margins(0)
+        ax = plt.gca()
+        morse_graph.plot_colored_barcode(ax=ax)
+        plt.savefig(save_path, dpi=300, bbox_inches="tight", pad_inches=0)
+        save_path = str(vis_dir / f"morse_tree{tuned_str}.png")
+        plt.figure(figsize=(10, 10))
+        plt.margins(0)
+        ax = plt.gca()
+        ax.imshow(rescale_intensity(img, out_range=(0, 255)), cmap="gray")
+        morse_graph.plot_colored_tree(ax=ax)
+        plt.savefig(save_path, dpi=300, bbox_inches="tight", pad_inches=0)
+
+        print("\nComputing branch statistics...")
+
+        # Get total and average branch length
+        total_branch_length = morse_graph.get_total_branch_length()
+        avg_branch_length = morse_graph.get_average_branch_length()
+        total_num_branches = len(morse_graph.barcode)
+
+        total_branch_length = pixels_to_microns(
+            total_branch_length, image_width_px, image_width_microns
+        )
+        avg_branch_length = pixels_to_microns(
+            avg_branch_length, image_width_px, image_width_microns
+        )
+
+        # Write results to csv file
+        fields = [
+            img_path.stem,
+            total_num_branches,
+            total_branch_length,
+            avg_branch_length,
+        ]
+        output_file = output_dir / f"branching_analysis{tuned_str}.csv"
+        if not output_file.is_file():
+            create_output_csv(output_file)
+        with open(output_dir / output_file, "a", encoding="utf-16") as f:
+            writer = csv.writer(f, lineterminator="\n")
+            writer.writerow(fields)
+
+        print(f"Results saved to {output_dir / output_file}.")
 
 
 def main():
@@ -210,22 +308,9 @@ def main():
     with open(args.config, "r", encoding="utf8") as config_fp:
         config = json.load(config_fp)
 
-    model_cfg_path = config.get("model_cfg_path", "")
-    use_latest_model_cfg = config.get("use_latest_model_cfg", True)
+    model_cfg_path = config.get("model_cfg_path")
 
-    if use_latest_model_cfg and model_cfg_path:
-        print(
-            f"{su.SFM.failure}Cannot use both use_latest_model_cfg and model_cfg_path."
-        )
-        sys.exit()
-
-    if not use_latest_model_cfg and not model_cfg_path:
-        print(
-            f"{su.SFM.failure}Must specify either use_latest_model_cfg or model_cfg_path."
-        )
-        sys.exit()
-
-    if use_latest_model_cfg:
+    if not model_cfg_path:
         last_exp = models_util.get_last_exp_num()
         model_cfg_dir = defs.MODEL_TRAINING_DIR / "binary_segmentation" / "configs"
         model_cfg_path = str(model_cfg_dir / f"unet_patch_segmentor_{last_exp}.json")
@@ -257,17 +342,6 @@ def main():
 
     ### Load model ###
     model = models.get_unet_patch_segmentor_from_cfg(model_cfg_path)
-
-    ### Create output csv ###
-    fields = [
-        "Image",
-        "Total # of branches",
-        "Total branch length (µm)",
-        "Average branch length (µm)",
-    ]
-    with open(output_dir / "branching_analysis.csv", "w", encoding="utf-16") as f:
-        writer = csv.writer(f, lineterminator="\n")
-        writer.writerow(fields)
 
     ### Analyze images ###
     for img_path in img_paths:
