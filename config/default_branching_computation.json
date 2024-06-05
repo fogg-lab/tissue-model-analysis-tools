@@ -6,5 +6,6 @@
     "graph_thresh_1": 2,
     "graph_thresh_2": 4,
     "graph_smoothing_window": 12,
-    "min_branch_length": 12
+    "min_branch_length": 12,
+    "remove_isolated_branches": false
 }

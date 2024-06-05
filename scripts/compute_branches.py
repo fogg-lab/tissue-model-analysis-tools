@@ -64,6 +64,8 @@ def analyze_img(
     morse_thresholds = config.get("graph_thresh_1", 2), config.get("graph_thresh_2", 4)
     graph_smoothing_window = config.get("graph_smoothing_window", 10)
     min_branch_length = config.get("min_branch_length", 10)
+    max_branch_length = config.get("max_branch_length", None)
+    remove_isolated_branches = config.get("remove_isolated_branches", False)
 
     print("")
     print("=========================================")
@@ -71,6 +73,7 @@ def analyze_img(
     print("=========================================")
 
     img = cv2.imread(str(img_path), cv2.IMREAD_ANYDEPTH)
+    img_width_px = img.shape[1]
     img = rescale_intensity(img, out_range=(0, 1)).astype(np.float32)
 
     # downsample image with Lanczos interpolation
@@ -117,8 +120,6 @@ def analyze_img(
     # Save pred and save well mask if needed
     save_vis(pred, vis_dir, "prediction.png")
     if use_well_mask:
-        # save_vis(well_mask.astype(np.float32), vis_dir, "well_mask.png")
-        # cv2.imwrite(os.path.join(save_dir, filename), img)
         cv2.imwrite(os.path.join(vis_dir, "well_mask.png"), well_mask * 255)
 
     # filter out non-branching structures from segmentation mask
@@ -146,6 +147,8 @@ def analyze_img(
             thresholds=morse_thresholds,
             smoothing_window=graph_smoothing_window,
             min_branch_length=min_branch_length,
+            max_branch_length=max_branch_length,
+            remove_isolated_branches=remove_isolated_branches,
             pruning_mask=pruning_mask,
         )
     except nxPointlessConceptException:
@@ -175,10 +178,10 @@ def analyze_img(
     total_num_branches = len(morse_graph.barcode)
 
     total_branch_length = pixels_to_microns(
-        total_branch_length, img.shape[1], well_width_microns
+        total_branch_length, img_width_px, well_width_microns
     )
     avg_branch_length = pixels_to_microns(
-        avg_branch_length, img.shape[1], well_width_microns
+        avg_branch_length, img_width_px, well_width_microns
     )
 
     # Write results to csv file
