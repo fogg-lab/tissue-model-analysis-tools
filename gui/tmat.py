@@ -23,7 +23,9 @@ def _strip_quotes(args: argparse.Namespace) -> argparse.Namespace:
 @Gooey
 def main():
     # Make sure base directory is set up
-    configure(str(USER_HOME / defs.PKG_NAME))
+    base_dir = USER_HOME / defs.PKG_NAME
+    if not base_dir.exists():
+        configure(str(base_dir))
 
     parser = GooeyParser(description="Tissue model analysis tools")
     subparsers = parser.add_subparsers(dest="command")
@@ -189,13 +191,13 @@ def main():
     args = _strip_quotes(args)
 
     if args.command == "analyze_microvessels":
-        compute_branches(args)
+        compute_branches.main(args)
     elif args.command == "make_z_projection":
         compute_zproj(args)
     elif args.command == "measure_cell_coverage_area":
-        compute_cell_area(args)
+        compute_cell_area.main(args)
     elif args.command == "predict_depth_of_invasion":
-        compute_inv_depth(args)
+        compute_inv_depth.main(args)
 
 
 if __name__ == "__main__":

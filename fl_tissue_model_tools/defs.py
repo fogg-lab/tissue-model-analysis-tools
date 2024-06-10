@@ -16,9 +16,12 @@ PKG_BASE_DIR = Path(__file__).resolve().parent
 PKG_CFG_PATH = PKG_BASE_DIR / 'package.cfg'
 
 # Name of this package
-_pkg_config = configparser.ConfigParser()
-_pkg_config.read(PKG_CFG_PATH)
-PKG_NAME = _pkg_config['metadata']['name']
+try:
+    _pkg_config = configparser.ConfigParser()
+    _pkg_config.read(PKG_CFG_PATH)
+    PKG_NAME = _pkg_config['metadata']['name']
+except KeyError:
+    PKG_NAME = "fl_tissue_model_tools"
 
 # Paths to scripts and config files from this package
 PKG_SCRIPTS_DIR = PKG_BASE_DIR / 'scripts'
@@ -26,7 +29,10 @@ PKG_CONFIG_DIR = PKG_BASE_DIR / 'config'
 PKG_MODEL_DIR = PKG_BASE_DIR / 'model_training'
 
 # Get the user-specified base directory to store scripts, config, and output
-_user_base_dir = _pkg_config[PKG_NAME]['base_dir']
+try:
+    _user_base_dir = _pkg_config[PKG_NAME]['base_dir']
+except KeyError:
+    _user_base_dir = str(Path.home().resolve() / PKG_NAME)
 
 # Expand a user-relative base directory to an absolute path for current user
 if _user_base_dir.startswith('~'):
