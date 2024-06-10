@@ -12,6 +12,7 @@ from fl_tissue_model_tools import defs
 from fl_tissue_model_tools import script_util as su
 from fl_tissue_model_tools import zstacks as zs
 from fl_tissue_model_tools import helper
+from fl_tissue_model_tools.scripts import compute_cell_area
 
 
 proj_methods = {
@@ -116,7 +117,6 @@ def main(args=None):
 
     if compute_cell_area:
         if args_prespecified:
-            from fl_tissue_model_tools.scripts import compute_cell_area
             compute_cell_area.main(args)
         else:
             if "-a" in sys.argv:
