@@ -340,6 +340,13 @@ def analyze_img(
             anti_aliasing=True,
         ).astype(np.float32)
 
+        pruning_mask = resize(
+            pruning_mask,
+            img_dsamp_res,
+            order=0,
+            preserve_range=True
+        ).astype(bool)
+
     if use_well_mask:
         cv2.imwrite(os.path.join(vis_dir, "well_mask.png"), well_mask * 255)
 
