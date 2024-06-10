@@ -180,13 +180,6 @@ def main():
         ),
     )
 
-    compute_zproj_parser.add_argument(
-        "-a",
-        "--area",
-        action="store_true",
-        help="Compute cell area after computing Z projection.",
-    )
-
     args = parser.parse_args()
     args = _strip_quotes(args)
 
