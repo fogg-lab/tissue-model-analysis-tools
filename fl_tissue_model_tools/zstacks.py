@@ -5,10 +5,8 @@ https://github.com/cmcguinness/focusstack
 """
 
 import re
-import os
 from string import digits
 import os.path as osp
-from typing import Optional, Sequence, Callable
 from glob import glob
 import numpy.typing as npt
 import numpy as np
