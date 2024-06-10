@@ -465,22 +465,28 @@ def analyze_img(
         print(f"Results saved to {output_dir / output_file}.")
 
 
-def main():
+def main(args=None):
     ### Parse arguments ###
     arg_defaults = {
         "default_config_path": DEFAULT_CONFIG_PATH,
     }
 
-    args = su.parse_branching_args(arg_defaults)
-
-    ### Load/validate config ###
-
-    if not Path(args.config).is_file():
-        print(f"{su.SFM.failure}Config file {args.config} does not exist.")
-        sys.exit()
-
-    with open(args.config, "r", encoding="utf8") as config_fp:
-        config = json.load(config_fp)
+    if args is None:
+        args = su.parse_branching_args(arg_defaults)
+        ### Load/validate config ###
+        if not Path(args.config).is_file():
+            print(f"{su.SFM.failure}Config file {args.config} does not exist.")
+            sys.exit()
+        with open(args.config, "r", encoding="utf8") as config_fp:
+            config = json.load(config_fp)
+    else:
+        config = {}
+        config["image_width_microns"] = args.image_width_microns
+        config["graph_thresh_1"] = args.graph_thresh_1
+        config["graph_thresh_2"] = args.graph_thresh_2
+        config["graph_smoothing_window"] = args.graph_smoothing_window
+        config["min_branch_length"] = args.min_branch_length
+        config["remove_isolated_branches"] = args.remove_isolated_branches
 
     model_cfg_path = config.get("model_cfg_path")
 

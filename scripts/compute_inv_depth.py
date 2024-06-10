@@ -19,8 +19,12 @@ from fl_tissue_model_tools import zstacks as zs
 DEFAULT_CONFIG_PATH = str(defs.SCRIPT_CONFIG_DIR / "default_invasion_depth_computation.json")
 
 
-def main():
-    args = su.parse_inv_depth_args({"default_config_path": DEFAULT_CONFIG_PATH})
+def main(args=None):
+    if args is None:
+        args = su.parse_inv_depth_args({"default_config_path": DEFAULT_CONFIG_PATH})
+        args_prespecified = False
+    else:
+        args_prespecified = True
 
     ### Verify input source ###
     if os.path.isfile(args.in_root):
@@ -66,7 +70,7 @@ def main():
     last_resnet_layer = best_hp["last_resnet_layer"]
 
     ### Load config ###
-    config_path = args.config
+    config_path = DEFAULT_CONFIG_PATH if args_prespecified else args.config
     try:
         config = su.inv_depth_verify_config_file(config_path, n_models)
     except FileNotFoundError as e:

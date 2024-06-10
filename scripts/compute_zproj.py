@@ -43,10 +43,10 @@ def get_zstack(
         return np.array([helper.load_image(zsp, T, C) for zsp in zs_path])
 
 
-def main():
+def main(args=None):
     """Computes z projections and saves to output directory."""
-
-    args = su.parse_zproj_args()
+    if args is None:
+        args = su.parse_zproj_args()
     compute_cell_area = args.area
 
     ### Verify input source ###
