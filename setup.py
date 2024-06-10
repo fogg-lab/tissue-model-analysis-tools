@@ -57,6 +57,7 @@ setup(
     url="https://github.com/fogg-lab/tissue-model-analysis-tools",
     install_requires=[
         "albumentations==1.4.1",
+        "aicsimageio[nd2]==4.14.0",
         "click==8.1.7",
         "dask==2024.5.2",
         "gudhi==3.9.0",
@@ -73,7 +74,7 @@ setup(
         "scikit-image==0.22.0",
         "scikit-learn==1.5.0",
         "scipy==1.13.1",
-        "tifffile==2024.5.22",
+        "tifffile==2023.2.28",
         "tqdm==4.66.4",
         "keras-tuner==1.4.7",
         "pyometiff==1.0.0",

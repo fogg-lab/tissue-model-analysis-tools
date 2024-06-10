@@ -1,16 +1,17 @@
 import os
 import shutil
-from typing import Sequence, Callable, Union, Tuple, Dict
+from typing import Sequence, Callable, Union, Tuple, Dict, Optional
 from copy import deepcopy
 import numpy as np
 import numpy.typing as npt
 import dask as d
 import cv2
 from skimage.exposure import rescale_intensity
-
 from numpy.random import RandomState
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+from fl_tissue_model_tools import helper
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
 from tensorflow.keras import utils
 from tensorflow.keras.applications import resnet50
@@ -38,44 +39,56 @@ def make_dir(path: str) -> None:
         os.makedirs(path)
 
 
-def load_inv_depth_img(path: str, img_hw: Tuple[int, int]) -> npt.NDArray:
+def load_inv_depth_img(
+    image: Union[str, npt.NDArray],
+    img_hw: Tuple[int, int],
+    T: Optional[int] = None,
+    C: Optional[int] = None,
+) -> npt.NDArray:
     """Load an invasion depth image and convert it to grayscale with 3 redundant channels.
 
     Args:
-        path: Path to image. Assumed to be .tif.
+        image: Image or path to image.
         img_hw: Desired height and width for image to be resized to.
+        T (int, optional): Index of the time to use (needed if time series).
+        C (int, optional): Index of the color channel to use (needed if multi channel).
 
     Returns:
         Preprocessed invasion depth image.
     """
-    img = cv2.imread(path, cv2.IMREAD_ANYDEPTH)
+    img = helper.load_image(image, T, C) if isinstance(image, str) else image
     img = cv2.resize(img, img_hw, cv2.INTER_LANCZOS4)
     img = rescale_intensity(img, out_range=(0, 255))
     img = np.repeat(img[:, :, np.newaxis], 3, axis=2)
     return img
 
 
-def prep_inv_depth_imgs(paths: Sequence[str], img_hw: Tuple[int, int]) -> npt.NDArray:
+def prep_inv_depth_imgs(
+    images: Union[Sequence[str], list[npt.NDArray]],
+    img_hw: Tuple[int, int],
+    T: Optional[int] = None,
+    C: Optional[int] = None,
+) -> npt.NDArray:
     """Prepare a batch of invasion depth images.
 
     Args:
         paths: Paths to each image in batch.
         img_hw: Desired height and width for each image to be resized to.
+        T (int, optional): Index of the time to use (needed if time series).
+        C (int, optional): Index of the color channel to use (needed if multi channel).
 
     Returns:
         Preprocessed invasion depth images.
     """
     imgs = np.array(
-        d.compute((d.delayed(load_inv_depth_img)(p, img_hw) for p in paths))[0]
+        d.compute((d.delayed(load_inv_depth_img)(im, img_hw, T, C) for im in images))[0]
     )
     return resnet50.preprocess_input(imgs)
 
 
 def get_train_val_split(
-    tv_class_paths: Dict[int, Sequence[str]], val_split: float=0.2
-) -> Tuple[
-    Dict[int, Sequence[str]], Dict[int, Sequence[str]]
-]:
+    tv_class_paths: Dict[int, Sequence[str]], val_split: float = 0.2
+) -> Tuple[Dict[int, Sequence[str]], Dict[int, Sequence[str]]]:
     """Generate a train/validation split using mapping from labels to image paths.
 
     Args:
@@ -91,8 +104,8 @@ def get_train_val_split(
     """
     tv_counts = {k: len(v) for k, v in tv_class_paths.items()}
     val_counts = {k: round(v * val_split) for k, v in tv_counts.items()}
-    train_data_paths = {k: v[val_counts[k]:] for k, v in tv_class_paths.items()}
-    val_data_paths = {k: v[:val_counts[k]] for k, v in tv_class_paths.items()}
+    train_data_paths = {k: v[val_counts[k] :] for k, v in tv_class_paths.items()}
+    val_data_paths = {k: v[: val_counts[k]] for k, v in tv_class_paths.items()}
     return train_data_paths, val_data_paths
 
 
@@ -100,10 +113,15 @@ class InvasionDataGenerator(utils.Sequence):
     """Sequence class for handling invasion depth images."""
 
     def __init__(
-        self, class_paths: Sequence[str], class_labels: Dict[str, int],
-        batch_size: int, img_shape: Tuple[int, int], random_state: RandomState,
-        class_weights: Union[Dict[int, float], bool]=False, shuffle: bool=True,
-        augmentation_function: Callable=None
+        self,
+        class_paths: Sequence[str],
+        class_labels: Dict[str, int],
+        batch_size: int,
+        img_shape: Tuple[int, int],
+        random_state: RandomState,
+        class_weights: Union[Dict[int, float], bool] = False,
+        shuffle: bool = True,
+        augmentation_function: Callable = None,
     ):
         """Create sequence class for handling invasion depth images.
 
@@ -142,7 +160,9 @@ class InvasionDataGenerator(utils.Sequence):
         if isinstance(class_weights, Dict):
             self.class_weights = deepcopy(class_weights)
         elif class_weights:
-            self.class_weights = prep.balanced_class_weights_from_counts(self.class_counts)
+            self.class_weights = prep.balanced_class_weights_from_counts(
+                self.class_counts
+            )
         else:
             self.class_weights = None
 
@@ -150,7 +170,7 @@ class InvasionDataGenerator(utils.Sequence):
             self.shuffle_indices()
 
     def __len__(self) -> int:
-        """Get length of data (number of batches) 
+        """Get length of data (number of batches)
 
         Returns:
             Number of batches.
@@ -160,8 +180,7 @@ class InvasionDataGenerator(utils.Sequence):
     def __getitem__(
         self, index
     ) -> Union[
-        Tuple[npt.NDArray, npt.NDArray],
-        Tuple[npt.NDArray, npt.NDArray, npt.NDArray]
+        Tuple[npt.NDArray, npt.NDArray], Tuple[npt.NDArray, npt.NDArray, npt.NDArray]
     ]:
         """Retrieve a mini-batch of images, labels, and (optionally) sample weights.
 
@@ -173,7 +192,7 @@ class InvasionDataGenerator(utils.Sequence):
         """
         batch_idx_start = index * self.batch_size
         batch_idx_end = batch_idx_start + self.batch_size
-        batch_indices = self.indices[batch_idx_start: batch_idx_end]
+        batch_indices = self.indices[batch_idx_start:batch_idx_end]
 
         img_paths = [self.img_paths[i] for i in batch_indices]
         img_labels = np.array([self.img_labels[i] for i in batch_indices])
@@ -182,7 +201,9 @@ class InvasionDataGenerator(utils.Sequence):
         preprocessed_imgs = prep_inv_depth_imgs(img_paths, self.img_shape)
 
         if self.augmentation_function is not None:
-            preprocessed_imgs = self.augmentation_function(preprocessed_imgs, self.rand_state, expand_dims=False)
+            preprocessed_imgs = self.augmentation_function(
+                preprocessed_imgs, self.rand_state, expand_dims=False
+            )
 
         # Set img_labels to be (m,1) rather than (m,)
         if self.class_weights is not None:

@@ -5,40 +5,93 @@ https://github.com/cmcguinness/focusstack
 """
 
 import re
-import os
+from string import digits
 import os.path as osp
-from pathlib import Path
-from typing import Optional, Sequence, Callable
 from glob import glob
-import numbers
 import numpy.typing as npt
 import numpy as np
-from skimage.exposure import rescale_intensity
 import cv2
-import tifffile
-import imghdr
-from pyometiff import OMETIFFReader
-
-from . import defs
-from .helper import get_img_paths
-
-# Zpos pattern: flexible, matches substrings like z012., Z34_, z[567]-
-ZPOS_PATTERN = "(z|Z)(\[)?[0-9]+(\])?(_|\.|\-)"
-TIFF_INTERIM_DIR_SUFFIX = "_TMP_tiff_files"
 
 
-def default_get_zpos(z_path: str) -> int:
-    """Use `ZPOS_PATTERN` to retrieve z-position from path string.
+def simplify_zstack_ids(zstack_ids: list[str]):
+    """Trim identifiers to remove common prefixes and suffixes.
 
     Args:
-        z_path: The full path or file name of a z-position image
+        zstack_ids: List of zstack ids.
 
     Returns:
-        Image z-position as an integer.
+        list[str]: List of zstack ids with common prefixes and suffixes removed.
 
     """
-    # Trim the 'Z' from the beginning of the match
-    return int(re.search(ZPOS_PATTERN, z_path)[0][1:-1])
+    while zstack_ids[0] and all(zid.startswith(zstack_ids[0][0]) for zid in zstack_ids):
+        zstack_ids = [zid[1:] for zid in zstack_ids]
+    while zstack_ids[0] and all(zid.endswith(zstack_ids[0][-1]) for zid in zstack_ids):
+        zstack_ids = [zid[:-1] for zid in zstack_ids]
+    return zstack_ids
+
+
+def find_zstack_image_sequences(input_dir: str):
+    """ Find zstacks from image sequences with numbered filenames.
+
+    Args:
+        input_dir: input directory
+
+    Returns:
+        dict[str, list[str]]: Dictionary of zstack ids and their file paths.
+
+    """
+    img_paths = list(filter(osp.isfile, glob(osp.join(input_dir, "*"))))
+    if not img_paths:
+        img_paths = list(filter(osp.isfile, glob(osp.join(input_dir, "*", "*"))))
+    elif any(osp.isdir(fp) for fp in glob(osp.join(input_dir, "*"))):
+        raise ValueError("Found both files and directories in input directory")
+
+    # Get Z stack identifier for each Z slice and parse numbers present in file names
+    zslice_stack_ids = []
+    zslice_numbers_in_name = []
+    for zslice_relpath in [osp.relpath(img_path, input_dir) for img_path in img_paths]:
+        name = osp.basename(zslice_relpath)
+        dir_name = osp.dirname(zslice_relpath)
+        zstack_id = osp.join(dir_name, name.translate(str.maketrans("", "", digits)))
+        zslice_stack_ids.append(zstack_id)
+        zslice_numbers_in_name.append(list(map(int, re.findall(r"\d+", name)))[::-1])
+
+    zslice_stack_ids = simplify_zstack_ids(zslice_stack_ids)
+
+    # Group Z slices by Z stack identifier
+    zstacks = {}
+    unique_zslice_stack_ids = set(zslice_stack_ids)
+    for zstack_id in unique_zslice_stack_ids:
+        zstacks[zstack_id] = []
+        zs_inds = [i for i, zid in enumerate(zslice_stack_ids) if zid == zstack_id]
+        zs_nums_in_name = [zslice_numbers_in_name[i] for i in zs_inds]
+        if not all([len(nums) == len(zs_nums_in_name[0]) for nums in zs_nums_in_name]):
+            raise ValueError("Unrecognized Z slice naming convention")
+        if len(set([tuple(nums) for nums in zs_nums_in_name])) != len(zs_inds):
+            raise ValueError("Unrecognized Z slice numbering convention in image names")
+        zs_nums = [nums + [i] for i, nums in zip(zs_inds, zs_nums_in_name)]
+        for nums in sorted(zs_nums):
+            index = nums[-1]
+            zstacks[zstack_id].append(img_paths[index])
+
+    return zstacks
+
+
+def find_zstack_files(input_dir: str):
+    """ Get paths to zstack files.
+
+    Args:
+        - input_dir: input directory
+
+    Returns:
+        - dict[str, str]: Dictionary of zstack ids and their file paths.
+
+    """
+    img_paths = list(filter(osp.isfile, glob(osp.join(input_dir, "*"))))
+    if any(osp.isdir(fp) for fp in glob(osp.join(input_dir, "*"))):
+        raise ValueError("Found both files and directories in input directory")
+    zstack_ids = simplify_zstack_ids([osp.basename(img_path) for img_path in img_paths])
+    return {zs_id: fp for zs_id, fp in zip(zstack_ids, img_paths)}
 
 
 def _blur_and_lap(image: npt.NDArray, kernel_size: int = 5) -> npt.NDArray:
@@ -54,111 +107,10 @@ def _blur_and_lap(image: npt.NDArray, kernel_size: int = 5) -> npt.NDArray:
 
     Returns:
         Laplacian of blurred image.
+
     """
     blurred = cv2.GaussianBlur(image, (kernel_size, kernel_size), 0)
     return cv2.Laplacian(blurred, cv2.CV_64F, ksize=kernel_size)
-
-
-def is_single_file_zstack(fp: str) -> bool:
-    """Check whether given file path `fp` is an OME file."""
-    basename = osp.basename(fp)
-    if not osp.isfile(fp):
-        # directory or wrong file path
-        return False
-    if not any(ext == "ome" for ext in basename.lower().split(".")[1:]):
-        if imghdr.what(fp) != "tiff":
-            # Not a TIFF file of any kind
-            return False
-    if re.search(ZPOS_PATTERN, basename) is not None:
-        # Looks like a single slice within a z-stack, not a whole z-stack
-        return False
-    try:
-        OMETIFFReader(fp).read()
-    except Exception:
-        return False
-    return True
-
-
-def is_zstack(fp):
-    """Check whether file path given file path `fp` contains a z-stack."""
-    return (osp.isdir(fp) and len(glob(f"{fp}/*")) > 0) or is_single_file_zstack(fp)
-
-
-def save_tiff_zstack(image_stack: npt.NDArray, output_dir: str) -> None:
-    """Save a stack of images as individual TIFF files.
-
-    Args:
-        image_stack: A numpy array representing a stack of images.
-        output_dir: Directory to save the TIFF files.
-    """
-    for i, image in enumerate(image_stack):
-        output_path = osp.join(output_dir, f"Z{str(i+1).zfill(5)}.tiff")
-        tifffile.imsave(output_path, image)
-
-
-def convert_zstack_image_to_tiffs(img_path: str) -> str:
-    """Convert a z-stack image file in OME-TIFF format to individual TIFF files.
-
-    Args:
-        img_path: Path to the input z-stack image file.
-
-    Returns:
-        The directory where the TIFF files are saved.
-    """
-    output_dir_name = Path(img_path).stem + TIFF_INTERIM_DIR_SUFFIX
-    # Clean up output directory name, in case it contains spaces or periods
-    output_dir_name = output_dir_name.replace(" ", "_")
-    output_dir_name = output_dir_name.replace(".", "_")
-    output_dir = osp.join(osp.dirname(img_path), output_dir_name)
-    os.makedirs(output_dir, exist_ok=True)
-
-    def print_failure_message(e: Exception) -> None:
-        print(f"Failed to read {img_path}. Error:\n{e}")
-
-    try:
-        with tifffile.TiffFile(img_path) as tif:
-            images = tif.asarray()
-    except Exception as e:
-        print_failure_message(e)
-
-    if images.ndim > 3:
-        # Move z dimension to the first axis
-        images = np.moveaxis(images, -3, 0)
-        # Move channel dimension to the last axis
-        images = np.moveaxis(images, 1, -1)
-        # Squeeze: Remove axes of length one
-        images = np.squeeze(images)
-
-    save_tiff_zstack(images, output_dir)
-    return output_dir
-
-
-def zstack_paths_from_dir(
-    z_stack_dir: str,
-    descending: bool = True,
-    get_zpos: Optional[Callable[[str], int]] = None,
-) -> Sequence[str]:
-    """Get sorted z-stack image paths.
-
-    Args:
-        z_stack_dir: Directory containing z-stack images.
-        descending: Whether z-position index is numbered from top to bottom
-            or bottom to top. For example, descending means z-position 3 is
-            located _above_ z-position 2.
-        get_zpos: A function to sort the z-position images. Must take in a
-            z-position image name and return that image's z-position. The
-            z-position is used to sort the z-stack.
-
-    Returns:
-        A list of the full paths to each z-position image
-        in the z-stack (sorted by z-position)
-
-    """
-    z_paths = get_img_paths(z_stack_dir)
-    if get_zpos is None:
-        get_zpos = default_get_zpos
-    sorted_z_paths = sorted(z_paths, key=get_zpos, reverse=descending)
-    return sorted_z_paths
 
 
 def proj_focus_stacking(
