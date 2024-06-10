@@ -217,10 +217,10 @@ Customize configuration variables (you can edit `config/default_branching_comput
 - `model_cfg_path` (string): Optional. This is the path to the configuration file of the segmentation model. This parameter is not included in the default configuration file. If it is not specified, the latest pretrained model in the `model_training` folder will be used.
 - `graph_thresh_1` (float): May require some experimentation to find the best value for your data. This threshold controls how much of the morse graph is used to compute the number of branches. Lower values include more of the graph, and more branches are detected. Higher values include less of the graph, and fewer branches are detected. The default is 5. If the default value does not work well, try different values like 0.25, 0.5, 1, 2, 4, etc. up to around 64.
 - `graph_thresh_2` (float): Also could use some tuning. This is the threshold for connecting branches, e.g. where it is ambiguous whether two branches are part of the same component. Lower values result in more connected branches, and higher values result in more disconnections. The default is 10. If the default value does not work well, try values like 0.0, 0.25, 0.5, 1, 2, 4, etc. up to around 64.
-- `min_branch_length` (integer): The minimum branch length (in microns) to consider. The default is 10.
+- `min_branch_length` (integer): The minimum branch length (in microns) to consider. The default is 12.
 - `max_branch_length` (integer): Optional. This is the maximum branch length (in microns) to consider. By default, this parameter is not included in the configuration file. If it is not in the configuration, no maximum branch length will be enforced.
 - `remove_isolated_branches` (boolean): Whether to remove branches that are not connected to any other branches *after* the network is trimmed per the branch length constraints (enforcing minimum and maximum branch lengths might isolate some branches, which may or may not be desired). The default is "false".
-- `graph_smoothing_window` (float): This is the window size (in microns) for smoothing the branch paths. The default is 10.
+- `graph_smoothing_window` (float): This is the window size (in microns) for smoothing the branch paths. The default is 12.
 
 \*Trying out a few different values for the graph thresholds tends to yield more accurate quantification of vessel formation. An efficient way to do this is to specify a list of values directly in the configuration file, for example:
 ```json
