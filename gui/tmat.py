@@ -193,7 +193,7 @@ def main():
     if args.command == "analyze_microvessels":
         compute_branches.main(args)
     elif args.command == "make_z_projection":
-        compute_zproj(args)
+        compute_zproj.main(args)
     elif args.command == "measure_cell_coverage_area":
         compute_cell_area.main(args)
     elif args.command == "predict_depth_of_invasion":

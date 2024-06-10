@@ -47,6 +47,9 @@ def main(args=None):
     """Computes z projections and saves to output directory."""
     if args is None:
         args = su.parse_zproj_args()
+        args_prespecified = False
+    else:
+        args_prespecified = True
     compute_cell_area = args.area
 
     ### Verify input source ###
@@ -112,22 +115,26 @@ def main(args=None):
     print(su.END_SEPARATOR)
 
     if compute_cell_area:
-        if "-a" in sys.argv:
-            sys.argv.remove("-a")
-        elif "--area" in sys.argv:
-            sys.argv.remove("--area")
+        if args_prespecified:
+            from fl_tissue_model_tools.scripts import compute_cell_area
+            compute_cell_area.main(args)
+        else:
+            if "-a" in sys.argv:
+                sys.argv.remove("-a")
+            elif "--area" in sys.argv:
+                sys.argv.remove("--area")
 
-        script_path = defs.SCRIPT_DIR / "compute_cell_area.py"
+            script_path = defs.SCRIPT_DIR / "compute_cell_area.py"
 
-        options = [
-            arg for arg in sys.argv[1:] if arg != args.in_root and arg != args.out_root
-        ]
+            options = [
+                arg for arg in sys.argv[1:] if arg != args.in_root and arg != args.out_root
+            ]
 
-        # use out_root as both in_root and out_root
-        subprocess.run(
-            [sys.executable, script_path, *options, args.out_root, args.out_root],
-            check=True,
-        )
+            # use out_root as both in_root and out_root
+            subprocess.run(
+                [sys.executable, script_path, *options, args.out_root, args.out_root],
+                check=True,
+            )
 
 
 if __name__ == "__main__":
