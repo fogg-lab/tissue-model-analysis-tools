@@ -2,18 +2,16 @@ import argparse
 import os
 import os.path as osp
 from pathlib import Path
+from glob import glob
 import shutil
 import json
-import re
 import imghdr
-from glob import glob
 from dataclasses import dataclass
 from typing import Sequence, Any
 
 from typing import Dict
 
-from .helper import get_img_paths
-from . import data_prep, zstacks
+from . import data_prep, helper
 
 
 @dataclass
@@ -85,6 +83,28 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "-C",
+        "--channel",
+        type=int,
+        default=None,
+        help=(
+            "Index of color channel (starting from 0) to read from images. "
+            "If no argument is supplied, images must be single channel."
+        )
+    )
+
+    parser.add_argument(
+        "-T",
+        "--time",
+        type=int,
+        default=None,
+        help=(
+            "Index of time (starting from 0) to read from images. "
+            "If no argument is supplied, images must not be time series."
+        )
+    )
+
+    parser.add_argument(
         "-w",
         "--detect-well",
         action="store_true",
@@ -147,6 +167,28 @@ def parse_cell_area_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "-C",
+        "--channel",
+        type=int,
+        default=None,
+        help=(
+            "Index of color channel (starting from 0) to read from images. "
+            "If no argument is supplied, images must be single channel."
+        )
+    )
+
+    parser.add_argument(
+        "-T",
+        "--time",
+        type=int,
+        default=None,
+        help=(
+            "Index of time (starting from 0) to read from images. "
+            "If no argument is supplied, images must not be time series."
+        )
+    )
+
+    parser.add_argument(
         "-w",
         "--detect-well",
         action="store_true",
@@ -202,6 +244,28 @@ def parse_zproj_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "-C",
+        "--channel",
+        type=int,
+        default=None,
+        help=(
+            "Index of color channel (starting from 0) to read from images. "
+            "If no argument is supplied, images must be single channel."
+        )
+    )
+
+    parser.add_argument(
+        "-T",
+        "--time",
+        type=int,
+        default=None,
+        help=(
+            "Index of time (starting from 0) to read from images. "
+            "If no argument is supplied, images must not be time series."
+        )
+    )
+
+    parser.add_argument(
         "-m",
         "--method",
         type=str,
@@ -210,20 +274,6 @@ def parse_zproj_args() -> argparse.Namespace:
         help=(
             "Z projection method. If no argument supplied, defaults to 'max' "
             "(focus stacking)."
-        ),
-    )
-
-    parser.add_argument(
-        "-o",
-        "--order",
-        type=int,
-        default=1,
-        choices=[0, 1],
-        help=(
-            "Interpretation of Z stack order. 0=Ascending, 1=Descending. "
-            "For Z stack of size k: -o 0 means (TOP -> BOTTOM) = (Z0 -> Zk) "
-            "while -o 1 means (TOP -> BOTTOM) = (Zk -> Z0). If no argument "
-            "supplied, defaults to 1=Descending."
         ),
     )
 
@@ -274,6 +324,28 @@ def parse_inv_depth_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "-C",
+        "--channel",
+        type=int,
+        default=None,
+        help=(
+            "Index of color channel (starting from 0) to read from images. "
+            "If no argument is supplied, images must be single channel."
+        )
+    )
+
+    parser.add_argument(
+        "-T",
+        "--time",
+        type=int,
+        default=None,
+        help=(
+            "Index of time (starting from 0) to read from images. "
+            "If no argument is supplied, images must not be time series."
+        )
+    )
+
+    parser.add_argument(
         "-c",
         "--config",
         type=str,
@@ -282,20 +354,6 @@ def parse_inv_depth_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
             "Full path to invasion depth computation configuration file. "
             "Ex: C:/my_config/inv_depth_comp_config.json. If no argument "
             "supplied, default configuration will be used."
-        ),
-    )
-
-    parser.add_argument(
-        "-o",
-        "--order",
-        type=int,
-        default=1,
-        choices=[0, 1],
-        help=(
-            "Interpretation of Z stack order. 0=Ascending, 1=Descending."
-            "For Z stack of size k: -o 0 means (TOP -> BOTTOM) = (Z0 -> Zk)"
-            "while -o 1 means (TOP -> BOTTOM) = (Zk -> Z0). If no argument"
-            "supplied, defaults to 1=Descending."
         ),
     )
 
@@ -322,11 +380,23 @@ def cell_area_verify_input_dir(input_path: str) -> Sequence[str]:
 
     if not osp.isdir(input_path):
         raise FileNotFoundError(
-            "Input data directory not found:" f"{os.linesep}\t{input_path}"
+            f"Input data directory not found:{os.linesep}\t{input_path}"
         )
 
-    # Get all images in input directory
-    img_paths = get_img_paths(input_path)
+    # Make sure all files are valid image files
+    img_paths = []
+    for fp in glob(osp.join(input_path, "*")):
+        if osp.isfile(fp):
+            # Reading image dimensions should not raise an error
+            # If image is in an unsupported format, `get_image_dims` will raise an error
+            # and print out what the supported formats are.
+            helper.get_image_dims(fp)
+            img_paths.append(fp)
+
+    if len(img_paths) == 0:
+        raise FileNotFoundError(
+            f"No files found in input directory:{os.linesep}\t{input_path}"
+        )
 
     print(f"Found {len(img_paths)} images in:{os.linesep}\t{input_path}")
     print(SFM.success)
@@ -402,98 +472,6 @@ def cell_area_verify_config_file(
     return config
 
 
-def zproj_verify_input_dir(input_path: str) -> Sequence[str]:
-    """Verify appropriate contents of input data directory.
-
-    Input directory should contain either:
-     - One subdirectory per Z stack.
-     - One OME-TIFF file per Z stack.
-     - No subdirectories, requires filenames for each z-stack to have the same unique
-       alphanumeric pattern at the beginning of the filename (e.g. A12_...).
-    Each Zstack should contain all Z position images for that stack.
-    Each image should have the pattern ...Z[pos]_... in its name (e.g. ...Z12_...).
-
-    Args:
-        input_path: Path to input Z stacks.
-
-    Raises:
-        FileNotFoundError: Input data directory not found.
-        FileNotFoundError: No images found in a subdirectory.
-
-    Returns:
-        List of full paths for Z stack subdirectories.
-
-    """
-
-    section_header("Verifying Input Directory")
-
-    if zstacks.is_single_file_zstack(input_path):
-        input_path = zstacks.convert_zstack_image_to_tiffs(input_path)
-        zstack_paths = [input_path]
-    else:
-        if not osp.isdir(input_path):
-            raise FileNotFoundError(
-                f"Data directory or OME-TIF file not found at path: {os.linesep}\t{input_path}"
-            )
-
-        zstack_paths = list(filter(zstacks.is_zstack, glob(f"{input_path}/*")))
-        for i, zsp in enumerate(zstack_paths):
-            if zstacks.is_single_file_zstack(zsp):
-                zstack_paths[i] = zstacks.convert_zstack_image_to_tiffs(zsp)
-        zstack_paths = list(set(zstack_paths))
-
-    if len(zstack_paths) == 0:
-        zstack_prefixes = set()
-        for img_path in get_img_paths(input_path):
-            iname = Path(img_path).name
-            prefix = iname.split("_")[0]
-            prefix_valid = True
-            if not prefix or prefix[0] not in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
-                prefix_valid = False
-            elif not prefix[1:].isdigit():
-                prefix_valid = False
-            if not prefix_valid:
-                raise FileNotFoundError(
-                    f"Image file{os.linesep}\t{iname}{os.linesep}does not have "
-                    "the expected pattern to denote Z stack. Files must have a "
-                    "unique uppercase alphanumeric prefix followed by an underscore. "
-                    "Ex: A12_..., Q001_..., W09_..., etc. "
-                )
-            zstack_prefixes.add(prefix)
-        zstack_paths = [osp.join(input_path, prefix) for prefix in zstack_prefixes]
-
-    print(f"{'Z Stack ID':<40}{'No. Z Positions':>20}")
-
-    for zsp in zstack_paths:
-        # Get all images in subdirectory
-        img_paths = get_img_paths(zsp)
-        n_imgs = len(img_paths)
-        if n_imgs == 0:
-            raise FileNotFoundError(f"No images found in: {os.linesep}\t{zsp}")
-        for img_path in img_paths:
-            iname = Path(img_path).name
-            # Strip zsp from iname in case zsp ends with a zstack prefix containing a Z
-            iname_without_zstack_prefix = iname.replace(Path(zsp).name, "")
-            pattern = re.search(zstacks.ZPOS_PATTERN, iname_without_zstack_prefix)
-            if pattern is None:
-                raise FileNotFoundError(
-                    f"Image file{os.linesep}\t{iname}{os.linesep} "
-                    "does not contain the expected pattern to denote Z position. "
-                    "Files must have ...Z[pos]... in their name, where [pos] is "
-                    "a number denoting Z stack position."
-                )
-
-        zsp_id = Path(zsp).name
-        if zsp_id.endswith(zstacks.TIFF_INTERIM_DIR_SUFFIX):
-            zsp_id = zsp_id[:-len(zstacks.TIFF_INTERIM_DIR_SUFFIX)]
-        print(f"{zsp_id:.<40}{n_imgs:.>20}")
-
-    print(SFM.success)
-    section_footer()
-
-    return zstack_paths
-
-
 def zproj_verify_output_dir(output_path: str) -> None:
     """Verify output directory is either created or wiped.
 
@@ -521,55 +499,6 @@ def zproj_verify_output_dir(output_path: str) -> None:
                 os.remove(prev_output_fp)
 
         print(f"... Cleared dir:{os.linesep}\t{output_path}")
-
-    print(SFM.success)
-    section_footer()
-
-
-def inv_depth_verify_input_dir(input_path: str) -> None:
-    """Verify appropriate contents of input data directory.
-
-    Each Z stack image should have the pattern ...Z[pos]_... in its name,
-    where [pos] is a number denoting the Z stack position for that image.
-
-    Args:
-        input_path: Path to input Z stacks.
-
-    Raises:
-        FileNotFoundError: Input data directory not found.
-        FileNotFoundError: No images found in a subdirectory.
-        FileNotFoundError: Image file does not contain the expected pattern.
-    """
-
-    section_header("Verifying Input Directory")
-
-    if not osp.isdir(input_path):
-        raise FileNotFoundError(
-            f"Input data directory not found:{os.linesep}\t{input_path}"
-        )
-
-    print(f"{'Z Stack ID':<60}{'No. Z Positions':>20}")
-
-    # Get all images in input directory
-    img_paths = get_img_paths(input_path)
-
-    n_imgs = len(img_paths)
-
-    if n_imgs == 0:
-        raise FileNotFoundError(f"No images found in: {os.linesep}\t{input_path}")
-    for img_path in img_paths:
-        iname = Path(img_path).name
-        pattern = re.search(zstacks.ZPOS_PATTERN, img_path)
-        if pattern is None:
-            raise FileNotFoundError(
-                f"Image file{os.linesep}\t{iname}{os.linesep}does not contain "
-                "the expected pattern to denote Z position. Files must have "
-                "...Z[pos]_... in their name, where [pos] is a number denoting "
-                "Z stack position."
-            )
-
-    zsp_id = Path(input_path).name
-    print(f"{zsp_id:.<60}{n_imgs:.>20}")
 
     print(SFM.success)
     section_footer()

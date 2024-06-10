@@ -22,13 +22,12 @@ NEIGHBOR_3 = 7
 NEIGHBOR_4 = 8
 
 # Names for data members of Edge stored as an ndarray
-INDEX = 0
-V1_IDX = 1
-V2_IDX = 2
-DV1_IDX = 3
-DV2_IDX = 4
-PAIR_TYPE = 5
-PERSISTENCE = 6
+V1_IDX = 0
+V2_IDX = 1
+DV1_IDX = 2
+DV2_IDX = 3
+PAIR_TYPE = 4
+PERSISTENCE = 5
 
 # Pair types (names that map to values stored in an ndarray)
 UNKNOWN_PAIR_TYPE = 0
@@ -64,15 +63,20 @@ def compute_dmt_graph(img: NDArray[np.float32], delta1: float, delta2: float = 0
     n_edges = (nrows - 1) * ncols + nrows * (ncols - 1) + (nrows - 1) * (ncols - 1)
     V = np.full((n_verts, 9), -1, dtype=np.float32)
     DV = np.full((n_dual_verts, 9), -1, dtype=np.float32)
-    E = np.full((n_edges, 7), -1, dtype=np.float32)
+    E = np.full((n_edges, 6), -1, dtype=np.float32)
     img = -img
     create_vertices(img, V)
     n_dual_verts = create_dual_vertices(img, DV)
     create_edges(img, E, n_dual_verts)
-
-    ### Compute persistence
+    vertex_nonzero = ~np.isclose(V[:, VALUE], 0)
     edge_v1_indices = E[:, V1_IDX].astype(np.int32)
     edge_v2_indices = E[:, V2_IDX].astype(np.int32)
+    edge_nonzero = vertex_nonzero[edge_v1_indices] & vertex_nonzero[edge_v2_indices]
+    E = E[edge_nonzero]
+    edge_v1_indices = edge_v1_indices[edge_nonzero]
+    edge_v2_indices = edge_v2_indices[edge_nonzero]
+
+    ### Compute persistence
     edge_v1_values = V[edge_v1_indices, VALUE]
     edge_v2_values = V[edge_v2_indices, VALUE]
     edge_max_val = np.maximum(edge_v1_values, edge_v2_values)
@@ -212,7 +216,6 @@ def create_edges(img: NDArray[np.float32], E: NDArray[np.float32], n_dual_verts:
 
     dual_indices = v_r_coords_flat * 2 * (n_cols - 1) + v_c_coords_flat * 2
 
-    E[v_indices, INDEX] = v_indices
     E[v_indices, V1_IDX] = v1_indices
     E[v_indices, V2_IDX] = v2_indices
     E[v_indices, DV1_IDX] = np.where(
@@ -238,7 +241,6 @@ def create_edges(img: NDArray[np.float32], E: NDArray[np.float32], n_dual_verts:
 
     dual_indices = h_r_coords_flat * 2 * (n_cols - 1) + h_c_coords_flat * 2
 
-    E[h_indices, INDEX] = h_indices
     E[h_indices, V1_IDX] = h1_indices
     E[h_indices, V2_IDX] = h2_indices
     E[h_indices, DV1_IDX] = np.where(
@@ -264,7 +266,6 @@ def create_edges(img: NDArray[np.float32], E: NDArray[np.float32], n_dual_verts:
 
     dual_indices = d_r_coords_flat * 2 * (n_cols - 1) + d_c_coords_flat * 2
 
-    E[d_indices, INDEX] = d_indices
     E[d_indices, V1_IDX] = d1_indices
     E[d_indices, V2_IDX] = d2_indices
     E[d_indices, DV1_IDX] = dual_indices
