@@ -1,31 +1,88 @@
 import os.path as osp
 from glob import glob
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from pathlib import Path
-import imghdr
 
-def get_img_paths(directory: str) -> List[str]:
-    """Get all image paths in a directory.
+# Before importing aicsimageio, ignore warning about Java from `bfio.backends`
+import logging
+
+logging.getLogger("bfio.backends").setLevel(logging.ERROR)
+from aicsimageio import AICSImage
+from aicsimageio.dimensions import Dimensions
+from aicsimageio.exceptions import UnsupportedFileFormatError
+
+from fl_tissue_model_tools.defs import SUPPORTED_IMAGE_FORMATS
+
+
+def load_image(file_path: str, T: Optional[int] = None, C: Optional[int] = None):
+    """Load image from path using AICSImage.
 
     Args:
-        directory: Path to directory containing images.
+        file_path (str): Path to image.
+        T (int, optional): Index of the time to use (needed if time series).
+        C (int, optional): Index of the color channel to use (needed if multi channel).
 
-    Returns:
-        A list of image paths.
+    Returns: np.ndarray: ZYX or YX image for 2D (if there is only 1 Z slice).
     """
-    unsupported_img_formats = {None, "rgb", "gif", "xbm"}
-    # directory might be a prefix rather than a directory
-    if not osp.isdir(directory):
-        img_paths = [fp for fp in glob(f"{directory}*") if osp.isfile(fp)]
-    else:
-        img_paths = [fp for fp in glob(f"{directory}/*") if osp.isfile(fp)]
-    img_paths = [fp for fp in img_paths if imghdr.what(fp) not in unsupported_img_formats]
-    return img_paths
+
+    try:
+        img_reader = AICSImage(file_path)
+    except UnsupportedFileFormatError as exc:
+        raise UnsupportedFileFormatError(
+            f"Unsupported image format: {file_path}"
+            f"Supported formats: {SUPPORTED_IMAGE_FORMATS}"
+        )
+
+    # AICSImage consistently reads images with the same order of dimensions:
+    # Time-Channel-Z-Y-X
+    if T is None:
+        if img_reader.dims.T > 1:
+            raise ValueError(f"{file_path} is a time series image "
+                             "but no time index was specified.")
+        T = 0
+    elif T >= img_reader.dims.T or T < 0:
+        raise ValueError(f"Time {T} is out of range for {file_path} "
+                         f"with times: 0 - {img_reader.T - 1}")
+
+    if C is None:
+        if img_reader.dims.C > 1:
+            raise ValueError(f"{file_path} is a multi channel image "
+                             "but no color channel index was specified.")
+        C = 0
+    elif C >= img_reader.dims.C or C < 0:
+        raise ValueError(f"Color channel {C} is out of range for {file_path} "
+                         f"with color channels: 0 - {img_reader.C - 1}")
+
+    image = img_reader.get_image_data("ZYX", T = T, C = C)
+
+    if len(image) == 1:
+        return image[0]
+    return image
+
+
+def get_image_dims(file_path: str) -> Dimensions:
+    """Get dimensions of image (Time-Channel-Z-Y-X) from metadata.
+
+    Args:
+        file_path: Path to the image file.
+    """
+
+    try:
+        img_reader = AICSImage(file_path)
+    except UnsupportedFileFormatError as exc:
+        raise UnsupportedFileFormatError(
+            f"Unsupported image format: {file_path}"
+            f"Supported formats: {SUPPORTED_IMAGE_FORMATS}"
+        )
+
+    return img_reader.dims
 
 
 def get_img_mask_paths(
-    img_dir: str, mask_dir=None,
-    img_suffix_pattern='.tif', label_suffix_pattern='_mask.tif'
+    img_dir: str,
+    mask_dir=None,
+    img_suffix_pattern=".tif",
+    label_suffix_pattern="_mask.tif",
 ) -> Tuple[List[str], List[str]]:
     """Return list of image, label pairs.
     Args:
@@ -47,34 +104,45 @@ def get_img_mask_paths(
         mask_dir = img_dir
 
     # make sure the search patterns are distinct
-    same_dir = img_dir==mask_dir
-    if same_dir and img_suffix_pattern==label_suffix_pattern:
-        raise ValueError('directories and suffixes for images and labels are identical')
-    exclude_mask_suffix_from_img_search = same_dir and label_suffix_pattern.endswith(img_suffix_pattern)
-    exclude_img_suffix_from_mask_search = same_dir and img_suffix_pattern.endswith(label_suffix_pattern)
+    same_dir = img_dir == mask_dir
+    if same_dir and img_suffix_pattern == label_suffix_pattern:
+        raise ValueError("directories and suffixes for images and labels are identical")
+    exclude_mask_suffix_from_img_search = same_dir and label_suffix_pattern.endswith(
+        img_suffix_pattern
+    )
+    exclude_img_suffix_from_mask_search = same_dir and img_suffix_pattern.endswith(
+        label_suffix_pattern
+    )
 
     # get image paths
-    img_paths = glob(osp.join(img_dir, f'*{img_suffix_pattern}'))
+    img_paths = glob(osp.join(img_dir, f"*{img_suffix_pattern}"))
     if exclude_mask_suffix_from_img_search:
         img_paths = [fp for fp in img_paths if not fp.endswith(label_suffix_pattern)]
 
     # get mask filenames
-    mask_filenames = [Path(fp).name for fp in glob(osp.join(mask_dir, f'*{label_suffix_pattern}'))]
+    mask_filenames = [
+        Path(fp).name for fp in glob(osp.join(mask_dir, f"*{label_suffix_pattern}"))
+    ]
     if exclude_img_suffix_from_mask_search:
-        mask_filenames = [fn for fn in mask_filenames if not fn.endswith(img_suffix_pattern)]
+        mask_filenames = [
+            fn for fn in mask_filenames if not fn.endswith(img_suffix_pattern)
+        ]
 
     # sort paths and make sure images and masks are paired 1:1
     if len(img_paths) != len(mask_filenames):
         raise ValueError(
-            f'number of images ({len(img_paths)}) and labels ({len(mask_filenames)}) is different')
+            f"number of images ({len(img_paths)}) and labels ({len(mask_filenames)}) is different"
+        )
     img_paths = sorted(img_paths)
     mask_paths = []
     for img_path in img_paths:
-        sample_name = Path(img_path).name.replace(img_suffix_pattern, '')
+        sample_name = Path(img_path).name.replace(img_suffix_pattern, "")
         mask_fname = sample_name + label_suffix_pattern
         if mask_fname in mask_filenames:
             mask_paths.append(osp.join(mask_dir, mask_fname))
         else:
-            raise ValueError(f'label {mask_fname} not found for image {Path(img_path).name}')
+            raise ValueError(
+                f"label {mask_fname} not found for image {Path(img_path).name}"
+            )
 
     return [*zip(img_paths, mask_paths)]

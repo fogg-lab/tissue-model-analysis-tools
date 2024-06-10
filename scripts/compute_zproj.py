@@ -1,14 +1,14 @@
 import os
+from glob import glob
 from pathlib import Path
-import shutil
 import subprocess
 import sys
+from typing import Optional, Union
 import numpy as np
 import numpy.typing as npt
 import cv2
 
 from fl_tissue_model_tools import defs
-from fl_tissue_model_tools import preprocessing as prep
 from fl_tissue_model_tools import script_util as su
 from fl_tissue_model_tools import zstacks as zs
 from fl_tissue_model_tools import helper
@@ -23,22 +23,24 @@ proj_methods = {
 }
 
 
-def get_zstack(zs_path: str, descending: bool) -> npt.NDArray:
+def get_zstack(
+    zs_path: Union[str, list[str]], T: Optional[int] = None, C: Optional[int] = None
+) -> npt.NDArray:
     """Given path to Z stack, return Z stack as array of images.
 
     Args:
-        zs_path: Path to Z stack.
-        descending: Whether to consider 0 to be the bottom or top. If
-            descending=True, 0 is considered to be the bottom.
+        zs_path: Path to Z stack or an ordered sequence of paths to Z slices.
+        T (int, optional): Index of the time to use (needed if time series).
+        C (int, optional): Index of the color channel to use (needed if multi channel).
 
     Returns:
         Z stack as array of images.
     """
 
-    z_paths = sorted(
-        helper.get_img_paths(zs_path), key=zs.default_get_zpos, reverse=descending
-    )
-    return np.array([cv2.imread(z_path, cv2.IMREAD_ANYDEPTH) for z_path in z_paths])
+    if isinstance(zs_path, str):
+        return helper.load_image(zs_path, T, C)
+    else:
+        return np.array([helper.load_image(zsp, T, C) for zsp in zs_path])
 
 
 def main():
@@ -48,11 +50,25 @@ def main():
     compute_cell_area = args.area
 
     ### Verify input source ###
-    try:
-        zstack_paths = su.zproj_verify_input_dir(args.in_root)
-    except FileNotFoundError as error:
-        print(f"{su.SFM.failure} {error}")
-        sys.exit()
+    if os.path.isfile(args.in_root):
+        print(f"{su.SFM.failure} Input directory is a file: {args.in_root}")
+        sys.exit(1)
+
+    if not os.path.isdir(args.in_root):
+        print(f"{su.SFM.failure} Input directory does not exist: {args.in_root}")
+        sys.exit(1)
+
+    zstack_paths = glob(os.path.join(args.in_root, "*"))
+
+    if len(zstack_paths) == 0:
+        print(f"{su.SFM.failure} Input directory is empty: {args.in_root}")
+        sys.exit(1)
+
+    test_path = zstack_paths[0]
+    if os.path.isdir(test_path) or helper.get_image_dims(test_path).Z > 1:
+        zstack_paths = zs.find_zstack_image_sequences(args.in_root)
+    else:
+        zstack_paths = zs.find_zstack_files(args.in_root)
 
     ### Verify output destination ###
     try:
@@ -65,13 +81,12 @@ def main():
     su.section_header("Constructing Z projections")
 
     proj_method = proj_methods[args.method]
-    descending = bool(args.order)
     print("Loading and computing Z stacks...")
     try:
         # zprojs: A dictionary of Z projections, keyed by Z stack ID.
         zprojs = {
-            Path(zsp).name: proj_method(get_zstack(zsp, descending))
-            for zsp in zstack_paths
+            zs_id: proj_method(get_zstack(zsp, args.time, args.channel))
+            for (zs_id, zsp) in zstack_paths.items()
         }
     except OSError as error:
         print(f"{su.SFM.failure}{error}")
@@ -82,15 +97,12 @@ def main():
     ### Save Z projections ###
 
     # Use first extension from the input directory as the output extension
-    out_ext = Path(zstack_paths[0]).suffix
+    out_ext = Path(np.atleast_1d(list(zstack_paths.values())[0])[0]).suffix
     if out_ext not in (".tif", ".tiff", ".png"):
         out_ext = ".tiff"
 
     print(f"{os.linesep}Saving projections...")
     for z_id, zproj in zprojs.items():
-        if z_id.endswith(zs.TIFF_INTERIM_DIR_SUFFIX):
-            shutil.rmtree(os.path.join(args.in_root, z_id))
-            z_id = z_id[: -len(zs.TIFF_INTERIM_DIR_SUFFIX)]
         cv2.imwrite(
             os.path.join(args.out_root, f"{z_id}_{args.method}_{out_ext}"), zproj
         )
