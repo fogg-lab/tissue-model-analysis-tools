@@ -1,7 +1,8 @@
 from pathlib import Path
 import configparser
-import pkg_resources
 import numpy as np
+
+SUPPORTED_IMAGE_FORMATS = ("ND2", "TIF", "TIFF", "OME-TIFF")
 
 # Max values for each integer type, placed here for convenience
 MAX_UINT16 = np.iinfo(np.uint16).max

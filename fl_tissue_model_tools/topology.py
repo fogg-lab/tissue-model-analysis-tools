@@ -64,13 +64,11 @@ class MorseGraph:
             return 0
         return bar_sum / len(bar_lengths)
 
-    def plot_colored_barcode(self, ax=None, **kwargs):
+    def plot_colored_barcode(self, scaling_factor=1.0, ax=None, **kwargs):
         """Plot a colored barcode computed by `compute_colored_tree_and_barcode`.
 
         Args:
-            barcode_and_colors (list): list of bars and colors in the format returned
-                by `compute_colored_tree_and_barcode`. Each item in the list is
-                a tuple of a persistence pair and a color.
+            scaling_factor (float): Factor to scale x and y coordinates.
             ax (matplotlib.axes.Axes): axis on which to plot barcode. defaults to None.
                 If no axis is provided, the tree is just plotted on the current axis of plt.
             kwargs (dict): Additional keyword arguments.
@@ -81,7 +79,7 @@ class MorseGraph:
         """
 
         if not self._barcode_and_colors:
-            self.__compute_colored_tree_and_barcode()
+            self.__compute_colored_tree_and_barcode(scaling_factor=scaling_factor)
 
         # if no axis is provided, fetch the current axis
         ax_provided = ax is not None
@@ -108,13 +106,11 @@ class MorseGraph:
         if not ax_provided:
             plt.show()
 
-    def plot_colored_tree(self, ax=None, **kwargs):
+    def plot_colored_tree(self, scaling_factor=1.0, ax=None, **kwargs):
         """Plot a colored tree computed by `compute_colored_tree_and_barcode`
 
         Args:
-            edges_and_colors (list): List of edges and colors.
-                Each item in the list is a tuple of a line and an rgb color.
-                Each line in a tuple with the 2d endpoints of an edge in the tree
+            scaling_factor (float): Factor to scale x and y coordinates.
             ax (matplotlib.axes.Axes): axis on which to plot barcode. defaults to None.
                 If no axis is provided, the tree is just plotted on the current axis of plt.
             kwargs (dict): Additional keyword arguments.
@@ -126,7 +122,7 @@ class MorseGraph:
         """
 
         if not self._edges_and_colors:
-            self.__compute_colored_tree_and_barcode()
+            self.__compute_colored_tree_and_barcode(scaling_factor=scaling_factor)
 
         # if no axis is provided, fetch the current axis
         ax_provided = ax is not None
@@ -137,7 +133,6 @@ class MorseGraph:
             edges, colors = zip(*self._edges_and_colors)
             # add alpha channel to colors (fixed at 1.0)
             colors = [(*c, 1.0) for c in colors]
-
             edges_collection = LineCollection(edges, colors=colors, **kwargs)
             # plot the tree
             ax.add_collection(edges_collection)
@@ -173,6 +168,7 @@ class MorseGraph:
             self.min_branch_length,
             self.max_branch_length,
             self.pruning_mask,
+            self.remove_isolated_branches,
         )
 
         # Compute minimum spanning forest of the graph
@@ -359,8 +355,11 @@ class MorseGraph:
         bar_lengths = bar_lengths[~np.isinf(bar_lengths)]
         return bar_lengths
 
-    def __compute_colored_tree_and_barcode(self):
+    def __compute_colored_tree_and_barcode(self, scaling_factor = 1.0):
         """Compute a tree and barcode colored according to branches.
+
+        Args:
+            scaling_factor (float): Factor to scale x and y coordinates.
 
         Initialize the following attributes:
             edges_and_colors (list): List of edges and colors.
@@ -375,14 +374,16 @@ class MorseGraph:
 
         for i, (branch, bar) in enumerate(zip(self._branches, self.barcode)):
             color = self.__random_color(i)
+            bar = (bar[0] * scaling_factor, bar[1] * scaling_factor)
             barcode_and_colors.append((bar, color))
-            for v1idx, v2idx in branch:
-                v1 = self._vertices[v1idx]
-                v2 = self._vertices[v2idx]
-                # reverse v1 and v2 as mpl uses image coordinates
-                c1 = (v1[1], v1[0])
-                c2 = (v2[1], v2[0])
-                edges_and_colors.append(([c1, c2], color))
+            branch_vertices = [b[0] for b in branch] + [branch[-1][1]]
+            branch_pos = self._vertices[branch_vertices] * scaling_factor
+            branch_pos = self.__moving_average_fixed_ends(branch_pos, 3)
+            for j in range(len(branch_pos)-1):
+                v1 = branch_pos[j]
+                v2 = branch_pos[j+1]
+                # reverse coordinates in v1 and v2 as mpl uses image coordinates
+                edges_and_colors.append(([v1[::-1], v2[::-1]], color))
 
         self._edges_and_colors = edges_and_colors
         self._barcode_and_colors = barcode_and_colors
@@ -592,12 +593,17 @@ class MorseGraph:
         min_branch_length: int,
         max_branch_length: Optional[int] = None,
         pruning_mask: npt.NDArray = None,
+        remove_isolated_branches: bool = False,
     ) -> nx.Graph:
-        """Remove branches that are too short or are positioned inside the pruning mask.
+        """Remove branches that are wrong length, isolated, or are marked for pruning.
         Args:
             G: Graph to trim.
             vertices: Physical positions of the graph nodes.
+            shape: shape used to initialize pruning mask if not provided.
+            min_branch_length: Minimum branch length to keep.
+            max_branch_length: Maximum branch length to keep.
             pruning_mask: Mask of regions to prune.
+            remove_isolated_branches: Whether to remove unconnected branches.
         Returns:
             nx.Graph: Pruned graph.
         """
@@ -611,10 +617,13 @@ class MorseGraph:
 
         def get_segment_length(segment):
             # segment is an edge-connected sequence of nodes that aren't junctions
-            edge_lengths = [
-                MorseGraph.__edge_len(vertices, n1, n2) for n1, n2 in G.edges(segment)
-            ]
-            return sum(edge_lengths)
+            min_x = np.min(vertices[segment, 0])
+            min_y = np.min(vertices[segment, 1])
+            max_x = np.max(vertices[segment, 0])
+            max_y = np.max(vertices[segment, 1])
+            bbox_min = np.array(min_x, min_y)
+            bbox_max = np.array(max_x, max_y)
+            return np.sqrt(np.sum((bbox_max-bbox_min)**2))
 
         # Remove segments that are too short or are positioned inside the mask.
         # Pass 1: Prune offshoots and isolated segments, starting from leaves.
@@ -635,6 +644,7 @@ class MorseGraph:
             segments = []
             short_segments = []
             long_segments = []
+            isolated_segments = []
 
             while base_nodes:
                 starting_node = base_nodes.pop()
@@ -650,8 +660,12 @@ class MorseGraph:
                         node = neighbor[0]
                         segment.append(node)
                         unmarked_nodes.remove(node)
-                    # if one of the segment's endpoints is a leaf, consider removal based on length
-                    if G.degree[segment[0]] == 1 or G.degree[segment[-1]] == 1:
+                    n_leaf = (G.degree[segment[0]] == 1) + (G.degree[segment[-1]] == 1)
+                    if remove_isolated_branches and n_leaf == 2 and not any(G.degree[v] > 2 for v in segment):
+                        # Remove isolated segment
+                        isolated_segments.append(segment)
+                    elif n_leaf > 0:
+                        # at least one endpoint is a leaf, consider removal based on length
                         if get_segment_length(segment) < min_branch_length:
                             short_segments.append(segment)
                         elif (
@@ -677,6 +691,7 @@ class MorseGraph:
                 segments_to_remove = []
             segments_to_remove.extend(short_segments)
             segments_to_remove.extend(long_segments)
+            segments_to_remove.extend(isolated_segments)
 
             for segment in segments_to_remove:
                 G.remove_edges_from(set(G.edges(segment)))
@@ -687,7 +702,5 @@ class MorseGraph:
             pruning_complete = pass_num == 2 and not segments_to_remove
             pass_num = 2 if pass_num == 1 else 1
 
-        # end = perf_counter_ns()
-        # print(f"Pruning took {round((end - start) / 1e6)} ms")
 
         return G

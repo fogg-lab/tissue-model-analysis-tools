@@ -2,6 +2,7 @@ import os
 import sys
 import json
 from pathlib import Path
+from glob import glob
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
@@ -11,7 +12,7 @@ import pandas as pd
 import tensorflow.keras.backend as K
 import tensorflow as tf
 
-from fl_tissue_model_tools import models, data_prep, defs
+from fl_tissue_model_tools import models, data_prep, defs, helper
 from fl_tissue_model_tools import script_util as su
 from fl_tissue_model_tools import zstacks as zs
 
@@ -22,11 +23,19 @@ def main():
     args = su.parse_inv_depth_args({"default_config_path": DEFAULT_CONFIG_PATH})
 
     ### Verify input source ###
-    try:
-        su.inv_depth_verify_input_dir(args.in_root)
-    except FileNotFoundError as e:
-        print(f"{su.SFM.failure} {e}")
-        sys.exit()
+    if os.path.isfile(args.in_root):
+        print(f"{su.SFM.failure} Input directory is a file: {args.in_root}")
+        sys.exit(1)
+
+    if not os.path.isdir(args.in_root):
+        print(f"{su.SFM.failure} Input directory does not exist: {args.in_root}")
+        sys.exit(1)
+
+    zstack_paths = glob(os.path.join(args.in_root, "*"))
+
+    if len(zstack_paths) == 0:
+        print(f"{su.SFM.failure} Input directory is empty: {args.in_root}")
+        sys.exit(1)
 
     ### Verify output destination ###
     try:
@@ -55,7 +64,6 @@ def main():
     n_models = training_values["n_models"]
     n_outputs = 1
     last_resnet_layer = best_hp["last_resnet_layer"]
-    descending = bool(args.order)
 
     ### Load config ###
     config_path = args.config
@@ -104,40 +112,57 @@ def main():
     ### Generate predictions ###
     su.section_header("Making predictions")
 
-    try:
-        zstack_dir = args.in_root
-        # Load data
-        zpaths = zs.zstack_paths_from_dir(zstack_dir, descending=descending)
-        x = data_prep.prep_inv_depth_imgs(zpaths, resnet_inp_shape[:-1])
-        # Convert to tensor before calling predict() to speed up execution
-        x = tf.convert_to_tensor(x, dtype="float")
+    # Load data
 
-        # Make predictions
-        # Probability predictions of each model
-        yhatp_m = np.array(
-            d.compute([d.delayed(m.predict)(x).squeeze()
-                        for m in inv_depth_models])[0]
-        ).T
-        # Mean probability predictions (ensemble predictions)
-        yhatp = np.mean(yhatp_m, axis=1, keepdims=True)
-        # Threshold probability predictions
-        yhat = (yhatp > cls_thresh).astype(np.int32)
-        print("... Predictions finished.")
+    test_path = zstack_paths[0]
+    if os.path.isdir(test_path) or helper.get_image_dims(test_path).Z > 1:
+        zstack_paths = zs.find_zstack_image_sequences(args.in_root)
+    else:
+        zstack_paths = zs.find_zstack_files(args.in_root)
 
-        # Save outputs
-        print("Saving results...")
-        output_file = pd.DataFrame({"img_name": [Path(zp).name for zp in zpaths],
-                        "inv_prob": yhatp.squeeze(), "inv_label": yhat.squeeze()})
-        out_csv_path = os.path.join(args.out_root, "invasion_depth_predictions.csv")
-        output_file.to_csv(out_csv_path, index=False)
-        print("... Results saved.")
+    images = []
+    image_names = []
+    for zsp in zstack_paths.values():
+        if isinstance(zsp, list):
+            for img_path in zsp:
+                images.append(helper.load_image(img_path, args.time, args.channel))
+                image_names.append(Path(zsp).stem)
+        else:
+            image = helper.load_image(zsp, args.time, args.channel)
+            if image.ndim == 2:
+                images.append(image)
+                image_names.append(Path(zsp).stem)
+            else:
+                for z in len(images):
+                    images.append(images[z])
+                    image_names.append(f"{Path(zsp).stem}_z{z}")
 
-        print(su.SFM.success)
-        su.section_footer()
+    x = data_prep.prep_inv_depth_imgs(images, resnet_inp_shape[:-1])
+    # Convert to tensor before calling predict() to speed up execution
+    x = tf.convert_to_tensor(x, dtype="float")
 
-    except Exception as e:
-        print(f"{su.SFM.failure} {e}")
-        sys.exit()
+    # Make predictions
+    # Probability predictions of each model
+    yhatp_m = np.array(
+        d.compute([d.delayed(m.predict)(x).squeeze()
+                    for m in inv_depth_models])[0]
+    ).T
+    # Mean probability predictions (ensemble predictions)
+    yhatp = np.mean(yhatp_m, axis=1, keepdims=True)
+    # Threshold probability predictions
+    yhat = (yhatp > cls_thresh).astype(np.int32)
+    print("... Predictions finished.")
+
+    # Save outputs
+    print("Saving results...")
+    output_file = pd.DataFrame({"img_name": image_names,
+                    "inv_prob": yhatp.squeeze(), "inv_label": yhat.squeeze()})
+    out_csv_path = os.path.join(args.out_root, "invasion_depth_predictions.csv")
+    output_file.to_csv(out_csv_path, index=False)
+    print("... Results saved.")
+
+    print(su.SFM.success)
+    su.section_footer()
 
 
 if __name__ == "__main__":
