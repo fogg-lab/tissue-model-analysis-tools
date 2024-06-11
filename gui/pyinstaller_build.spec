@@ -20,8 +20,8 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     name='tmat',
-    debug=True,
-    console=True,
+    debug=False,
+    console=False,
     icon="icon.ico",
     onefile=True,
 )
