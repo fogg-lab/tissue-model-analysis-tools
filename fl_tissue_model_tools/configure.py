@@ -20,7 +20,6 @@ import shutil
 import sys
 import re
 import configparser
-from glob import glob
 from urllib.request import urlretrieve
 
 from fl_tissue_model_tools import defs
