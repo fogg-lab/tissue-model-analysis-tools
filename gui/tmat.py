@@ -1,16 +1,11 @@
 import argparse
 from gooey import Gooey, GooeyParser
-from fl_tissue_model_tools import defs
-from fl_tissue_model_tools.configure import configure
 from fl_tissue_model_tools.scripts import (
     compute_branches,
     compute_cell_area,
     compute_inv_depth,
     compute_zproj,
 )
-from pathlib import Path
-
-USER_HOME = Path.home().resolve()
 
 
 def _strip_quotes(args: argparse.Namespace) -> argparse.Namespace:
@@ -22,11 +17,6 @@ def _strip_quotes(args: argparse.Namespace) -> argparse.Namespace:
 
 @Gooey
 def main():
-    # Make sure base directory is set up
-    base_dir = USER_HOME / defs.PKG_NAME
-    if not base_dir.exists():
-        configure(str(base_dir))
-
     parser = GooeyParser(description="Tissue model analysis tools")
     subparsers = parser.add_subparsers(dest="command")
 

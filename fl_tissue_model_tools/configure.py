@@ -105,91 +105,14 @@ def configure(target_base_dir: str = ""):
             print(f"Cannot create directory {target_base_dir}: Permission denied")
             sys.exit(1)
 
-    if not defs.PKG_CONFIG_DIR.exists():
-        repo_owner = "fogg-lab"
-        repo_name = "tissue-model-analysis-tools"
-        base_url = f"https://raw.githubusercontent.com/{repo_owner}/{repo_name}/main/"
-        print(f"...Retrieving scripts and script config files from github.com/{repo_owner}/{repo_name}")
-        # Must be using Pyinstaller executable. Download from GitHub
-        config_dir = Path(target_base_dir) / CFG_SUBDIR
-        config_dir.mkdir(exist_ok=True, parents=True)
-        scripts_dir = Path(target_base_dir) / SCRIPTS_SUBDIR
-        scripts_dir.mkdir(exist_ok=True)
-        model_dir = Path(target_base_dir) / MODEL_SUBDIR
-        model_dir.mkdir(exist_ok=True)
-        best_ensemble_dir = model_dir / "best_ensemble"
-        best_ensemble_dir.mkdir(exist_ok=True)
-        binary_seg_checkpoints_dir = model_dir / "binary_segmentation" / "checkpoints"
-        binary_seg_checkpoints_dir.mkdir(exist_ok=True, parents=True)
-        binary_seg_configs_dir = model_dir / "binary_segmentation" / "configs"
-        binary_seg_configs_dir.mkdir(exist_ok=True)
-        cfg_files = [
-            "config/default_branching_computation.json",
-            "config/default_cell_area_computation.json",
-            "config/default_invasion_depth_computation.json",
-        ]
-        for cfg_file in cfg_files:
-            urlretrieve(base_url + cfg_file, config_dir / Path(cfg_file).name)
-        script_files = [
-            "scripts/compute_branches.py",
-            "scripts/compute_cell_area.py",
-            "scripts/compute_inv_depth.py",
-            "scripts/compute_zproj.py",
-        ]
-        for script_file in script_files:
-            urlretrieve(base_url + script_file, scripts_dir / Path(script_file).name)
-        model_training_files = [
-            "model_training/invasion_depth_best_hp.json",
-            "model_training/invasion_depth_hp_space.json",
-            "model_training/invasion_depth_training_values.json",
-        ]
-        for model_training_file in model_training_files:
-            urlretrieve(
-                base_url + model_training_file,
-                model_dir / Path(model_training_file).name,
-            )
-        best_ensemble_files = [
-            "model_training/best_ensemble/best_finetune_weights_0.h5",
-            "model_training/best_ensemble/best_finetune_weights_1.h5",
-            "model_training/best_ensemble/best_finetune_weights_2.h5",
-            "model_training/best_ensemble/best_finetune_weights_3.h5",
-            "model_training/best_ensemble/best_finetune_weights_4.h5",
-            "model_training/best_ensemble/best_model_history_0.csv",
-            "model_training/best_ensemble/best_model_history_1.csv",
-            "model_training/best_ensemble/best_model_history_2.csv",
-            "model_training/best_ensemble/best_model_history_3.csv",
-            "model_training/best_ensemble/best_model_history_4.csv",
-        ]
-        for best_ensemble_file in best_ensemble_files:
-            urlretrieve(
-                base_url + best_ensemble_file,
-                best_ensemble_dir / Path(best_ensemble_file).name,
-            )
-        binary_seg_checkpoints_files = [
-            "model_training/binary_segmentation/checkpoints/checkpoint_1.h5",
-        ]
-        for binary_seg_checkpoints_file in binary_seg_checkpoints_files:
-            urlretrieve(
-                base_url + binary_seg_checkpoints_file,
-                binary_seg_checkpoints_dir / Path(binary_seg_checkpoints_file).name,
-            )
-        binary_seg_configs_files = [
-            "model_training/binary_segmentation/configs/unet_patch_segmentor_1.json",
-        ]
-        for binary_seg_configs_file in binary_seg_configs_files:
-            urlretrieve(
-                base_url + binary_seg_configs_file,
-                binary_seg_configs_dir / Path(binary_seg_configs_file).name,
-            )
-    else:
-        # Copy subdirectories into the base directory
-        for src_dir, dest_dir in [
-            (defs.PKG_CONFIG_DIR, CFG_SUBDIR),
-            (defs.PKG_SCRIPTS_DIR, SCRIPTS_SUBDIR),
-            (defs.PKG_MODEL_DIR, MODEL_SUBDIR),
-        ]:
-            dest_dir_path = Path(target_base_dir) / dest_dir
-            shutil.copytree(src_dir, dest_dir_path, dirs_exist_ok=True)
+    # Copy subdirectories into the base directory
+    for src_dir, dest_dir in [
+        (defs.PKG_CONFIG_DIR, CFG_SUBDIR),
+        (defs.PKG_SCRIPTS_DIR, SCRIPTS_SUBDIR),
+        (defs.PKG_MODEL_DIR, MODEL_SUBDIR),
+    ]:
+        dest_dir_path = Path(target_base_dir) / dest_dir
+        shutil.copytree(src_dir, dest_dir_path, dirs_exist_ok=True)
 
     if target_base_dir != prev_base_dir:
         # Update package config file with new base_dir
