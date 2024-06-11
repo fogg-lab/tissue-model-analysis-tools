@@ -4,13 +4,16 @@ import json
 from pathlib import Path
 from glob import glob
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-
 import numpy as np
 import dask as d
 import pandas as pd
-import tensorflow.keras.backend as K
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+os.environ["AUTOGRAPH_VERBOSITY"] = "2"
 import tensorflow as tf
+tf.get_logger().setLevel("ERROR")
+tf.autograph.set_verbosity(2)
+import tensorflow.keras.backend as K
 
 from fl_tissue_model_tools import models, data_prep, defs, helper
 from fl_tissue_model_tools import script_util as su
