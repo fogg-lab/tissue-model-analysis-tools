@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Sequence, Tuple, Union
 from numbers import Number
 import os
-from skimage.exposure import rescale_intensity
 
 import numpy as np
 import cv2
