@@ -137,8 +137,7 @@ def main():
 
     compute_branches_parser.add_argument(
         "--remove-isolated-branches",
-        type=bool,
-        default=False,
+        action="store_true",
         help=(
             "Whether to remove branches that are not connected to any other branches "
             "after the network is trimmed per the branch length constraints "
