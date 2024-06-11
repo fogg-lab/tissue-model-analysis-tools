@@ -1,4 +1,5 @@
 from pathlib import Path
+import sys
 import configparser
 import numpy as np
 
@@ -31,8 +32,14 @@ PKG_MODEL_DIR = PKG_BASE_DIR / 'model_training'
 # Get the user-specified base directory to store scripts, config, and output
 try:
     _user_base_dir = _pkg_config[PKG_NAME]['base_dir']
-except KeyError:
-    _user_base_dir = str(Path.home().resolve() / PKG_NAME)
+except KeyError as e:
+    # Might just mean that the user is running the Pyinstaller executable,
+    # and that Pyinstaller created a directory containing an executable + files
+    # If there is an "_internal" dir, we can safely assume this is the case.
+    _user_base_dir = str(Path(sys.executable).parent / "_internal")
+    if not Path(_user_base_dir).is_dir():
+        # The original error is probably the most appropriate to raise
+        raise e
 
 # Expand a user-relative base directory to an absolute path for current user
 if _user_base_dir.startswith('~'):
