@@ -38,6 +38,7 @@ exe = EXE(
     runtime_tmpdir=None,
     console=False,
     windowed=True,
+    onefile=True,
 )
 
 coll = COLLECT(
