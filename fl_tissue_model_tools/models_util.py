@@ -5,13 +5,15 @@ from numbers import Number
 import os
 from skimage.exposure import rescale_intensity
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-
 import numpy as np
 import cv2
 import dask as d
 
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+os.environ["AUTOGRAPH_VERBOSITY"] = "2"
 import tensorflow as tf
+tf.get_logger().setLevel("ERROR")
+tf.autograph.set_verbosity(2)
 import tensorflow.keras.backend as K
 from tensorflow.keras.utils import Sequence as KerasSequence
 from tensorflow.keras import Model, optimizers
