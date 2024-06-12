@@ -462,7 +462,7 @@ def analyze_img(
             writer = csv.writer(f, lineterminator="\n")
             writer.writerow(fields)
 
-        print(f"Results saved to {output_dir / output_file}.")
+        print(f"Results saved to {output_file}.")
 
 
 def main():
