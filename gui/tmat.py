@@ -1,5 +1,5 @@
 import argparse
-from gooey import Gooey, GooeyParser
+from gooey import Gooey, GooeyParser, local_resource_path
 from fl_tissue_model_tools.scripts import (
     compute_branches,
     compute_cell_area,
@@ -8,22 +8,19 @@ from fl_tissue_model_tools.scripts import (
 )
 
 
-def _strip_quotes(args: argparse.Namespace) -> argparse.Namespace:
-    """Strips quotes around in_root and out_root arguments (escaped by the interactive prompt)."""
-    args.in_root = args.in_root.strip("'").strip('"')
-    args.out_root = args.out_root.strip("'").strip('"')
-    return args
-
-
-@Gooey
+@Gooey(
+    program_name="Tissue Model Analysis Tools",
+    image_dir=local_resource_path("."),
+    navigation="TABBED",
+)
 def main():
     parser = GooeyParser(description="Tissue model analysis tools")
     subparsers = parser.add_subparsers(dest="command")
 
-    compute_branches_parser = subparsers.add_parser("analyze_microvessels")
-    compute_zproj_parser = subparsers.add_parser("make_z_projection")
-    compute_cell_area_parser = subparsers.add_parser("measure_cell_coverage_area")
-    compute_inv_depth_parser = subparsers.add_parser("predict_depth_of_invasion")
+    compute_branches_parser = subparsers.add_parser("Analyze ​Microvessels")
+    compute_zproj_parser = subparsers.add_parser("Z ​Project")
+    compute_cell_area_parser = subparsers.add_parser("Estimate ​Cell ​Coverage ​Area")
+    compute_inv_depth_parser = subparsers.add_parser("Predict Depth ​of ​Invasion")
 
     for subparser in [
         compute_branches_parser,
@@ -86,24 +83,28 @@ def main():
 
     compute_branches_parser.add_argument(
         "--graph-thresh-1",
+        nargs="+",
         type=float,
         default=5,
         help=(
             "This threshold controls how much of the morse graph is used to compute the number of branches. "
             "Lower values include more of the graph, and more branches are detected. "
             "Higher values include less of the graph, and fewer branches are detected."
+            "You can provide multiple values (separated by space characters) to test multiple thresholds."
         ),
     )
 
     compute_branches_parser.add_argument(
         "--graph-thresh-2",
+        nargs="+",
         type=float,
         default=10,
         help=(
             "This is the threshold for connecting branches, e.g. where it is "
             "ambiguous whether two branches are part of the same component. Lower "
             "values result in more connected branches, and higher values result in "
-            "more disconnections."
+            "more disconnections.\n"
+            "You can provide multiple values (separated by space characters) to test multiple thresholds."
         ),
     )
 
@@ -164,21 +165,24 @@ def main():
         default="max",
         choices=["min", "max", "med", "avg", "fs"],
         help=(
-            "Z projection method. If no argument supplied, defaults to 'max' "
-            "(focus stacking)."
+            "Z projection method. Defaults to 'max'.\n"
+            "min = Minimum intensity projection\n"
+            "max = Maximum intensity projection\n"
+            "med = Median intensity projection\n"
+            "avg = Average intensity projection\n"
+            "fs = Focus stacking"
         ),
     )
 
     args = parser.parse_args()
-    args = _strip_quotes(args)
 
-    if args.command == "analyze_microvessels":
+    if args.command == "Analyze ​Microvessels":
         compute_branches.main(args)
-    elif args.command == "make_z_projection":
+    elif args.command == "Z ​Project":
         compute_zproj.main(args)
-    elif args.command == "measure_cell_coverage_area":
+    elif args.command == "Estimate Cell​ Coverage​ Area":
         compute_cell_area.main(args)
-    elif args.command == "predict_depth_of_invasion":
+    elif args.command == "Predict ​Depth ​of ​Invasion":
         compute_inv_depth.main(args)
 
 
