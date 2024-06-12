@@ -272,14 +272,6 @@ def analyze_img(
         img_vess_zprojection = img_vess.max(axis=0)
         img_vess_zprojection[combined_buffer_mask] = 0
 
-        # Clean up projection by removing objects that are not vessel or tube-like,
-        # Objects with >25% coverage area inside bbox are removed.
-        labeled_vess_img = measure.label(img_vess_zprojection > 0)
-        props = measure.regionprops_table(labeled_vess_img, properties=["extent"])
-        extent = props["extent"]
-        extent = np.insert(extent, 0, 0)
-        img_vess_zprojection[extent[labeled_vess_img] > 0.25] = 0
-
         # Enhance centerlines and reduce variance
         vess_skel = medial_axis(img_vess_zprojection > 0)
         vess_skel_dil = dilation(vess_skel, disk(1))
