@@ -51,7 +51,10 @@ def main(args=None):
         args_prespecified = False
     else:
         args_prespecified = True
-    compute_cell_area = args.area
+    try:
+        compute_cell_area = args.area
+    except AttributeError:
+        compute_cell_area = False
 
     ### Verify input source ###
     if os.path.isfile(args.in_root):
