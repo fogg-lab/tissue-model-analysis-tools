@@ -1,4 +1,3 @@
-import argparse
 from gooey import Gooey, GooeyParser, local_resource_path
 from fl_tissue_model_tools.scripts import (
     compute_branches,
