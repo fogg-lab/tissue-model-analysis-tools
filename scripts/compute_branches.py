@@ -142,7 +142,7 @@ def analyze_img(
     print(f"Analyzing {img_path.stem}...")
     print("=========================================")
 
-    img = helper.load_image(img_path, channel_index, time_index)
+    img = helper.load_image(img_path, time_index, channel_index)
     n_dims = img.ndim
 
     # Create directory for intermediate outputs
@@ -462,7 +462,7 @@ def analyze_img(
             writer = csv.writer(f, lineterminator="\n")
             writer.writerow(fields)
 
-        print(f"Results saved to {output_dir / output_file}.")
+        print(f"Results saved to {output_file}.")
 
 
 def main(args=None):
