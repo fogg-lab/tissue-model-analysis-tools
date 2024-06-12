@@ -142,7 +142,7 @@ def analyze_img(
     print(f"Analyzing {img_path.stem}...")
     print("=========================================")
 
-    img = helper.load_image(img_path, channel_index, time_index)
+    img = helper.load_image(img_path, time_index, channel_index)
     n_dims = img.ndim
 
     # Create directory for intermediate outputs
