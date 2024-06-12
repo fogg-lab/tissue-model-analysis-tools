@@ -272,8 +272,12 @@ def parse_zproj_args() -> argparse.Namespace:
         default="max",
         choices=["min", "max", "med", "avg", "fs"],
         help=(
-            "Z projection method. If no argument supplied, defaults to 'max' "
-            "(focus stacking)."
+            "Z projection method. If no argument supplied, defaults to 'max'.\n"
+            "min = Minimum intensity projection\n"
+            "max = Maximum intensity projection\n"
+            "med = Median intensity projection\n"
+            "avg = Average intensity projection\n"
+            "fs = Focus stacking"
         ),
     )
 
