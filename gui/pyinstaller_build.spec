@@ -4,6 +4,10 @@
 
 from PyInstaller.utils.hooks import collect_data_files, collect_all
 
+import distributed
+import os.path as osp
+distributed_yml_path = osp.join(osp.dirname(distributed.__file__), "distributed.yaml")
+
 block_cipher = None
 
 a = Analysis(
@@ -11,6 +15,7 @@ a = Analysis(
     pathex=['.'],
     binaries=[],
     datas=collect_data_files('xmlschema', include_py_files=True) + [
+        (distributed_yml_path, 'distributed'),
         ('../config/default_branching_computation.json', 'config'),
         ('../config/default_cell_area_computation.json', 'config'),
         ('../config/default_invasion_depth_computation.json', 'config'),
@@ -34,7 +39,7 @@ a = Analysis(
         ('../model_training/binary_segmentation/checkpoints/checkpoint_1.h5', 'model_training/binary_segmentation/checkpoints'),
         ('../model_training/binary_segmentation/configs/unet_patch_segmentor_1.json', 'model_training/binary_segmentation/configs'),
     ],
-    hiddenimports=['xsdata_pydantic_basemodel.hooks', 'xsdata_pydantic_basemodel.hooks.class_type', 'PIL._tkinter_finder', 'tensorflow.python._pywrap_tensorflow_internal'],
+    hiddenimports=['xsdata_pydantic_basemodel.hooks', 'xsdata_pydantic_basemodel.hooks.class_type', 'PIL._tkinter_finder'],
     hookspath=[],
     runtime_hooks=[],
     excludes=[],

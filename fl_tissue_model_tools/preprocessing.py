@@ -72,10 +72,8 @@ def exec_threshold(
         mask_idx = tuple(np.indices(masked.shape).reshape(2, -1))
     pixels = masked[mask_idx][:, np.newaxis]
 
-    # print(pixels.shape, pixels.min(), pixels.max(), pixels.mean(), pixels.std())
-    # print(masked.shape, masked.min(), masked.max(), masked.mean(), masked.std())
-
     gm = GaussianMixture(n_components=2, random_state=rand_state)
+
     gm = gm.fit(pixels)
 
     # Get GMM components
