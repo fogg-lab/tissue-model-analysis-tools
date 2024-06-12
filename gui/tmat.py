@@ -9,7 +9,7 @@ from fl_tissue_model_tools.scripts import (
 
 @Gooey(
     program_name="Tissue Model Analysis Tools",
-    image_dir=local_resource_path("."),
+    image_dir=local_resource_path("./images"),
     navigation="TABBED",
 )
 def main():
