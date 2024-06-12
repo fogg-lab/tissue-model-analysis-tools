@@ -458,7 +458,7 @@ def analyze_img(
         output_file = output_dir / f"branching_analysis{tuned_str}.csv"
         if not output_file.is_file():
             create_output_csv(output_file)
-        with open(output_dir / output_file, "a", encoding="utf-16") as f:
+        with open(output_file, "a", encoding="utf-16") as f:
             writer = csv.writer(f, lineterminator="\n")
             writer.writerow(fields)
 
