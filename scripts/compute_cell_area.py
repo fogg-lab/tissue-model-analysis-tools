@@ -253,7 +253,7 @@ def main(args=None):
 
     for img_paths in chunks(all_img_paths, batch_size):
         try:
-            gs_ds_imgs = prep_images(img_paths, dsamp_size)
+            gs_ds_imgs = prep_images(img_paths, dsamp_size, T=args.T, C=args.C)
         except OSError as error:
             print(f"{su.SFM.failure}{error}", flush=True)
             sys.exit()
