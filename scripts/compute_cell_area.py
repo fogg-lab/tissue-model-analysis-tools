@@ -10,6 +10,7 @@ import pandas as pd
 from skimage.exposure import rescale_intensity
 
 from fl_tissue_model_tools import defs
+from fl_tissue_model_tools import helper
 from fl_tissue_model_tools import preprocessing as prep
 from fl_tissue_model_tools import script_util as su
 from fl_tissue_model_tools.well_mask_generation import generate_well_mask
@@ -19,22 +20,32 @@ THRESH_SUBDIR = "thresholded"
 CALC_SUBDIR = "calculations"
 
 
-def load_img(img_path: str, dsamp_size: Optional[int] = None) -> npt.NDArray:
+def load_img(
+    img_path: str,
+    dsamp_size: Optional[int] = None,
+    T: Optional[int] = None,
+    C: Optional[int] = None,
+) -> npt.NDArray:
     """Load and optionally downsample image.
 
     Args:
         img_path: Path to image.
         dsize: If downsampling image, size to downsample to.
+        T (int, optional): Index of the time to use (needed if time series).
+        C (int, optional): Index of the color channel to use (needed if multi channel).
 
     Returns:
         Loaded and (optionally) downsampled image.
 
     """
 
-    img = cv2.imread(img_path, cv2.IMREAD_ANYDEPTH)
+    img = helper.load_image(img_path, T, C)
+    if img.ndim == 3:
+        # Max projection
+        img = img.max(0)
     if dsamp_size is not None:
         dsamp_ratio = dsamp_size / max(img.shape)
-        dsize = tuple(np.round(np.multiply(img.shape[:2], dsamp_ratio)).astype(int))
+        dsize = tuple(np.round(np.multiply(img.shape, dsamp_ratio)).astype(int))
         img = cv2.resize(img, dsize, cv2.INTER_AREA)
     return img
 
@@ -69,12 +80,19 @@ def mask_and_threshold(
     return (masked_and_thresholded > 0).astype(np.uint8) * defs.MAX_UINT8
 
 
-def prep_images(img_paths: Sequence[str], dsamp_size: int) -> List[npt.NDArray]:
+def prep_images(
+    img_paths: Sequence[str],
+    dsamp_size: int,
+    T: Optional[int] = None,
+    C: Optional[int] = None,
+) -> List[npt.NDArray]:
     """Create grayscale, downsampled versions of original images.
 
     Args:
         img_paths: Paths to each image.
         dsamp_size: Image size after downsampling.
+        T (int, optional): Index of the time to use (needed if time series).
+        C (int, optional): Index of the color channel to use (needed if multi channel).
 
     Returns:
         Downsampled, grayscale versions of initial images.
@@ -173,20 +191,16 @@ def compute_areas(
     return area_prop
 
 
-def main(args=None):
+def main():
     """Computes cell area and saves to output directory."""
 
-    if args is None:
-        args = su.parse_cell_area_args(
-            {
-                "thresh_subdir": THRESH_SUBDIR,
-                "calc_subdir": CALC_SUBDIR,
-                "default_config_path": DEFAULT_CONFIG_PATH,
-            }
-        )
-        args_prespecified = False
-    else:
-        args_prespecified = True
+    args = su.parse_cell_area_args(
+        {
+            "thresh_subdir": THRESH_SUBDIR,
+            "calc_subdir": CALC_SUBDIR,
+            "default_config_path": DEFAULT_CONFIG_PATH,
+        }
+    )
 
     ### Verify input source ###
     try:
@@ -203,7 +217,7 @@ def main(args=None):
         sys.exit()
 
     ### Load config ###
-    config_path = DEFAULT_CONFIG_PATH if args_prespecified else args.config
+    config_path = args.config
     try:
         config = su.cell_area_verify_config_file(config_path)
     except FileNotFoundError as error:
@@ -269,23 +283,21 @@ def main(args=None):
             # Save masked image
             out_img = all_well_masks[i]
             out_path = os.path.join(
-                args.out_root, THRESH_SUBDIR, f"{img_id}_well_mask.png"
+                args.out_root, THRESH_SUBDIR, f"{img_id}_well_mask.png", flush=True
             )
             cv2.imwrite(out_path, out_img)
         # Save thresholded image
         out_img = gmm_thresh_all[i].astype(np.uint8)
         out_path = os.path.join(
-            args.out_root, THRESH_SUBDIR, f"{img_id}_thresholded.png"
+            args.out_root, THRESH_SUBDIR, f"{img_id}_thresholded.png", flush=True
         )
         cv2.imwrite(out_path, out_img)
 
     if args.detect_well:
-        print(
-            f"... Well masks saved to:{os.linesep}\t{args.out_root}/{THRESH_SUBDIR}",
-            flush=True,
-        )
+        print(f"... Well masks saved to:{os.linesep}\t{args.out_root}/{THRESH_SUBDIR}", flush=True)
     print(
-        f"... Thresholded images saved to:{os.linesep}\t{args.out_root}/{THRESH_SUBDIR}"
+        f"... Thresholded images saved to:{os.linesep}\t{args.out_root}/{THRESH_SUBDIR}",
+        flush=True,
     )
 
     area_out_path = os.path.join(args.out_root, CALC_SUBDIR, "cell_area.csv")
