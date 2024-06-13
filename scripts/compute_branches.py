@@ -137,6 +137,7 @@ def analyze_img(
     time_index = config.get("time", None)
     channel_index = config.get("channel", None)
 
+    print("HERE1")
     print("")
     print("=========================================")
     print(f"Analyzing {img_path.stem}...")
@@ -222,6 +223,7 @@ def analyze_img(
             x1, y1 = bbox["bbox-2"], bbox["bbox-3"]
             # Calculate (squared) length of regions bbox diagonals
             diag_lengths = (x0 - x1) ** 2 + (y0 - y1) ** 2
+            # The labels start at 1 (0 is background). Prepend 0 to index by label
             diag_lengths = np.insert(diag_lengths, 0, 0)
             slice_region_labels[~maxima[z]] = 0
             cur_bbox_diag = diag_lengths[slice_region_labels]
@@ -271,6 +273,31 @@ def analyze_img(
         # Max-project img_vess and zero-out the buffer region to separate objects
         img_vess_zprojection = img_vess.max(axis=0)
         img_vess_zprojection[combined_buffer_mask] = 0
+
+        # Clean up projection by removing objects that won't qualify as vessels
+        # (objects whose medial axis has a bbox diagonal length below min_branch_length)
+        labeled_vess_img = measure.label(img_vess_zprojection > 0)
+        skel_vess_img = medial_axis(labeled_vess_img > 0).astype(int)
+        skel_vess_img = dilation(skel_vess_img, disk(1))
+        skel_vess_img[labeled_vess_img == 0] = 0
+        skel_vess_img[skel_vess_img > 0] = labeled_vess_img[skel_vess_img > 0]
+        bbox = measure.regionprops_table(
+            label_image=skel_vess_img,
+            properties=["bbox"],
+        )
+        x0, y0 = bbox["bbox-0"], bbox["bbox-1"]
+        x1, y1 = bbox["bbox-2"], bbox["bbox-3"]
+        diag_lengths = (x0 - x1) ** 2 + (y0 - y1) ** 2
+        # The labels start at 1 (0 is background). Prepend 0 to index by label
+        diag_lengths = np.insert(diag_lengths, 0, 0)
+        thresh = microns_to_pixels(
+            min_branch_length, skel_vess_img.shape[1], image_width_microns
+        )
+        # Square the threshold (we skipped sqrt in the calculation of diag_lengths)
+        print(f"Thresholding at {round(thresh, 2)} pixels, {skel_vess_img.shape=}")
+        thresh **= 2
+        exclude_mask = diag_lengths[labeled_vess_img] < thresh
+        img_vess_zprojection[exclude_mask] = 0
 
         # Enhance centerlines and reduce variance
         vess_skel = medial_axis(img_vess_zprojection > 0)
@@ -333,10 +360,7 @@ def analyze_img(
         ).astype(np.float32)
 
         pruning_mask = resize(
-            pruning_mask,
-            img_dsamp_res,
-            order=0,
-            preserve_range=True
+            pruning_mask, img_dsamp_res, order=0, preserve_range=True
         ).astype(bool)
 
     if use_well_mask:
@@ -384,9 +408,7 @@ def analyze_img(
         max_branch_length_px = (
             None
             if max_branch_length is None
-            else microns_to_pixels(
-                max_branch_length, img.shape[1], image_width_microns
-            )
+            else microns_to_pixels(max_branch_length, img.shape[1], image_width_microns)
         )
         if max_branch_length_px is not None:
             max_branch_length_px = round(max(1, max_branch_length_px))
