@@ -221,7 +221,7 @@ def generate_well_mask(image: npt.NDArray, mask_val: Integral=1,
         found_superellipse = True
     except Exception:
         traceback.print_exc()
-        print("Falling back to convex hull well mask.")
+        print("Falling back to convex hull well mask.", flush=True)
 
     # Prepare the mask
     well_mask = well_mask.astype(np.uint8) * mask_val

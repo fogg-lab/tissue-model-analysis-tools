@@ -89,7 +89,7 @@ def make_well_mask(img: np.ndarray, use_well_mask: bool):
     """
 
     if use_well_mask:
-        print("Applying mask to image...")
+        print("Applying mask to image...", flush=True)
         well_mask = generate_well_mask(img, return_superellipse_params=True)
     else:
         well_mask = np.full_like(img, fill_value=True, dtype=bool)
@@ -137,11 +137,10 @@ def analyze_img(
     time_index = config.get("time", None)
     channel_index = config.get("channel", None)
 
-    print("HERE1")
-    print("")
-    print("=========================================")
-    print(f"Analyzing {img_path.stem}...")
-    print("=========================================")
+    print("", flush=True)
+    print("=========================================", flush=True)
+    print(f"Analyzing {img_path.stem}...", flush=True)
+    print("=========================================", flush=True)
 
     img = helper.load_image(img_path, time_index, channel_index)
     n_dims = img.ndim
@@ -294,7 +293,10 @@ def analyze_img(
             min_branch_length, skel_vess_img.shape[1], image_width_microns
         )
         # Square the threshold (we skipped sqrt in the calculation of diag_lengths)
-        print(f"Thresholding at {round(thresh, 2)} pixels, {skel_vess_img.shape=}")
+        print(
+            f"Thresholding at {round(thresh, 2)} pixels, {skel_vess_img.shape=}",
+            flush=True,
+        )
         thresh **= 2
         exclude_mask = diag_lengths[labeled_vess_img] < thresh
         img_vess_zprojection[exclude_mask] = 0
@@ -325,8 +327,8 @@ def analyze_img(
         well_mask, shrunken_well_mask = make_well_mask(img, use_well_mask)
         pruning_mask = np.logical_not(shrunken_well_mask)
 
-        print("")
-        print("Segmenting image...")
+        print("", flush=True)
+        print("Segmenting image...", flush=True)
 
         pred = model.predict(img * well_mask, auto_resample=False)
 
@@ -399,7 +401,7 @@ def analyze_img(
 
         if n_dims == 2:
             img = pred
-            print("\nComputing graph and barcode...")
+            print("\nComputing graph and barcode...", flush=True)
 
         min_branch_length_px = microns_to_pixels(
             min_branch_length, img.shape[1], image_width_microns
@@ -428,7 +430,7 @@ def analyze_img(
                 pruning_mask=pruning_mask,
             )
         except nxPointlessConceptException:
-            print(f"No branches found for {img_path.stem}.")
+            print(f"No branches found for {img_path.stem}.", flush=True)
             return
 
         # Save barcode and Morse tree visualization
@@ -448,7 +450,7 @@ def analyze_img(
         plt.savefig(save_path, dpi=300, bbox_inches="tight", pad_inches=0)
         plt.close("all")
 
-        print("\nComputing branch statistics...")
+        print("\nComputing branch statistics...", flush=True)
 
         # Get total and average branch length
         total_branch_length = morse_graph.get_total_branch_length()
@@ -476,7 +478,7 @@ def analyze_img(
             writer = csv.writer(f, lineterminator="\n")
             writer.writerow(fields)
 
-        print(f"Results saved to {output_file}.")
+        print(f"Results saved to {output_file}.", flush=True)
 
 
 def main(args=None):
@@ -489,7 +491,9 @@ def main(args=None):
         args = su.parse_branching_args(arg_defaults)
         ### Load/validate config ###
         if not Path(args.config).is_file():
-            print(f"{su.SFM.failure}Config file {args.config} does not exist.")
+            print(
+                f"{su.SFM.failure}Config file {args.config} does not exist.", flush=True
+            )
             sys.exit()
         with open(args.config, "r", encoding="utf8") as config_fp:
             config = json.load(config_fp)
@@ -510,13 +514,19 @@ def main(args=None):
         model_cfg_path = str(model_cfg_dir / f"unet_patch_segmentor_{last_exp}.json")
 
     if not Path(model_cfg_path).is_file():
-        print(f"{su.SFM.failure}Model config file {model_cfg_path} does not exist.")
+        print(
+            f"{su.SFM.failure}Model config file {model_cfg_path} does not exist.",
+            flush=True,
+        )
         sys.exit()
 
     ### Verify input and output directories ###
     input_dir = Path(args.in_root)
     if not input_dir.exists():
-        print(f"{su.SFM.failure}Input directory {args.in_root} does not exist.")
+        print(
+            f"{su.SFM.failure}Input directory {args.in_root} does not exist.",
+            flush=True,
+        )
         sys.exit()
 
     output_dir = Path(args.out_root)
@@ -531,7 +541,7 @@ def main(args=None):
     img_paths = glob(str(input_dir / "*"))
 
     if not img_paths:
-        print(f"{su.SFM.failure}No images found in {input_dir}")
+        print(f"{su.SFM.failure}No images found in {input_dir}", flush=True)
         sys.exit()
 
     ### Load model ###

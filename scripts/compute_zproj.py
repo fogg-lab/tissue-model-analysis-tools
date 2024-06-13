@@ -58,17 +58,17 @@ def main(args=None):
 
     ### Verify input source ###
     if os.path.isfile(args.in_root):
-        print(f"{su.SFM.failure} Input directory is a file: {args.in_root}")
+        print(f"{su.SFM.failure} Input directory is a file: {args.in_root}", flush=True)
         sys.exit(1)
 
     if not os.path.isdir(args.in_root):
-        print(f"{su.SFM.failure} Input directory does not exist: {args.in_root}")
+        print(f"{su.SFM.failure} Input directory does not exist: {args.in_root}", flush=True)
         sys.exit(1)
 
     zstack_paths = glob(os.path.join(args.in_root, "*"))
 
     if len(zstack_paths) == 0:
-        print(f"{su.SFM.failure} Input directory is empty: {args.in_root}")
+        print(f"{su.SFM.failure} Input directory is empty: {args.in_root}", flush=True)
         sys.exit(1)
 
     test_path = zstack_paths[0]
@@ -81,14 +81,14 @@ def main(args=None):
     try:
         su.zproj_verify_output_dir(args.out_root)
     except PermissionError as error:
-        print(f"{su.SFM.failure} {error}")
+        print(f"{su.SFM.failure} {error}", flush=True)
         sys.exit()
 
     ### Compute Z projections ###
     su.section_header("Constructing Z projections")
 
     proj_method = proj_methods[args.method]
-    print("Loading and computing Z stacks...")
+    print("Loading and computing Z stacks...", flush=True)
     try:
         # zprojs: A dictionary of Z projections, keyed by Z stack ID.
         zprojs = {
@@ -96,10 +96,10 @@ def main(args=None):
             for (zs_id, zsp) in zstack_paths.items()
         }
     except OSError as error:
-        print(f"{su.SFM.failure}{error}")
+        print(f"{su.SFM.failure}{error}", flush=True)
         sys.exit()
 
-    print("... Projections computed.")
+    print("... Projections computed.", flush=True)
 
     ### Save Z projections ###
 
@@ -108,15 +108,15 @@ def main(args=None):
     if out_ext not in (".tif", ".tiff", ".png"):
         out_ext = ".tiff"
 
-    print(f"{os.linesep}Saving projections...")
+    print(f"{os.linesep}Saving projections...", flush=True)
     for z_id, zproj in zprojs.items():
         cv2.imwrite(
             os.path.join(args.out_root, f"{z_id}_{args.method}_{out_ext}"), zproj
         )
 
-    print("... Projections saved.")
-    print(su.SFM.success)
-    print(su.END_SEPARATOR)
+    print("... Projections saved.", flush=True)
+    print(su.SFM.success, flush=True)
+    print(su.END_SEPARATOR, flush=True)
 
     if compute_cell_area:
         if args_prespecified:
