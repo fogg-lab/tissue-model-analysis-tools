@@ -72,7 +72,7 @@ def main(args=None):
         sys.exit(1)
 
     test_path = zstack_paths[0]
-    if os.path.isdir(test_path) or helper.get_image_dims(test_path).Z > 1:
+    if os.path.isdir(test_path) or helper.get_image_dims(test_path).Z == 1:
         zstack_paths = zs.find_zstack_image_sequences(args.in_root)
     else:
         zstack_paths = zs.find_zstack_files(args.in_root)

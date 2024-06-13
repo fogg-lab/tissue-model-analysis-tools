@@ -99,7 +99,10 @@ def prep_images(
 
     """
     gs_ds_imgs = d.compute(
-        [d.delayed(load_img)(img_p, dsamp_size=dsamp_size) for img_p in img_paths]
+        [
+            d.delayed(load_img)(img_p, dsamp_size=dsamp_size, T=T, C=C)
+            for img_p in img_paths
+        ]
     )[0]
     return gs_ds_imgs
 
@@ -250,7 +253,7 @@ def main(args=None):
 
     for img_paths in chunks(all_img_paths, batch_size):
         try:
-            gs_ds_imgs = prep_images(img_paths, dsamp_size)
+            gs_ds_imgs = prep_images(img_paths, dsamp_size, T=args.time, C=args.channel)
         except OSError as error:
             print(f"{su.SFM.failure}{error}", flush=True)
             sys.exit()
@@ -287,18 +290,21 @@ def main(args=None):
             # Save masked image
             out_img = all_well_masks[i]
             out_path = os.path.join(
-                args.out_root, THRESH_SUBDIR, f"{img_id}_well_mask.png", flush=True
+                args.out_root, THRESH_SUBDIR, f"{img_id}_well_mask.png"
             )
             cv2.imwrite(out_path, out_img)
         # Save thresholded image
         out_img = gmm_thresh_all[i].astype(np.uint8)
         out_path = os.path.join(
-            args.out_root, THRESH_SUBDIR, f"{img_id}_thresholded.png", flush=True
+            args.out_root, THRESH_SUBDIR, f"{img_id}_thresholded.png"
         )
         cv2.imwrite(out_path, out_img)
 
     if args.detect_well:
-        print(f"... Well masks saved to:{os.linesep}\t{args.out_root}/{THRESH_SUBDIR}", flush=True)
+        print(
+            f"... Well masks saved to:{os.linesep}\t{args.out_root}/{THRESH_SUBDIR}",
+            flush=True,
+        )
     print(
         f"... Thresholded images saved to:{os.linesep}\t{args.out_root}/{THRESH_SUBDIR}",
         flush=True,
