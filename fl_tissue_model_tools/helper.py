@@ -5,7 +5,6 @@ from pathlib import Path
 
 # Before importing aicsimageio, ignore warning about Java from `bfio.backends`
 import logging
-
 logging.getLogger("bfio.backends").setLevel(logging.ERROR)
 from aicsimageio import AICSImage
 from aicsimageio.dimensions import Dimensions
