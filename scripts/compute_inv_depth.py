@@ -126,7 +126,7 @@ def main():
         if isinstance(zsp, list):
             for img_path in zsp:
                 images.append(helper.load_image(img_path, args.time, args.channel))
-                image_names.append(Path(zsp).stem)
+                image_names.append(Path(img_path).stem)
         else:
             image = helper.load_image(zsp, args.time, args.channel)
             if image.ndim == 2:
