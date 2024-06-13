@@ -99,7 +99,10 @@ def prep_images(
 
     """
     gs_ds_imgs = d.compute(
-        [d.delayed(load_img)(img_p, dsamp_size=dsamp_size) for img_p in img_paths]
+        [
+            d.delayed(load_img)(img_p, dsamp_size=dsamp_size, T=T, C=C)
+            for img_p in img_paths
+        ]
     )[0]
     return gs_ds_imgs
 
