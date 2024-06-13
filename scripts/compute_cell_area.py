@@ -191,16 +191,20 @@ def compute_areas(
     return area_prop
 
 
-def main():
+def main(args=None):
     """Computes cell area and saves to output directory."""
 
-    args = su.parse_cell_area_args(
-        {
-            "thresh_subdir": THRESH_SUBDIR,
-            "calc_subdir": CALC_SUBDIR,
-            "default_config_path": DEFAULT_CONFIG_PATH,
-        }
-    )
+    if args is None:
+        args = su.parse_cell_area_args(
+            {
+                "thresh_subdir": THRESH_SUBDIR,
+                "calc_subdir": CALC_SUBDIR,
+                "default_config_path": DEFAULT_CONFIG_PATH,
+            }
+        )
+        args_prespecified = False
+    else:
+        args_prespecified = True
 
     ### Verify input source ###
     try:
@@ -217,7 +221,7 @@ def main():
         sys.exit()
 
     ### Load config ###
-    config_path = args.config
+    config_path = DEFAULT_CONFIG_PATH if args_prespecified else args.config
     try:
         config = su.cell_area_verify_config_file(config_path)
     except FileNotFoundError as error:
