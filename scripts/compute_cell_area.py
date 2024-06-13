@@ -290,18 +290,21 @@ def main(args=None):
             # Save masked image
             out_img = all_well_masks[i]
             out_path = os.path.join(
-                args.out_root, THRESH_SUBDIR, f"{img_id}_well_mask.png", flush=True
+                args.out_root, THRESH_SUBDIR, f"{img_id}_well_mask.png"
             )
             cv2.imwrite(out_path, out_img)
         # Save thresholded image
         out_img = gmm_thresh_all[i].astype(np.uint8)
         out_path = os.path.join(
-            args.out_root, THRESH_SUBDIR, f"{img_id}_thresholded.png", flush=True
+            args.out_root, THRESH_SUBDIR, f"{img_id}_thresholded.png"
         )
         cv2.imwrite(out_path, out_img)
 
     if args.detect_well:
-        print(f"... Well masks saved to:{os.linesep}\t{args.out_root}/{THRESH_SUBDIR}", flush=True)
+        print(
+            f"... Well masks saved to:{os.linesep}\t{args.out_root}/{THRESH_SUBDIR}",
+            flush=True,
+        )
     print(
         f"... Thresholded images saved to:{os.linesep}\t{args.out_root}/{THRESH_SUBDIR}",
         flush=True,
