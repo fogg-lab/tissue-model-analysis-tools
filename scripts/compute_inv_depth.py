@@ -133,7 +133,7 @@ def main(args=None):
     for zsp in zstack_paths.values():
         if isinstance(zsp, list):
             for img_path in zsp:
-                image = helper.load_image(img_path, args.time, args.channel)
+                image = helper.load_image(img_path, args.time, args.channel)[0]
                 if image.ndim == 2:
                     images.append(image)
                     image_names.append(Path(img_path).stem)
@@ -142,7 +142,7 @@ def main(args=None):
                         images.append(image[z])
                         image_names.append(f"{Path(img_path).stem}_z{z}")
         else:
-            image = helper.load_image(zsp, args.time, args.channel)
+            image = helper.load_image(zsp, args.time, args.channel)[0]
             if image.ndim == 2:
                 images.append(image)
                 image_names.append(Path(zsp).stem)

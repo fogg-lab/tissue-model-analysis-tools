@@ -21,9 +21,11 @@ class SFM:
     red = "\u001b[31m"
     green = "\u001b[32m"
     cyan = "\u001b[36m"
+    yellow = "\u001b[93m"
     reset = "\u001b[0m"
     success = f"{green}[SUCCESS]{reset}"
     failure = f"{red}[FAILURE]{reset}"
+    warning = f"{yellow}[WARNING]{reset}"
     all_succeeded = f"{green}[ALL SUCCEEDED]{reset}"
     failures_present = f"{red}[FAILURES PRESENT]{reset}"
 

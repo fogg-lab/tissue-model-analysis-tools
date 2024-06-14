@@ -56,7 +56,7 @@ def load_inv_depth_img(
     Returns:
         Preprocessed invasion depth image.
     """
-    img = helper.load_image(image, T, C) if isinstance(image, str) else image
+    img = helper.load_image(image, T, C)[0] if isinstance(image, str) else image
     img = cv2.resize(img, img_hw, cv2.INTER_LANCZOS4)
     img = rescale_intensity(img, out_range=(0, 255))
     img = np.repeat(img[:, :, np.newaxis], 3, axis=2)

@@ -39,7 +39,7 @@ def load_img(
 
     """
 
-    img = helper.load_image(img_path, T, C)
+    img = helper.load_image(img_path, T, C)[0]
     if img.ndim == 3:
         # Max projection
         img = img.max(0)
