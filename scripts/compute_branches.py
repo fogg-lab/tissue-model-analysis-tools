@@ -127,23 +127,33 @@ def analyze_img(
         output_dir (pathlib.Path): Directory to save results to.
     """
 
-    image_width_microns = config.get("image_width_microns", 1000.0)
-    graph_thresh_1 = config.get("graph_thresh_1", 2)
-    graph_thresh_2 = config.get("graph_thresh_2", 4)
-    graph_smoothing_window = config.get("graph_smoothing_window", 10)
-    min_branch_length = config.get("min_branch_length", 10)
-    max_branch_length = config.get("max_branch_length", None)
+    image_width_microns = config.get("image_width_microns")
+    graph_thresh_1 = config.get("graph_thresh_1", 5)
+    graph_thresh_2 = config.get("graph_thresh_2", 10)
+    graph_smoothing_window = config.get("graph_smoothing_window", 12)
+    min_branch_length = config.get("min_branch_length", 12)
+    max_branch_length = config.get("max_branch_length")
     remove_isolated_branches = config.get("remove_isolated_branches", False)
-    time_index = config.get("time", None)
-    channel_index = config.get("channel", None)
+    time_index = config.get("time")
+    channel_index = config.get("channel")
 
     print("")
     print("=========================================")
     print(f"Analyzing {img_path.stem}...")
     print("=========================================")
 
-    img = helper.load_image(img_path, time_index, channel_index)
+    img, pix_sizes = helper.load_image(img_path, time_index, channel_index)
     n_dims = img.ndim
+
+    if image_width_microns is None:
+        # Use pixel size from image metadata if available
+        if pix_sizes.X is None:
+            print(f"{su.SFM.warning} image_width_microns not provided in the config, "
+                  "and could not be inferred from the image metadata. "
+                  "using arbitrary value of 1000 microns.")
+            image_width_microns = 1000
+        else:
+            image_width_microns = img.shape[-1] * pix_sizes.X
 
     # Create directory for intermediate outputs
     vis_dir = output_dir / "visualizations" / img_path.stem
