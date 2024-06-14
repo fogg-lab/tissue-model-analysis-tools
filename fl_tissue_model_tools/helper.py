@@ -8,20 +8,27 @@ import logging
 logging.getLogger("bfio.backends").setLevel(logging.ERROR)
 from aicsimageio import AICSImage
 from aicsimageio.dimensions import Dimensions
+from aicsimageio.types import PhysicalPixelSizes
 from aicsimageio.exceptions import UnsupportedFileFormatError
+from numpy.typing import NDArray
 
 from fl_tissue_model_tools.defs import SUPPORTED_IMAGE_FORMATS
 
 
-def load_image(file_path: str, T: Optional[int] = None, C: Optional[int] = None):
-    """Load image from path using AICSImage.
+def load_image(
+    file_path: str, T: Optional[int] = None, C: Optional[int] = None
+) -> tuple[NDArray, PhysicalPixelSizes]:
+    """Load ZYX or YX image from path using AICSImage.
 
     Args:
         file_path (str): Path to image.
         T (int, optional): Index of the time to use (needed if time series).
         C (int, optional): Index of the color channel to use (needed if multi channel).
 
-    Returns: np.ndarray: ZYX or YX image for 2D (if there is only 1 Z slice).
+    Returns:
+        np.ndarray: ZYX or YX image for 2D (if there is only 1 Z slice).
+        PhysicalPixelSizes: Physical pixel sizes, most likely in microns. If unparsable,
+                            returns `PhysicalPixelSizes(Z=None, Y=None, X=None)`.
     """
 
     try:
@@ -36,27 +43,37 @@ def load_image(file_path: str, T: Optional[int] = None, C: Optional[int] = None)
     # Time-Channel-Z-Y-X
     if T is None:
         if img_reader.dims.T > 1:
-            raise ValueError(f"{file_path} is a time series image "
-                             "but no time index was specified.")
+            raise ValueError(
+                f"{file_path} is a time series image "
+                "but no time index was specified."
+            )
         T = 0
     elif T >= img_reader.dims.T or T < 0:
-        raise ValueError(f"Time {T} is out of range for {file_path} "
-                         f"with times: 0 - {img_reader.T - 1}")
+        raise ValueError(
+            f"Time {T} is out of range for {file_path} "
+            f"with times: 0 - {img_reader.T - 1}"
+        )
 
     if C is None:
         if img_reader.dims.C > 1:
-            raise ValueError(f"{file_path} is a multi channel image "
-                             "but no color channel index was specified.")
+            raise ValueError(
+                f"{file_path} is a multi channel image "
+                "but no color channel index was specified."
+            )
         C = 0
     elif C >= img_reader.dims.C or C < 0:
-        raise ValueError(f"Color channel {C} is out of range for {file_path} "
-                         f"with color channels: 0 - {img_reader.C - 1}")
+        raise ValueError(
+            f"Color channel {C} is out of range for {file_path} "
+            f"with color channels: 0 - {img_reader.C - 1}"
+        )
 
-    image = img_reader.get_image_data("ZYX", T = T, C = C)
+    pixel_sizes = img_reader.physical_pixel_sizes
+    image = img_reader.get_image_data("ZYX", T=T, C=C)
 
     if len(image) == 1:
-        return image[0]
-    return image
+        return image[0], pixel_sizes
+
+    return image, pixel_sizes
 
 
 def get_image_dims(file_path: str) -> Dimensions:
