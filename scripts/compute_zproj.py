@@ -38,9 +38,9 @@ def get_zstack(
     """
 
     if isinstance(zs_path, str):
-        return helper.load_image(zs_path, T, C)
+        return helper.load_image(zs_path, T, C)[0]
     else:
-        return np.array([helper.load_image(zsp, T, C) for zsp in zs_path])
+        return np.array([helper.load_image(zsp, T, C)[0] for zsp in zs_path])
 
 
 def main():

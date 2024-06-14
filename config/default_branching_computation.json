@@ -1,5 +1,4 @@
 {
-    "image_width_microns": 1000.0,
     "graph_thresh_1": 5,
     "graph_thresh_2": 10,
     "graph_smoothing_window": 12,
