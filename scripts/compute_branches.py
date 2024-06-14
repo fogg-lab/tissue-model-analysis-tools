@@ -436,12 +436,14 @@ def analyze_img(
         morse_graph.plot_colored_barcode(scaling_factor=scaling_factor, ax=ax)
         plt.savefig(save_path, dpi=300, bbox_inches="tight", pad_inches=0)
         save_path = str(vis_dir / f"morse_tree{tuned_str}.png")
-        plt.figure(figsize=(10, 10))
+        fig_width = 10
+        fig_height = fig_width * (original_image.shape[0] / original_image.shape[1])
+        plt.figure(figsize=(fig_width, fig_height))
         plt.margins(0)
         ax = plt.gca()
         ax.imshow(rescale_intensity(original_image, out_range=(0, 255)), cmap="gray")
         morse_graph.plot_colored_tree(scaling_factor=scaling_factor, ax=ax)
-        plt.savefig(save_path, dpi=300, bbox_inches="tight", pad_inches=0)
+        plt.savefig(save_path, dpi=200, bbox_inches="tight", pad_inches=0)
         plt.close("all")
 
         print("\nComputing branch statistics...")
