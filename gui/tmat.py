@@ -72,7 +72,7 @@ def main():
     compute_branches_parser.add_argument(
         "--image-width-microns",
         type=float,
-        default=1000,
+        default=None,
         help=(
             "Physical width in microns of the region captured by each image. "
             "For instance, if 1 pixel in the image corresponds to 0.8 microns, "
