@@ -303,10 +303,6 @@ def analyze_img(
             min_branch_length, skel_vess_img.shape[1], image_width_microns
         )
         # Square the threshold (we skipped sqrt in the calculation of diag_lengths)
-        print(
-            f"Thresholding at {round(thresh, 2)} pixels, {skel_vess_img.shape=}",
-            flush=True,
-        )
         thresh **= 2
         exclude_mask = diag_lengths[labeled_vess_img] < thresh
         img_vess_zprojection[exclude_mask] = 0
