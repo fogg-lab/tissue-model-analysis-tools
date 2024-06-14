@@ -77,6 +77,8 @@ def main():
             "Physical width in microns of the region captured by each image. "
             "For instance, if 1 pixel in the image corresponds to 0.8 microns, "
             "this value should equal to 0.8x the horizontal resolution of the image. "
+            "If not specified, the script will attempt to infer this value from the "
+            "image metadata."
         ),
     )
 
