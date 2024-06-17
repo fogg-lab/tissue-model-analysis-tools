@@ -1,10 +1,12 @@
 import os.path as osp
+import sys
 from glob import glob
 from typing import List, Tuple, Optional
 from pathlib import Path
 
 # Before importing aicsimageio, ignore warning about Java from `bfio.backends`
 import logging
+
 logging.getLogger("bfio.backends").setLevel(logging.ERROR)
 from aicsimageio import AICSImage
 from aicsimageio.dimensions import Dimensions
@@ -34,10 +36,11 @@ def load_image(
     try:
         img_reader = AICSImage(file_path)
     except UnsupportedFileFormatError as exc:
-        raise UnsupportedFileFormatError(
-            f"Unsupported image format: {file_path}"
-            f"Supported formats: {SUPPORTED_IMAGE_FORMATS}"
+        print(
+            f"\u001b[31m[FAILURE]\u001b[0m Unsupported image format: {file_path}\n"
+            f"Supported formats: {SUPPORTED_IMAGE_FORMATS}\n"
         )
+        sys.exit(1)
 
     # AICSImage consistently reads images with the same order of dimensions:
     # Time-Channel-Z-Y-X
