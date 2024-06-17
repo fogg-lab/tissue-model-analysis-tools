@@ -621,8 +621,8 @@ class MorseGraph:
             min_y = np.min(vertices[segment, 1])
             max_x = np.max(vertices[segment, 0])
             max_y = np.max(vertices[segment, 1])
-            bbox_min = np.array(min_x, min_y)
-            bbox_max = np.array(max_x, max_y)
+            bbox_min = np.array([min_x, min_y])
+            bbox_max = np.array([max_x, max_y])
             return np.sqrt(np.sum((bbox_max-bbox_min)**2))
 
         # Remove segments that are too short or are positioned inside the mask.
@@ -653,7 +653,7 @@ class MorseGraph:
                 }
                 while neighbors:
                     node = neighbors.pop()
-                    segment = [node]
+                    segment = [starting_node, node] if pass_num == 1 else [node]
                     while neighbor := [
                         n for n in G.neighbors(node) if n in unmarked_nodes
                     ]:
