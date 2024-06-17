@@ -111,7 +111,7 @@ def main(args=None):
     print(f"{os.linesep}Saving projections...", flush=True)
     for z_id, zproj in zprojs.items():
         cv2.imwrite(
-            os.path.join(args.out_root, f"{z_id}_{args.method}_{out_ext}"), zproj
+            os.path.join(args.out_root, f"{z_id}_{args.method}{out_ext}"), zproj
         )
 
     print("... Projections saved.", flush=True)
