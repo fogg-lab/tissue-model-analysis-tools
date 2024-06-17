@@ -15,7 +15,7 @@ A command-line application for automated high-throughput analysis of cancer and 
 
 ## Setup Option 1: Graphical User Interface (GUI)
 
-Simply download the latest release from the [releases page](https://github.com/fogg-lab/tissue-model-analysis-tools/releases) and extract the folder to any location on your system (e.g. Desktop). To use the tools, run the executable file (e.g. `tmat-win64.exe`).
+Simply download the latest release from the [releases page](https://github.com/fogg-lab/tissue-model-analysis-tools/releases) and extract the folder to any location on your system (e.g. Desktop). To use the tools, run the executable file within the folder (e.g. `tmat-win64.exe`).
 
 ## Setup Option 2: Command Line Interface (CLI)
 
