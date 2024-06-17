@@ -21,7 +21,7 @@ An application for automated high-throughput analysis of cancer and endothelial 
    - MacOS (Intel CPU): tmat-macos.zip
    - MacOS (Apple Silicon): tmat-macos-arm64.zip
    - Linux: tmat-linux64.zip
-3. Extract the contents of the zip file to any location on your system (e.g. Desktop). To use the tools to analyze your images, run the `tmat` program within the extracted folder.
+3. Extract the contents of the zip file to any location on your system (e.g. Desktop). To use the tools to analyze your images, open the `tmat` program within the extracted folder and follow the guidance on-screen.
 
 ## Setup Option 2: Command Line Interface (CLI)
 
