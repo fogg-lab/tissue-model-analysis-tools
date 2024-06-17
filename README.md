@@ -1,6 +1,6 @@
 # Fogg Lab Tissue Model Analysis Tools
 
-A command-line application for automated high-throughput analysis of cancer and endothelial cell dynamics in hydrogels.
+An application for automated high-throughput analysis of cancer and endothelial cell dynamics in hydrogels.
 
 **Try the interactive demo notebook in Google Colab**
 
