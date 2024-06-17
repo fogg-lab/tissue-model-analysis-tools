@@ -13,11 +13,15 @@ A command-line application for automated high-throughput analysis of cancer and 
 **[Capabilities](#capabilities)**<br>
 **[Usage](#usage)**<br>
 
-## Setup
+## Setup Option 1: Graphical User Interface (GUI)
 
-Windows, MacOS, and Linux are all supported for regular installation. Installation with CUDA (GPU acceleration) requires Linux or Windows Subsystem for Linux (WSL), Python **3.10**, and an NVidia CUDA-capable GPU.
+Simply download the latest release from the [releases page](https://github.com/fogg-lab/tissue-model-analysis-tools/releases) and extract the folder to any location on your system (e.g. Desktop). To use the tools, run the executable file (e.g. `tmat-win64.exe`).
 
-### Prerequisite: Install Python and pipx
+## Setup Option 2: Command Line Interface (CLI)
+
+Windows, MacOS, and Linux are all supported for regular installation without GPU acceleration. For GPU acceleration, Linux or Windows Subsystem for Linux (WSL) and an NVidia CUDA-cable GPU is required.
+
+### Prerequisite for the CLI Option: Install Python and pipx
 
 _Note: As an alternative option to using `pipx`, you could install Tissue Model Analysis Tools in a Conda environment. Otherwise, follow the instructions below._
 
@@ -47,7 +51,7 @@ py -m pipx ensurepath
 
 After you run these commands, close the terminal or command prompt window. `pipx` will be available the next time you open a terminal or command prompt window, and you can proceed with the setup.
 
-### Setup
+### CLI Setup
 
 Run the following commands in a terminal or command prompt window.
 
@@ -79,7 +83,7 @@ tmat
 
 ---
 
-#### Uninstall `fl_tissue_model_tools` package
+#### Uninstall `fl_tissue_model_tools` CLI Utility
 Execute
 ```bash
 pipx uninstall fl_tissue_model_tools
@@ -87,7 +91,7 @@ pipx uninstall fl_tissue_model_tools
 
 ---
 
-#### Update `fl_tissue_model_tools` package
+#### Update `fl_tissue_model_tools` CLI Utility
 To update `tmat`, just reinstall it with the `--force` flag:
 ```bash
 pipx install git+https://github.com/fogg-lab/tissue-model-analysis-tools.git@#egg=fl_tissue_model_tools --force
@@ -98,16 +102,26 @@ tmat configure
 
 For a detailed description of analysis capabilities, see the [capabilities overview notebook](notebooks/capabilities_overview.ipynb).
 
-## Usage
-
-### Tools
-The `tmat` command-line utility consists of four separate automated image analysis tools:
+## Tools
+`tmat` consists of four automated image analysis tools:
 * Z projection of image Z stacks. The input is a directory of Z stacks. The output is a directory of Z projections.
 * Cell coverage area computation. The input is a directory of images (for instance, Z projections). The output is a CSV file and a directory of binary masks, one mask per image, to visually show what was detected as cells.
 * Invasion depth computation (of Z stacks). The input is a directory of Z stacks. The output is a CSV file containing invasion predictions for each Z position in each Z stack.
 * Quantify microvessel formation (number of branches, lengths of branches). The input is a directory of images. Images can either be 2D images such as Z projections for 3D, Z-stack images. Z stacks should be provided as either single files or numbered image sequences contained in subdirectories, 1 subdirectory per Z stack. The output is a CSV file containing the total number of branches, total branch length, and average branch length. Additionally, this tool outputs a directory of intermediate outputs, which are all visualizations that you can use to confirm the validity of the analysis. These visualizations can also help you tweak the configuration parameters and run the tool again if it doesn't do a very good job.
 
-To use `tmat`, open a terminal or command prompt window and execute commands in the following format:
+## Usage
+
+### GUI
+
+1. Open the program.
+2. Select one of the four tools from the tabs near the top of the window.
+3. Fill in the required input fields, and check the optional fields for more customization.
+4. Click the "Start" button.
+5. Once the analysis is complete, the output will be saved in the output directory you specified.
+
+### CLI
+
+To use `tmat` CLI utility, open a terminal or command prompt window and execute commands in the following format:
 ```bash
 # For non-interactive use, specify all arguments in a single command
 tmat [command_script] [-flags] [arguments]
@@ -134,7 +148,7 @@ tmat [command_script] --help
 tmat
 ```
 
-#### Cell Area
+#### Cell Area (CLI Usage)
 **Basic usage (accept the default configuration)**
 ```bash
 tmat compute_cell_area "/path/to/input/folder" "/path/to/output/folder"
@@ -147,7 +161,7 @@ If your images are not cropped to the region inside the well, you can have the s
 tmat compute_cell_area --detect-well "/path/to/input/folder" "/path/to/output/folder"
 ```
 
-**Custom usage (customize the analysis configuration)**
+**Custom usage in the CLI utility (customize the analysis configuration)**
 
 * Create custom configuration `.json` file, using `config/default_cell_area_computation.json` as a template. The following parameters can be customized:
     * `dsamp_size` (int): Size that input images will be downsampled to for analysis. Smaller sizes mean faster, less accurate analysis. Default is 512, meaning the image will be downscaled so that the maximum dimension is 512 (e.g., 1000x1500 is downsampled to 341x512).
@@ -160,7 +174,7 @@ tmat compute_cell_area --detect-well "/path/to/input/folder" "/path/to/output/fo
 tmat compute_cell_area --config "/path/to/config/file.json" "/path/to/input/folder" "/path/to/output/folder"
 ```
 
-#### Z Projection
+#### Z Projection (CLI Usage)
 **Basic usage (accept the default configuration)**
 ```bash
 tmat compute_zproj "/path/to/input/directory" "/path/to/output/folder"
@@ -188,7 +202,7 @@ tmat compute_zproj --area --method fs "/path/to/input/folder" "/path/to/output/f
 
 See [Capabilities](#capabilities) for details.
 
-#### Invasion Depth
+#### Invasion Depth (CLI Usage)
 **Usage**
 ```
 tmat compute_inv_depth "/path/to/input/folder" "/path/to/output/folder"
@@ -209,11 +223,11 @@ If your images are not cropped to the region inside the well, you can have the s
 tmat compute_branches --detect-well "/path/to/input/folder" "/path/to/output/folder"
 ```
 
-**Custom usage (customize the analysis configuration)**
+**Custom usage in the CLI utility (customize the analysis configuration)**
 
 Customize configuration variables (you can edit `config/default_branching_computation.json` in your base directory, or refer to `src/fl_tissue_model_tools/config` in this repository):
 
-- `image_width_microns` (float): Optional. Physical width in microns of the region captured by each image. For instance, if 1 pixel in the image corresponds to 0.8 microns, this value should equal to 0.8x the horizontal resolution of the image. If not specified, the script will attempt to infer this value from the image metadata.
+- `image_width_microns` (float): Optional but recommended. Physical width in microns of the region captured by each image. For instance, if 1 pixel in the image corresponds to 0.8 microns, this value should equal to 0.8x the horizontal resolution of the image. If not specified, the script will attempt to infer this value from the image metadata.
 - `model_cfg_path` (string): Optional. This is the path to the configuration file of the segmentation model. This parameter is not included in the default configuration file. If it is not specified, the latest pretrained model in the `model_training` folder will be used.
 - `graph_thresh_1` (float): May require some experimentation to find the best value for your data. This threshold controls how much of the morse graph is used to compute the number of branches. Lower values include more of the graph, and more branches are detected. Higher values include less of the graph, and fewer branches are detected. The default is 5. If the default value does not work well, try different values like 0.25, 0.5, 1, 2, 4, etc. up to around 64.
 - `graph_thresh_2` (float): Also could use some tuning. This is the threshold for connecting branches, e.g. where it is ambiguous whether two branches are part of the same component. Lower values result in more connected branches, and higher values result in more disconnections. The default is 10. If the default value does not work well, try values like 0.0, 0.25, 0.5, 1, 2, 4, etc. up to around 64.
@@ -222,7 +236,7 @@ Customize configuration variables (you can edit `config/default_branching_comput
 - `remove_isolated_branches` (boolean): Whether to remove branches that are not connected to any other branches *after* the network is trimmed per the branch length constraints (enforcing minimum and maximum branch lengths might isolate some branches, which may or may not be desired). The default is "false".
 - `graph_smoothing_window` (float): This is the window size (in microns) for smoothing the branch paths. The default is 12.
 
-\*Trying out a few different values for the graph thresholds tends to yield more accurate quantification of vessel formation. An efficient way to do this is to specify a list of values directly in the configuration file, for example:
+Trying out a few different values for the graph thresholds tends to yield more accurate quantification of vessel formation. An efficient way to do this is to specify a list of values directly in the configuration file, for example:
 ```json
 {
     "image_width_microns": 1000.0,
