@@ -38,7 +38,7 @@ def load_image(
         img_reader = AICSImage(file_path)
     except UnsupportedFileFormatError as exc:
         print(
-            f"\u001b[31m[FAILURE]\u001b[0m Unsupported image format: {file_path}\n"
+            f"\x1b[38;5;1m\x1b[1m[FAILURE]\x1b[0m Unsupported image format: {file_path}\n"
             f"Supported formats: {SUPPORTED_IMAGE_FORMATS}\n"
         )
         sys.exit(1)
