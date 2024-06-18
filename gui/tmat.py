@@ -1,3 +1,4 @@
+# Needed on macOS to prevent the whole program from opening itself many times:
 # import multiprocessing
 # multiprocessing.set_start_method("forkserver", force=True)
 # multiprocessing.freeze_support()
