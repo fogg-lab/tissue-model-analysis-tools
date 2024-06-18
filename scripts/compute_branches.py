@@ -150,7 +150,7 @@ def analyze_img(
         if pix_sizes.X is None:
             print(f"{su.SFM.warning} image_width_microns not provided in the config, "
                   "and could not be inferred from the image metadata. "
-                  "using arbitrary value of 1000 microns.")
+                  "Using arbitrary value of 1000 microns.")
             image_width_microns = 1000
         else:
             image_width_microns = img.shape[-1] * pix_sizes.X
