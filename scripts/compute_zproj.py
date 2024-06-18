@@ -52,9 +52,9 @@ def main(args=None):
     else:
         args_prespecified = True
     try:
-        compute_cell_area = args.area
+        compute_area_after_zproj = args.area
     except AttributeError:
-        compute_cell_area = False
+        compute_area_after_zproj = False
 
     ### Verify input source ###
     if os.path.isfile(args.in_root):
@@ -118,7 +118,7 @@ def main(args=None):
     print(su.SFM.success, flush=True)
     print(su.END_SEPARATOR, flush=True)
 
-    if compute_cell_area:
+    if compute_area_after_zproj:
         if args_prespecified:
             compute_cell_area.main(args)
         else:

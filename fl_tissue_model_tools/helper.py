@@ -1,5 +1,6 @@
 import os.path as osp
 import sys
+import warnings
 from glob import glob
 from typing import List, Tuple, Optional
 from pathlib import Path
@@ -70,7 +71,13 @@ def load_image(
             f"with color channels: 0 - {img_reader.C - 1}"
         )
 
-    pixel_sizes = img_reader.physical_pixel_sizes
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="Could not parse tiff pixel size",
+            category=UserWarning,
+        )
+        pixel_sizes = img_reader.physical_pixel_sizes
     image = img_reader.get_image_data("ZYX", T=T, C=C)
 
     if len(image) == 1:

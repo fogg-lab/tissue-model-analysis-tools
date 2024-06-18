@@ -1,4 +1,10 @@
+import multiprocessing
+
+multiprocessing.set_start_method("forkserver", force=True)
+multiprocessing.freeze_support()
+
 from gooey import Gooey, GooeyParser, local_resource_path
+
 from fl_tissue_model_tools.scripts import (
     compute_branches,
     compute_cell_area,
@@ -6,11 +12,15 @@ from fl_tissue_model_tools.scripts import (
     compute_zproj,
 )
 
+# For rich text install older version of `colored`:
+# pip install -I "colored=1.4.3"
+# newer versions of `colored` may not be compatible w/ Gooey.
 
 @Gooey(
     program_name="Tissue Model Analysis Tools",
     image_dir=local_resource_path("./images"),
     navigation="TABBED",
+    richtext_controls=True,
 )
 def main():
     parser = GooeyParser(description="Tissue model analysis tools")
