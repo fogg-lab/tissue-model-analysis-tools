@@ -1,6 +1,6 @@
 import multiprocessing
 
-multiprocessing.set_start_method("forkserver", force=True)
+# multiprocessing.set_start_method("forkserver", force=True)
 multiprocessing.freeze_support()
 
 from gooey import Gooey, GooeyParser, local_resource_path
@@ -16,6 +16,7 @@ from fl_tissue_model_tools.scripts import (
 # pip install -I "colored=1.4.3"
 # newer versions of `colored` may not be compatible w/ Gooey.
 
+
 @Gooey(
     program_name="Tissue Model Analysis Tools",
     image_dir=local_resource_path("./images"),
@@ -26,10 +27,10 @@ def main():
     parser = GooeyParser(description="Tissue model analysis tools")
     subparsers = parser.add_subparsers(dest="command")
 
-    compute_branches_parser = subparsers.add_parser("Analyze ​Microvessels")
-    compute_zproj_parser = subparsers.add_parser("Z ​Project")
-    compute_cell_area_parser = subparsers.add_parser("Estimate ​Cell ​Coverage ​Area")
-    compute_inv_depth_parser = subparsers.add_parser("Predict Depth ​of ​Invasion")
+    compute_branches_parser = subparsers.add_parser("Analyze Microvessels")
+    compute_zproj_parser = subparsers.add_parser("Z Project")
+    compute_cell_area_parser = subparsers.add_parser("Estimate Cell Coverage Area")
+    compute_inv_depth_parser = subparsers.add_parser("Predict Depth of Invasion")
 
     for subparser in [
         compute_branches_parser,
@@ -187,13 +188,13 @@ def main():
 
     args = parser.parse_args()
 
-    if args.command == "Analyze ​Microvessels":
+    if args.command == "Analyze Microvessels":
         compute_branches.main(args)
-    elif args.command == "Z ​Project":
+    elif args.command == "Z Project":
         compute_zproj.main(args)
-    elif args.command == "Estimate Cell​ Coverage​ Area":
+    elif args.command == "Estimate Cell Coverage Area":
         compute_cell_area.main(args)
-    elif args.command == "Predict ​Depth ​of ​Invasion":
+    elif args.command == "Predict Depth of Invasion":
         compute_inv_depth.main(args)
 
 
