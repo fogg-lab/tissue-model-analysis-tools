@@ -4,13 +4,16 @@ import json
 from pathlib import Path
 from glob import glob
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-
 import numpy as np
 import dask as d
 import pandas as pd
-import tensorflow.keras.backend as K
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+os.environ["AUTOGRAPH_VERBOSITY"] = "2"
 import tensorflow as tf
+tf.get_logger().setLevel("ERROR")
+tf.autograph.set_verbosity(2)
+import tensorflow.keras.backend as K
 
 from fl_tissue_model_tools import models, data_prep, defs, helper
 from fl_tissue_model_tools import script_util as su
@@ -19,29 +22,33 @@ from fl_tissue_model_tools import zstacks as zs
 DEFAULT_CONFIG_PATH = str(defs.SCRIPT_CONFIG_DIR / "default_invasion_depth_computation.json")
 
 
-def main():
-    args = su.parse_inv_depth_args({"default_config_path": DEFAULT_CONFIG_PATH})
+def main(args=None):
+    if args is None:
+        args = su.parse_inv_depth_args({"default_config_path": DEFAULT_CONFIG_PATH})
+        args_prespecified = False
+    else:
+        args_prespecified = True
 
     ### Verify input source ###
     if os.path.isfile(args.in_root):
-        print(f"{su.SFM.failure} Input directory is a file: {args.in_root}")
+        print(f"{su.SFM.failure} Input directory is a file: {args.in_root}", flush=True)
         sys.exit(1)
 
     if not os.path.isdir(args.in_root):
-        print(f"{su.SFM.failure} Input directory does not exist: {args.in_root}")
+        print(f"{su.SFM.failure} Input directory does not exist: {args.in_root}", flush=True)
         sys.exit(1)
 
     zstack_paths = glob(os.path.join(args.in_root, "*"))
 
     if len(zstack_paths) == 0:
-        print(f"{su.SFM.failure} Input directory is empty: {args.in_root}")
+        print(f"{su.SFM.failure} Input directory is empty: {args.in_root}", flush=True)
         sys.exit(1)
 
     ### Verify output destination ###
     try:
         su.inv_depth_verify_output_dir(args.out_root)
     except PermissionError as e:
-        print(f"{su.SFM.failure} {e}")
+        print(f"{su.SFM.failure} {e}", flush=True)
         sys.exit()
 
     ### Load best hyperparameters ###
@@ -66,11 +73,11 @@ def main():
     last_resnet_layer = best_hp["last_resnet_layer"]
 
     ### Load config ###
-    config_path = args.config
+    config_path = DEFAULT_CONFIG_PATH if args_prespecified else args.config
     try:
         config = su.inv_depth_verify_config_file(config_path, n_models)
     except FileNotFoundError as e:
-        print(f"{su.SFM.failure} {e}")
+        print(f"{su.SFM.failure} {e}", flush=True)
         sys.exit()
     n_pred_models = config["n_pred_models"]
 
@@ -95,7 +102,7 @@ def main():
     ]
 
     for i, m in enumerate(inv_depth_models):
-        print(f"Loading classifier {i}...")
+        print(f"Loading classifier {i}...", flush=True)
         # Weights don't load properly in trainable set to False for model
         # Set trainable to True, load weights, then set back to False
         ith_best_idx = sorted_best_model_idx[i]
@@ -103,10 +110,10 @@ def main():
         weights_path = str(best_ensemble_dir / f"best_finetune_weights_{ith_best_idx}.h5")
         m.load_weights(weights_path)
         m.trainable = False
-        print(f"... Classifier {i} loaded.")
+        print(f"... Classifier {i} loaded.", flush=True)
 
-    print("All classifiers loaded.")
-    print(su.SFM.success)
+    print("All classifiers loaded.", flush=True)
+    print(su.SFM.success, flush=True)
     su.section_footer()
 
     ### Generate predictions ###
@@ -115,7 +122,7 @@ def main():
     # Load data
 
     test_path = zstack_paths[0]
-    if os.path.isdir(test_path) or helper.get_image_dims(test_path).Z > 1:
+    if os.path.isdir(test_path) or helper.get_image_dims(test_path).Z == 1:
         zstack_paths = zs.find_zstack_image_sequences(args.in_root)
     else:
         zstack_paths = zs.find_zstack_files(args.in_root)
@@ -158,17 +165,17 @@ def main():
     yhatp = np.mean(yhatp_m, axis=1, keepdims=True)
     # Threshold probability predictions
     yhat = (yhatp > cls_thresh).astype(np.int32)
-    print("... Predictions finished.")
+    print("... Predictions finished.", flush=True)
 
     # Save outputs
-    print("Saving results...")
+    print("Saving results...", flush=True)
     output_file = pd.DataFrame({"img_name": image_names,
                     "inv_prob": yhatp.squeeze(), "inv_label": yhat.squeeze()})
     out_csv_path = os.path.join(args.out_root, "invasion_depth_predictions.csv")
     output_file.to_csv(out_csv_path, index=False)
-    print("... Results saved.")
+    print("... Results saved.", flush=True)
 
-    print(su.SFM.success)
+    print(su.SFM.success, flush=True)
     su.section_footer()
 
 

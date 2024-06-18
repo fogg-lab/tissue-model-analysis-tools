@@ -99,7 +99,10 @@ def prep_images(
 
     """
     gs_ds_imgs = d.compute(
-        [d.delayed(load_img)(img_p, dsamp_size=dsamp_size) for img_p in img_paths]
+        [
+            d.delayed(load_img)(img_p, dsamp_size=dsamp_size, T=T, C=C)
+            for img_p in img_paths
+        ]
     )[0]
     return gs_ds_imgs
 
@@ -191,37 +194,41 @@ def compute_areas(
     return area_prop
 
 
-def main():
+def main(args=None):
     """Computes cell area and saves to output directory."""
 
-    args = su.parse_cell_area_args(
-        {
-            "thresh_subdir": THRESH_SUBDIR,
-            "calc_subdir": CALC_SUBDIR,
-            "default_config_path": DEFAULT_CONFIG_PATH,
-        }
-    )
+    if args is None:
+        args = su.parse_cell_area_args(
+            {
+                "thresh_subdir": THRESH_SUBDIR,
+                "calc_subdir": CALC_SUBDIR,
+                "default_config_path": DEFAULT_CONFIG_PATH,
+            }
+        )
+        args_prespecified = False
+    else:
+        args_prespecified = True
 
     ### Verify input source ###
     try:
         all_img_paths = su.cell_area_verify_input_dir(args.in_root)
     except FileNotFoundError as error:
-        print(f"{su.SFM.failure} {error}")
+        print(f"{su.SFM.failure} {error}", flush=True)
         sys.exit()
 
     ### Verify output destination ###
     try:
         su.cell_area_verify_output_dir(args.out_root, THRESH_SUBDIR, CALC_SUBDIR)
     except PermissionError as error:
-        print(f"{su.SFM.failure} {error}")
+        print(f"{su.SFM.failure} {error}", flush=True)
         sys.exit()
 
     ### Load config ###
-    config_path = args.config
+    config_path = DEFAULT_CONFIG_PATH if args_prespecified else args.config
     try:
         config = su.cell_area_verify_config_file(config_path)
     except FileNotFoundError as error:
-        print(f"{su.SFM.failure} {error}")
+        print(f"{su.SFM.failure} {error}", flush=True)
         sys.exit()
 
     su.section_header("Performing Analysis")
@@ -246,9 +253,9 @@ def main():
 
     for img_paths in chunks(all_img_paths, batch_size):
         try:
-            gs_ds_imgs = prep_images(img_paths, dsamp_size)
+            gs_ds_imgs = prep_images(img_paths, dsamp_size, T=args.time, C=args.channel)
         except OSError as error:
-            print(f"{su.SFM.failure}{error}")
+            print(f"{su.SFM.failure}{error}", flush=True)
             sys.exit()
 
         # Well masking
@@ -269,10 +276,10 @@ def main():
 
     area_prop = np.array(area_prop)
 
-    print("... Areas computed successfully.")
+    print("... Areas computed successfully.", flush=True)
 
     ### Save results ###
-    print(f"{os.linesep}Saving results...")
+    print(f"{os.linesep}Saving results...", flush=True)
 
     img_ids = [Path(img_n).stem for img_n in all_img_paths]
     area_df = pd.DataFrame(data={"image_id": img_ids, "area_pct": area_prop * 100})
@@ -294,17 +301,21 @@ def main():
         cv2.imwrite(out_path, out_img)
 
     if args.detect_well:
-        print(f"... Well masks saved to:{os.linesep}\t{args.out_root}/{THRESH_SUBDIR}")
+        print(
+            f"... Well masks saved to:{os.linesep}\t{args.out_root}/{THRESH_SUBDIR}",
+            flush=True,
+        )
     print(
-        f"... Thresholded images saved to:{os.linesep}\t{args.out_root}/{THRESH_SUBDIR}"
+        f"... Thresholded images saved to:{os.linesep}\t{args.out_root}/{THRESH_SUBDIR}",
+        flush=True,
     )
 
     area_out_path = os.path.join(args.out_root, CALC_SUBDIR, "cell_area.csv")
     area_df.to_csv(area_out_path, index=False)
 
-    print(f"... Area calculations saved to:{os.linesep}\t{area_out_path}")
-    print(su.SFM.success)
-    print(su.END_SEPARATOR)
+    print(f"... Area calculations saved to:{os.linesep}\t{area_out_path}", flush=True)
+    print(su.SFM.success, flush=True)
+    print(su.END_SEPARATOR, flush=True)
 
 
 if __name__ == "__main__":

@@ -247,14 +247,15 @@ def predict_img_with_smooth_windowing(input_img, window_size, subdivisions, pred
     # to 4 rather than 2.
 
     res = []
-    for pad in tqdm(pads):
+    pad_range = tqdm(pads)
+    for pad in pad_range:
         # For every rotation:
         sd = _windowed_subdivs(pad, window_size, subdivisions, pred_func)
         one_padded_result = _recreate_from_subdivs(
             sd, window_size, subdivisions, padded_out_shape=list(pad.shape)
         )
-
         res.append(one_padded_result)
+        pad_range.refresh()
 
     # Merge after rotations:
     padded_results = _rotate_mirror_undo(res)

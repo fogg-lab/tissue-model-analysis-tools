@@ -12,6 +12,7 @@ from fl_tissue_model_tools import defs
 from fl_tissue_model_tools import script_util as su
 from fl_tissue_model_tools import zstacks as zs
 from fl_tissue_model_tools import helper
+from fl_tissue_model_tools.scripts import compute_cell_area
 
 
 proj_methods = {
@@ -43,29 +44,35 @@ def get_zstack(
         return np.array([helper.load_image(zsp, T, C)[0] for zsp in zs_path])
 
 
-def main():
+def main(args=None):
     """Computes z projections and saves to output directory."""
-
-    args = su.parse_zproj_args()
-    compute_cell_area = args.area
+    if args is None:
+        args = su.parse_zproj_args()
+        args_prespecified = False
+    else:
+        args_prespecified = True
+    try:
+        compute_area_after_zproj = args.area
+    except AttributeError:
+        compute_area_after_zproj = False
 
     ### Verify input source ###
     if os.path.isfile(args.in_root):
-        print(f"{su.SFM.failure} Input directory is a file: {args.in_root}")
+        print(f"{su.SFM.failure} Input directory is a file: {args.in_root}", flush=True)
         sys.exit(1)
 
     if not os.path.isdir(args.in_root):
-        print(f"{su.SFM.failure} Input directory does not exist: {args.in_root}")
+        print(f"{su.SFM.failure} Input directory does not exist: {args.in_root}", flush=True)
         sys.exit(1)
 
     zstack_paths = glob(os.path.join(args.in_root, "*"))
 
     if len(zstack_paths) == 0:
-        print(f"{su.SFM.failure} Input directory is empty: {args.in_root}")
+        print(f"{su.SFM.failure} Input directory is empty: {args.in_root}", flush=True)
         sys.exit(1)
 
     test_path = zstack_paths[0]
-    if os.path.isdir(test_path) or helper.get_image_dims(test_path).Z > 1:
+    if os.path.isdir(test_path) or helper.get_image_dims(test_path).Z == 1:
         zstack_paths = zs.find_zstack_image_sequences(args.in_root)
     else:
         zstack_paths = zs.find_zstack_files(args.in_root)
@@ -74,14 +81,14 @@ def main():
     try:
         su.zproj_verify_output_dir(args.out_root)
     except PermissionError as error:
-        print(f"{su.SFM.failure} {error}")
+        print(f"{su.SFM.failure} {error}", flush=True)
         sys.exit()
 
     ### Compute Z projections ###
     su.section_header("Constructing Z projections")
 
     proj_method = proj_methods[args.method]
-    print("Loading and computing Z stacks...")
+    print("Loading and computing Z stacks...", flush=True)
     try:
         # zprojs: A dictionary of Z projections, keyed by Z stack ID.
         zprojs = {
@@ -89,10 +96,10 @@ def main():
             for (zs_id, zsp) in zstack_paths.items()
         }
     except OSError as error:
-        print(f"{su.SFM.failure}{error}")
+        print(f"{su.SFM.failure}{error}", flush=True)
         sys.exit()
 
-    print("... Projections computed.")
+    print("... Projections computed.", flush=True)
 
     ### Save Z projections ###
 
@@ -101,33 +108,36 @@ def main():
     if out_ext not in (".tif", ".tiff", ".png"):
         out_ext = ".tiff"
 
-    print(f"{os.linesep}Saving projections...")
+    print(f"{os.linesep}Saving projections...", flush=True)
     for z_id, zproj in zprojs.items():
         cv2.imwrite(
-            os.path.join(args.out_root, f"{z_id}_{args.method}_{out_ext}"), zproj
+            os.path.join(args.out_root, f"{z_id}_{args.method}{out_ext}"), zproj
         )
 
-    print("... Projections saved.")
-    print(su.SFM.success)
-    print(su.END_SEPARATOR)
+    print("... Projections saved.", flush=True)
+    print(su.SFM.success, flush=True)
+    print(su.END_SEPARATOR, flush=True)
 
-    if compute_cell_area:
-        if "-a" in sys.argv:
-            sys.argv.remove("-a")
-        elif "--area" in sys.argv:
-            sys.argv.remove("--area")
+    if compute_area_after_zproj:
+        if args_prespecified:
+            compute_cell_area.main(args)
+        else:
+            if "-a" in sys.argv:
+                sys.argv.remove("-a")
+            elif "--area" in sys.argv:
+                sys.argv.remove("--area")
 
-        script_path = defs.SCRIPT_DIR / "compute_cell_area.py"
+            script_path = defs.SCRIPT_DIR / "compute_cell_area.py"
 
-        options = [
-            arg for arg in sys.argv[1:] if arg != args.in_root and arg != args.out_root
-        ]
+            options = [
+                arg for arg in sys.argv[1:] if arg != args.in_root and arg != args.out_root
+            ]
 
-        # use out_root as both in_root and out_root
-        subprocess.run(
-            [sys.executable, script_path, *options, args.out_root, args.out_root],
-            check=True,
-        )
+            # use out_root as both in_root and out_root
+            subprocess.run(
+                [sys.executable, script_path, *options, args.out_root, args.out_root],
+                check=True,
+            )
 
 
 if __name__ == "__main__":

@@ -1,4 +1,6 @@
 import os.path as osp
+import sys
+import warnings
 from glob import glob
 from typing import List, Tuple, Optional
 from pathlib import Path
@@ -35,10 +37,11 @@ def load_image(
     try:
         img_reader = AICSImage(file_path)
     except UnsupportedFileFormatError as exc:
-        raise UnsupportedFileFormatError(
-            f"Unsupported image format: {file_path}"
-            f"Supported formats: {SUPPORTED_IMAGE_FORMATS}"
+        print(
+            f"\x1b[38;5;1m\x1b[1m[FAILURE]\x1b[0m Unsupported image format: {file_path}\n"
+            f"Supported formats: {SUPPORTED_IMAGE_FORMATS}\n"
         )
+        sys.exit(1)
 
     # AICSImage consistently reads images with the same order of dimensions:
     # Time-Channel-Z-Y-X
@@ -68,7 +71,13 @@ def load_image(
             f"with color channels: 0 - {img_reader.C - 1}"
         )
 
-    pixel_sizes = img_reader.physical_pixel_sizes
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="Could not parse tiff pixel size",
+            category=UserWarning,
+        )
+        pixel_sizes = img_reader.physical_pixel_sizes
     image = img_reader.get_image_data("ZYX", T=T, C=C)
 
     if len(image) == 1:
