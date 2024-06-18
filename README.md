@@ -18,8 +18,8 @@ An application for automated high-throughput analysis of cancer and endothelial 
 1. Navigate to the latest release on the [releases page](https://github.com/fogg-lab/tissue-model-analysis-tools/releases).
 2. Under "Assets", download the zip file that corresponds to your system.
    - Windows: tmat-win64.zip
-   - MacOS (Intel CPU): tmat-macos.zip
-   - MacOS (Apple Silicon): tmat-macos-arm64.zip
+   - MacOS (Intel CPU): tmat-macos.zip (Not added to the release yet. Will add soon)
+   - MacOS (Apple Silicon): tmat-macos-arm64.zip (Also will be added soon)
    - Linux: tmat-linux64.zip
 3. Extract the contents of the zip file to any location on your system (e.g. Desktop). To use the tools to analyze your images, open the `tmat` program stored within the extracted folder and follow the guidance on-screen (see the [Usage](#usage) section for more info).
 
