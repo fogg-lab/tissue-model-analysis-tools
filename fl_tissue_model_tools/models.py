@@ -6,8 +6,6 @@ from typing import Sequence, Tuple, Optional
 from itertools import product
 import os
 
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
-
 import numpy as np
 from numpy import typing as npt
 import keras_tuner as kt
@@ -16,6 +14,11 @@ from PIL import Image
 if not hasattr(Image, "Resampling"):
     Image.Resampling = Image
 
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+os.environ["AUTOGRAPH_VERBOSITY"] = "2"
+import tensorflow as tf
+tf.get_logger().setLevel("ERROR")
+tf.autograph.set_verbosity(2)
 import tensorflow.keras.backend as K
 from tensorflow.keras import Input, Model, optimizers
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Conv2D

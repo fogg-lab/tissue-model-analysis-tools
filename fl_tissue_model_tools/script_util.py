@@ -16,13 +16,13 @@ from . import data_prep, helper
 
 @dataclass
 class SFM:
-    """Colorized messages for success/failure output (uses ANSI escape codes)"""
+    """Colorized messages for success/failure output using Ansi escape sequences."""
 
-    red = "\u001b[31m"
-    green = "\u001b[32m"
-    cyan = "\u001b[36m"
-    yellow = "\u001b[93m"
-    reset = "\u001b[0m"
+    red = "\x1b[38;5;1m\x1b[1m"
+    green = "\x1b[38;5;2m\x1b[1m"
+    cyan = "\x1b[38;5;6m\x1b[1m"
+    yellow = "\x1b[38;5;3m\x1b[1m"
+    reset = "\x1b[0m"
     success = f"{green}[SUCCESS]{reset}"
     failure = f"{red}[FAILURE]{reset}"
     warning = f"{yellow}[WARNING]{reset}"
@@ -42,12 +42,15 @@ def section_header(title: str) -> None:
         title: Text to display in the header.
 
     """
-    print(f"{os.linesep}{SFM.cyan}{f'[{title}]':{DASH}<{CHUNK_WIDTH}}{SFM.reset}")
+    print(
+        f"{os.linesep}{SFM.cyan}{f'[{title}]':{DASH}<{CHUNK_WIDTH}}{SFM.reset}",
+        flush=True,
+    )
 
 
 def section_footer() -> None:
     """Print a section footer."""
-    print(END_SEPARATOR)
+    print(END_SEPARATOR, flush=True)
 
 
 def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
@@ -92,7 +95,7 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
         help=(
             "Index of color channel (starting from 0) to read from images. "
             "If no argument is supplied, images must be single channel."
-        )
+        ),
     )
 
     parser.add_argument(
@@ -103,7 +106,7 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
         help=(
             "Index of time (starting from 0) to read from images. "
             "If no argument is supplied, images must not be time series."
-        )
+        ),
     )
 
     parser.add_argument(
@@ -176,7 +179,7 @@ def parse_cell_area_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
         help=(
             "Index of color channel (starting from 0) to read from images. "
             "If no argument is supplied, images must be single channel."
-        )
+        ),
     )
 
     parser.add_argument(
@@ -187,7 +190,7 @@ def parse_cell_area_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
         help=(
             "Index of time (starting from 0) to read from images. "
             "If no argument is supplied, images must not be time series."
-        )
+        ),
     )
 
     parser.add_argument(
@@ -253,7 +256,7 @@ def parse_zproj_args() -> argparse.Namespace:
         help=(
             "Index of color channel (starting from 0) to read from images. "
             "If no argument is supplied, images must be single channel."
-        )
+        ),
     )
 
     parser.add_argument(
@@ -264,7 +267,7 @@ def parse_zproj_args() -> argparse.Namespace:
         help=(
             "Index of time (starting from 0) to read from images. "
             "If no argument is supplied, images must not be time series."
-        )
+        ),
     )
 
     parser.add_argument(
@@ -274,8 +277,12 @@ def parse_zproj_args() -> argparse.Namespace:
         default="max",
         choices=["min", "max", "med", "avg", "fs"],
         help=(
-            "Z projection method. If no argument supplied, defaults to 'max' "
-            "(focus stacking)."
+            "Z projection method. If no argument supplied, defaults to 'max'.\n"
+            "min = Minimum intensity projection\n"
+            "max = Maximum intensity projection\n"
+            "med = Median intensity projection\n"
+            "avg = Average intensity projection\n"
+            "fs = Focus stacking"
         ),
     )
 
@@ -333,7 +340,7 @@ def parse_inv_depth_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
         help=(
             "Index of color channel (starting from 0) to read from images. "
             "If no argument is supplied, images must be single channel."
-        )
+        ),
     )
 
     parser.add_argument(
@@ -344,7 +351,7 @@ def parse_inv_depth_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
         help=(
             "Index of time (starting from 0) to read from images. "
             "If no argument is supplied, images must not be time series."
-        )
+        ),
     )
 
     parser.add_argument(
@@ -400,8 +407,8 @@ def cell_area_verify_input_dir(input_path: str) -> Sequence[str]:
             f"No files found in input directory:{os.linesep}\t{input_path}"
         )
 
-    print(f"Found {len(img_paths)} images in:{os.linesep}\t{input_path}")
-    print(SFM.success)
+    print(f"Found {len(img_paths)} images in:{os.linesep}\t{input_path}", flush=True)
+    print(SFM.success, flush=True)
     section_footer()
 
     return img_paths
@@ -423,28 +430,26 @@ def cell_area_verify_output_dir(
     section_header("Verifying Output Directory")
 
     if not osp.isdir(output_path):
-        print(f"Did not find output dir:{os.linesep}\t{output_path}")
-        print("Creating...")
+        print(f"Did not find output dir:{os.linesep}\t{output_path}", flush=True)
+        print("Creating...", flush=True)
         data_prep.make_dir(output_path)
-        print(f"... Created dir:{os.linesep}\t{output_path}")
+        print(f"... Created dir:{os.linesep}\t{output_path}", flush=True)
 
-    print("Creating subdirs (overwriting if previously existed)...")
-    print(f"\t{output_path}/{thresh_subdir}")
-    print(f"\t{output_path}/{calc_subdir}")
+    print("Creating subdirs (overwriting if previously existed)...", flush=True)
+    print(f"\t{output_path}/{thresh_subdir}", flush=True)
+    print(f"\t{output_path}/{calc_subdir}", flush=True)
 
     data_prep.make_dir(f"{output_path}/{thresh_subdir}")
     data_prep.make_dir(f"{output_path}/{calc_subdir}")
 
-    print("... Created dirs:")
-    print(f"\t{output_path}/{thresh_subdir}")
-    print(f"\t{output_path}/{calc_subdir}")
-    print(SFM.success)
+    print("... Created dirs:", flush=True)
+    print(f"\t{output_path}/{thresh_subdir}", flush=True)
+    print(f"\t{output_path}/{calc_subdir}", flush=True)
+    print(SFM.success, flush=True)
     section_footer()
 
 
-def cell_area_verify_config_file(
-    config_path: str
-) -> Dict[str, Any]:
+def cell_area_verify_config_file(config_path: str) -> Dict[str, Any]:
     """Verify config script for performing area computations.
 
     Args:
@@ -464,11 +469,11 @@ def cell_area_verify_config_file(
     with open(config_path, "r", encoding="utf8") as config_fp:
         config = json.load(config_fp)
 
-    print(f"Using config file: {os.linesep}\t{config_path}")
-    print(f"{os.linesep}Parameter values:")
+    print(f"Using config file: {os.linesep}\t{config_path}", flush=True)
+    print(f"{os.linesep}Parameter values:", flush=True)
     for key, val in config.items():
-        print(f"{key:<20}{val:>20}")
-    print(SFM.success)
+        print(f"{key:<20}{val:>20}", flush=True)
+    print(SFM.success, flush=True)
     section_footer()
 
     return config
@@ -484,25 +489,25 @@ def zproj_verify_output_dir(output_path: str) -> None:
     section_header("Verifying Output Directory")
 
     if not osp.isdir(output_path):
-        print(f"Did not find output dir:{os.linesep}\t{output_path}")
-        print("Creating...")
+        print(f"Did not find output dir:{os.linesep}\t{output_path}", flush=True)
+        print("Creating...", flush=True)
 
         data_prep.make_dir(output_path)
 
-        print(f"... Created dir:{os.linesep}\t{output_path}")
+        print(f"... Created dir:{os.linesep}\t{output_path}", flush=True)
 
     else:
-        print(f"Found dir:{os.linesep}\t{output_path}")
-        print("Clearing...")
+        print(f"Found dir:{os.linesep}\t{output_path}", flush=True)
+        print("Clearing...", flush=True)
 
         # Remove previous zproj images in output directory
         for prev_output_fp in [Path(output_path) / f for f in os.listdir(output_path)]:
             if osp.isfile(prev_output_fp) and imghdr.what(prev_output_fp) is not None:
                 os.remove(prev_output_fp)
 
-        print(f"... Cleared dir:{os.linesep}\t{output_path}")
+        print(f"... Cleared dir:{os.linesep}\t{output_path}", flush=True)
 
-    print(SFM.success)
+    print(SFM.success, flush=True)
     section_footer()
 
 
@@ -516,15 +521,15 @@ def inv_depth_verify_output_dir(output_path: str) -> None:
     section_header("Verifying Output Directory")
 
     if not osp.isdir(output_path):
-        print(f"Did not find output dir:{os.linesep}\t{output_path}")
-        print("Creating...")
+        print(f"Did not find output dir:{os.linesep}\t{output_path}", flush=True)
+        print("Creating...", flush=True)
 
         data_prep.make_dir(output_path)
 
-        print(f"... Created dir:{os.linesep}\t{output_path}")
+        print(f"... Created dir:{os.linesep}\t{output_path}", flush=True)
     else:
-        print(f"Found dir:{os.linesep}\t{output_path}")
-        print("Clearing...")
+        print(f"Found dir:{os.linesep}\t{output_path}", flush=True)
+        print("Clearing...", flush=True)
 
         # Remove previous zproj output files
         for prev_output_filepath in [
@@ -536,15 +541,13 @@ def inv_depth_verify_output_dir(output_path: str) -> None:
             ):
                 os.remove(prev_output_filepath)
 
-        print(f"... Cleared dir:{os.linesep}\t{output_path}")
+        print(f"... Cleared dir:{os.linesep}\t{output_path}", flush=True)
 
-    print(SFM.success)
+    print(SFM.success, flush=True)
     section_footer()
 
 
-def inv_depth_verify_config_file(
-    config_path: str, n_models: int
-) -> Dict[str, Any]:
+def inv_depth_verify_config_file(config_path: str, n_models: int) -> Dict[str, Any]:
     """Verifies that the config file exists and is valid.
 
     Args:
@@ -562,7 +565,7 @@ def inv_depth_verify_config_file(
     if not osp.isfile(config_path):
         raise FileNotFoundError(f"Config file not found: {config_path}")
 
-    print(f"Using config file: {os.linesep}\t{config_path}")
+    print(f"Using config file: {os.linesep}\t{config_path}", flush=True)
 
     with open(config_path, "r", encoding="utf8") as config_fp:
         config = json.load(config_fp)
@@ -573,10 +576,10 @@ def inv_depth_verify_config_file(
             "is greater than number of saved models."
         )
 
-    print(f"{os.linesep}Parameter values:")
+    print(f"{os.linesep}Parameter values:", flush=True)
     for key, val in config.items():
-        print(f"{key:<20}{val:>20}")
-    print(SFM.success)
+        print(f"{key:<20}{val:>20}", flush=True)
+    print(SFM.success, flush=True)
     section_footer()
 
     return config

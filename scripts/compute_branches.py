@@ -11,15 +11,15 @@ import cv2
 from matplotlib import pyplot as plt
 from networkx.exception import NetworkXPointlessConcept as nxPointlessConceptException
 from skimage.exposure import rescale_intensity
-from skimage.filters import gaussian, frangi, median
+from skimage.feature import canny
+from skimage.filters import gaussian, sato, unsharp_mask
 from skimage.transform import resize
-from skimage.morphology import medial_axis, disk, binary_erosion, dilation
-from skimage import measure
+from skimage.morphology import medial_axis, disk, binary_erosion, dilation, square, closing
 from scipy.ndimage import distance_transform_edt
 
 from fl_tissue_model_tools import helper, models, models_util, defs
 from fl_tissue_model_tools import script_util as su
-from fl_tissue_model_tools.transforms import filter_branch_seg_mask
+from fl_tissue_model_tools.transforms import filter_branch_seg_mask, regionprops_image
 from fl_tissue_model_tools.topology import MorseGraph
 from fl_tissue_model_tools.well_mask_generation import (
     generate_well_mask,
@@ -89,7 +89,7 @@ def make_well_mask(img: np.ndarray, use_well_mask: bool):
     """
 
     if use_well_mask:
-        print("Applying mask to image...")
+        print("Applying mask to image...", flush=True)
         well_mask = generate_well_mask(img, return_superellipse_params=True)
     else:
         well_mask = np.full_like(img, fill_value=True, dtype=bool)
@@ -137,10 +137,10 @@ def analyze_img(
     time_index = config.get("time")
     channel_index = config.get("channel")
 
-    print("")
-    print("=========================================")
-    print(f"Analyzing {img_path.stem}...")
-    print("=========================================")
+    print("", flush=True)
+    print("=========================================", flush=True)
+    print(f"Analyzing {img_path.stem}...", flush=True)
+    print("=========================================", flush=True)
 
     img, pix_sizes = helper.load_image(img_path, time_index, channel_index)
     n_dims = img.ndim
@@ -150,7 +150,7 @@ def analyze_img(
         if pix_sizes.X is None:
             print(f"{su.SFM.warning} image_width_microns not provided in the config, "
                   "and could not be inferred from the image metadata. "
-                  "using arbitrary value of 1000 microns.")
+                  "Using arbitrary value of 1000 microns.")
             image_width_microns = 1000
         else:
             image_width_microns = img.shape[-1] * pix_sizes.X
@@ -172,132 +172,67 @@ def analyze_img(
         original_image = img.max(0)
         save_vis(original_image, vis_dir, "original_image.png")
 
-        # Apply gaussian filter with a small sigma
+        # Apply mild gaussian filter and downsample
         for i in range(len(img)):
             img[i, :] = gaussian(img[i], sigma=1, preserve_range=True)
-
         img = resize(
             img,
             (len(img), *img_dsamp_res),
             order=1,
             preserve_range=True,
             anti_aliasing=True,
-        ).astype(np.float32)
+        )
+        img = rescale_intensity(img, out_range=(0, 1)).astype(np.float32)
 
-        img_vess = np.zeros_like(img)
-
-        for i, im in enumerate(img):
-            im_vess = frangi(im, sigmas=range(1, 16, 2), beta=1.5, black_ridges=False)
-            img_vess[i] = rescale_intensity(im_vess, out_range=(0, 1))
-            img[i] = rescale_intensity(im, out_range=(0, 1))
-
-        maxima = np.ones_like(img, dtype=bool)
-        maxima[1:] = img_vess[1:] > img_vess[:-1]
-        maxima[:-1] &= img_vess[:-1] >= img_vess[1:]
-        img_vess[~maxima] = 0
-        background = img_vess < 0.01
-        img_vess[background] = 0
-        maxima[background] = 0
-
-        ### Handle overlapping regions prior to creating 2D projection:
-        # Find and label regions for each z slice in the vesselness maxima array;
-        # calculate regions for slice as maxima[z-1] | maxima[z] | maxima[z+1],
-        # calculate bbox diagonal length for regions on this mask,
-        # and, in case of overlapping regions at other depths,
-        # use the bbox diagonal length as a priority metric for what to project.
-        # Finally, add a buffer around objects on the projection that exist at
-        # contiguous xy coordinates but >1 difference in z position.
-        # This procedure cleanly separates different-depth objects for the 2D projection
-        # and prioritizes regions with a larger bounding box diagonal in cases of overlap.
-
-        # bbox_diag: Max bbox diagonal of potential vessel (Frangi >.01) at each xy position
-        bbox_diag = np.zeros_like(maxima[0], dtype=np.float32)
-
-        # best_vess_zpos: z position of voxel with max bbox diagonal at each xy position
-        best_vess_zpos = np.full_like(maxima[0], fill_value=-1, dtype=np.int32)
-
-        for z in range(len(maxima)):
-            zslice_regions = maxima[z]
-            # Union mask with the slice above and the slice below the current slice
-            if z != 0:
-                zslice_regions |= maxima[z - 1]
-            if z != len(maxima) - 1:
-                zslice_regions |= maxima[z + 1]
-            slice_region_labels = measure.label(zslice_regions)
-            bbox = measure.regionprops_table(
-                label_image=slice_region_labels,
-                properties=["bbox"],
+        # Vesselness filter with the Sato method
+        img_vess = np.zeros_like(img, shape=(len(img) - 1, *img.shape[1:]))
+        print("Processing slices...", flush=True)
+        for z in range(len(img) - 1):
+            im = np.maximum(img[z], img[z + 1])
+            img_vess[z] = sato(
+                im, sigmas=[1, 2, 3, 4, 5, 7, 9, 11, 13, 15], black_ridges=False
             )
-            x0, y0 = bbox["bbox-0"], bbox["bbox-1"]
-            x1, y1 = bbox["bbox-2"], bbox["bbox-3"]
-            # Calculate (squared) length of regions bbox diagonals
-            diag_lengths = (x0 - x1) ** 2 + (y0 - y1) ** 2
-            diag_lengths = np.insert(diag_lengths, 0, 0)
-            slice_region_labels[~maxima[z]] = 0
-            cur_bbox_diag = diag_lengths[slice_region_labels]
-            is_max = cur_bbox_diag > bbox_diag
-            best_vess_zpos[is_max] = z
-            bbox_diag[is_max] = cur_bbox_diag[is_max]
+            print(".", end="", flush=True)
+        print("", flush=True)
 
-        # Calculate buffer region of separation between objects at different depths
-        combined_buffer_mask = np.zeros_like(bbox_diag, dtype=bool)
-        for row_shift in (-1, 0, 1):
-            for col_shift in (-1, 0, 1):
-                if row_shift == col_shift == 0:
-                    continue
-                # Compare source array elements to shifted (in 1 of 8 directions) array
-                src_rows_slice = [None, None]
-                src_cols_slice = [None, None]
-                dst_rows_slice = [None, None]
-                dst_cols_slice = [None, None]
-                if row_shift == -1:  # Up
-                    src_rows_slice[0] = 1
-                    dst_rows_slice[1] = -1
-                elif row_shift == 1:  # Down
-                    src_rows_slice[1] = -1
-                    dst_rows_slice[0] = 1
-                if col_shift == -1:  # Left
-                    src_cols_slice[0] = 1
-                    dst_cols_slice[1] = -1
-                elif col_shift == 1:  # Right
-                    src_cols_slice[1] = -1
-                    dst_cols_slice[0] = 1
+        # Sharpen, max-project and find edges
+        img_vess_sharp = unsharp_mask(img_vess, 2, 2)
+        vessels = img_vess_sharp.max(0)
+        edges = canny(vessels, sigma=0)
 
-                src_rows_slice = slice(src_rows_slice[0], src_rows_slice[1])
-                dst_rows_slice = slice(dst_rows_slice[0], dst_rows_slice[1])
-                src_cols_slice = slice(src_cols_slice[0], src_cols_slice[1])
-                dst_cols_slice = slice(dst_cols_slice[0], dst_cols_slice[1])
+        # Mask vessels by flooding in from edges towards positive intensity gradient
+        mask = medial_axis(edges)
 
-                src_slice = src_rows_slice, src_cols_slice
-                dst_slice = dst_rows_slice, dst_cols_slice
-                z_diff = abs(best_vess_zpos[src_slice] - best_vess_zpos[dst_slice])
-                buffer_mask = (z_diff > 1) & (
-                    bbox_diag[src_slice] < bbox_diag[dst_slice]
-                )
-                combined_buffer_mask[src_slice][buffer_mask] = 1
-                best_vess_zpos[src_slice][buffer_mask] = -1
-                bbox_diag[src_slice][buffer_mask] = 0
+        eccentricity = regionprops_image(mask, "eccentricity")
+        circ_diam = regionprops_image(mask, "equivalent_diameter_area")
 
-        # Max-project img_vess and zero-out the buffer region to separate objects
-        img_vess_zprojection = img_vess.max(axis=0)
-        img_vess_zprojection[combined_buffer_mask] = 0
+        mask = np.where(eccentricity * circ_diam > 3.5, mask, 0)
 
-        # Clean up projection by removing objects that are not vessel or tube-like,
-        # Objects with >25% coverage area inside bbox are removed.
-        labeled_vess_img = measure.label(img_vess_zprojection > 0)
-        props = measure.regionprops_table(labeled_vess_img, properties=["extent"])
-        extent = props["extent"]
-        extent = np.insert(extent, 0, 0)
-        img_vess_zprojection[extent[labeled_vess_img] > 0.25] = 0
+        edge_blur_iters = 3
+        for _ in range(edge_blur_iters):
+            vessels_blur = gaussian(vessels)
+            vessels = np.where(mask, vessels_blur, vessels)
 
-        # Enhance centerlines and reduce variance
-        vess_skel = medial_axis(img_vess_zprojection > 0)
-        vess_skel_dil = dilation(vess_skel, disk(1))
-        vess_skel_dil_med = median(vess_skel_dil, disk(1))
-        vess_skel_refined = medial_axis(vess_skel_dil_med)
-        vess_skel_blur = gaussian(vess_skel_refined, 1)
-        img_vess_zprojection = np.sqrt(img_vess_zprojection * vess_skel_blur)
-        img = img_vess_zprojection
+        region_expansion_iters = 10
+        slice_by_offset = {-1: slice(1, None), 0: slice(None, None), 1: slice(None, -1)}
+        for _ in range(region_expansion_iters):
+            mask_lo = np.zeros_like(mask)
+            mask_hi = np.zeros_like(mask)
+            for r, c in (p for p in product((-1, 0, 1), repeat=2) if p != (0, 0)):
+                src = slice_by_offset[r], slice_by_offset[c]
+                dst = slice_by_offset[-r], slice_by_offset[-c]
+                dst_lt_src = vessels[dst] < vessels[src]
+                mask_lo[dst] = np.where(mask[src] & dst_lt_src, 1, mask_lo[dst])
+                mask_hi[dst] = np.where(mask[src] & ~dst_lt_src, 1, mask_hi[dst])
+            mask |= (vessels > 0.01) & mask_hi & ~mask_lo
+
+        mask &= ~edges
+        vessels_mask = closing(mask, disk(2))
+
+        vessels_mask = filter_branch_seg_mask(vessels_mask, None, False)
+
+        vessels = np.where(dilation(vessels_mask, square(3)), img_vess_sharp.max(0), 0)
+        img = gaussian(vessels)
 
         well_mask, shrunken_well_mask = make_well_mask(img, use_well_mask)
         pruning_mask = np.logical_not(shrunken_well_mask)
@@ -316,8 +251,8 @@ def analyze_img(
         well_mask, shrunken_well_mask = make_well_mask(img, use_well_mask)
         pruning_mask = np.logical_not(shrunken_well_mask)
 
-        print("")
-        print("Segmenting image...")
+        print("", flush=True)
+        print("Segmenting image...", flush=True)
 
         pred = model.predict(img * well_mask, auto_resample=False)
 
@@ -351,10 +286,7 @@ def analyze_img(
         ).astype(np.float32)
 
         pruning_mask = resize(
-            pruning_mask,
-            img_dsamp_res,
-            order=0,
-            preserve_range=True
+            pruning_mask, img_dsamp_res, order=0, preserve_range=True
         ).astype(bool)
 
     if use_well_mask:
@@ -393,7 +325,7 @@ def analyze_img(
 
         if n_dims == 2:
             img = pred
-            print("\nComputing graph and barcode...")
+            print("\nComputing graph and barcode...", flush=True)
 
         min_branch_length_px = microns_to_pixels(
             min_branch_length, img.shape[1], image_width_microns
@@ -402,9 +334,7 @@ def analyze_img(
         max_branch_length_px = (
             None
             if max_branch_length is None
-            else microns_to_pixels(
-                max_branch_length, img.shape[1], image_width_microns
-            )
+            else microns_to_pixels(max_branch_length, img.shape[1], image_width_microns)
         )
         if max_branch_length_px is not None:
             max_branch_length_px = round(max(1, max_branch_length_px))
@@ -424,7 +354,7 @@ def analyze_img(
                 pruning_mask=pruning_mask,
             )
         except nxPointlessConceptException:
-            print(f"No branches found for {img_path.stem}.")
+            print(f"No branches found for {img_path.stem}.", flush=True)
             return
 
         # Save barcode and Morse tree visualization
@@ -446,7 +376,7 @@ def analyze_img(
         plt.savefig(save_path, dpi=200, bbox_inches="tight", pad_inches=0)
         plt.close("all")
 
-        print("\nComputing branch statistics...")
+        print("\nComputing branch statistics...", flush=True)
 
         # Get total and average branch length
         total_branch_length = morse_graph.get_total_branch_length()
@@ -474,25 +404,33 @@ def analyze_img(
             writer = csv.writer(f, lineterminator="\n")
             writer.writerow(fields)
 
-        print(f"Results saved to {output_file}.")
+        print(f"Results saved to {output_file}.", flush=True)
 
 
-def main():
+def main(args=None):
     ### Parse arguments ###
     arg_defaults = {
         "default_config_path": DEFAULT_CONFIG_PATH,
     }
 
-    args = su.parse_branching_args(arg_defaults)
-
-    ### Load/validate config ###
-
-    if not Path(args.config).is_file():
-        print(f"{su.SFM.failure}Config file {args.config} does not exist.")
-        sys.exit()
-
-    with open(args.config, "r", encoding="utf8") as config_fp:
-        config = json.load(config_fp)
+    if args is None:
+        args = su.parse_branching_args(arg_defaults)
+        ### Load/validate config ###
+        if not Path(args.config).is_file():
+            print(
+                f"{su.SFM.failure}Config file {args.config} does not exist.", flush=True
+            )
+            sys.exit()
+        with open(args.config, "r", encoding="utf8") as config_fp:
+            config = json.load(config_fp)
+    else:
+        config = {}
+        config["image_width_microns"] = args.image_width_microns
+        config["graph_thresh_1"] = args.graph_thresh_1
+        config["graph_thresh_2"] = args.graph_thresh_2
+        config["graph_smoothing_window"] = args.graph_smoothing_window
+        config["min_branch_length"] = args.min_branch_length
+        config["remove_isolated_branches"] = args.remove_isolated_branches
 
     model_cfg_path = config.get("model_cfg_path")
 
@@ -502,13 +440,19 @@ def main():
         model_cfg_path = str(model_cfg_dir / f"unet_patch_segmentor_{last_exp}.json")
 
     if not Path(model_cfg_path).is_file():
-        print(f"{su.SFM.failure}Model config file {model_cfg_path} does not exist.")
+        print(
+            f"{su.SFM.failure}Model config file {model_cfg_path} does not exist.",
+            flush=True,
+        )
         sys.exit()
 
     ### Verify input and output directories ###
     input_dir = Path(args.in_root)
     if not input_dir.exists():
-        print(f"{su.SFM.failure}Input directory {args.in_root} does not exist.")
+        print(
+            f"{su.SFM.failure}Input directory {args.in_root} does not exist.",
+            flush=True,
+        )
         sys.exit()
 
     output_dir = Path(args.out_root)
@@ -523,7 +467,7 @@ def main():
     img_paths = glob(str(input_dir / "*"))
 
     if not img_paths:
-        print(f"{su.SFM.failure}No images found in {input_dir}")
+        print(f"{su.SFM.failure}No images found in {input_dir}", flush=True)
         sys.exit()
 
     ### Load model ###
