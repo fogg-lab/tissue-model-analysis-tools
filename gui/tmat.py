@@ -1,7 +1,6 @@
-import multiprocessing
-
+# import multiprocessing
 # multiprocessing.set_start_method("forkserver", force=True)
-multiprocessing.freeze_support()
+# multiprocessing.freeze_support()
 
 from gooey import Gooey, GooeyParser, local_resource_path
 
