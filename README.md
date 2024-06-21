@@ -15,6 +15,8 @@ An application for automated high-throughput analysis of cancer and endothelial 
 
 ## Setup Option 1: Graphical User Interface (GUI)
 
+**Prerequisite for Windows users:** Install Microsoft Visual C++ Redistributable Version from https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist or follow the direct download link for x64 architecture: https://aka.ms/vs/17/release/vc_redist.x64.exe
+
 1. Navigate to the latest release on the [releases page](https://github.com/fogg-lab/tissue-model-analysis-tools/releases).
 2. Under "Assets", download the zip file that corresponds to your system.
    - Windows: tmat-win64.zip
