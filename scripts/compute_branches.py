@@ -166,7 +166,7 @@ def analyze_img(
     )
 
     if n_dims == 3:
-        ### Z stack. Apply Frangi vesselness filter and post-process it.
+        ### Z stack. Apply Sato tubeness filter and post-process it.
 
         # Store max-projection of original image in visualizations directory
         original_image = img.max(0)
