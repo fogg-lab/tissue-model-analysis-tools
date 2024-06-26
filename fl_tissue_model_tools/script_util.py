@@ -131,7 +131,7 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
         "--graph-thresh-1",
         nargs="+",
         type=float,
-        default=5,
+        default=None,   # None => config file takes precedence
         help=(
             "This threshold controls how much of the morse graph is used to compute the number of branches. "
             "Lower values include more of the graph, and more branches are detected. "
@@ -144,7 +144,7 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
         "--graph-thresh-2",
         nargs="+",
         type=float,
-        default=10,
+        default=None,   # None => config file takes precedence
         help=(
             "This is the threshold for connecting branches, e.g. where it is "
             "ambiguous whether two branches are part of the same component. Lower "
@@ -157,14 +157,14 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
     parser.add_argument(
         "--min-branch-length",
         type=float,
-        default=12,
+        default=None,   # None => config file takes precedence
         help=("The minimum branch length (in microns) to consider."),
     )
 
     parser.add_argument(
         "--max-branch-length",
         type=float,
-        default=None,
+        default=None,   # None => config file takes precedence
         help=(
             "This is the maximum branch length (in microns) to consider. By default, "
             "this parameter is not included. If it is not specified, no maximum branch "
@@ -202,6 +202,10 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
     )
 
     args = parser.parse_args()
+
+    if not args.remove_isolated_branches:
+        args.remove_isolated_branches = None    # None => config file takes precedence
+
     return _strip_quotes(args)
 
 
