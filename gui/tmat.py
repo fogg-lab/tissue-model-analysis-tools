@@ -59,7 +59,6 @@ def main():
         )
 
         subparser.add_argument(
-            "-C",
             "--channel",
             type=int,
             default=None,
@@ -70,7 +69,6 @@ def main():
         )
 
         subparser.add_argument(
-            "-T",
             "--time",
             type=int,
             default=None,
@@ -168,6 +166,14 @@ def main():
         "--detect-well",
         action="store_true",
         help="Auto detect the well boundary and exclude regions outside the well.",
+    )
+
+    compute_cell_area_parser.add_argument(
+        "--sd-coef",
+        type=float,
+        default=None,
+        help="A multiplier of the foreground standard deviation used to help "
+             "determine the threshold. See the capabilities notebook for details.",
     )
 
     compute_zproj_parser.add_argument(

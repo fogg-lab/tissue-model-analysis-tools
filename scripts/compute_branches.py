@@ -425,12 +425,20 @@ def main(args=None):
             config = json.load(config_fp)
     else:
         config = {}
-        config["image_width_microns"] = args.image_width_microns
-        config["graph_thresh_1"] = args.graph_thresh_1
-        config["graph_thresh_2"] = args.graph_thresh_2
-        config["graph_smoothing_window"] = args.graph_smoothing_window
-        config["min_branch_length"] = args.min_branch_length
-        config["remove_isolated_branches"] = args.remove_isolated_branches
+
+    # Take in commandline-provided config params
+    args_dict = vars(args)
+    for param in (
+        "image_width_microns",
+        "graph_thresh_1",
+        "graph_thresh_2",
+        "graph_smoothing_window",
+        "min_branch_length",
+        "max_branch_length",
+        "remove_isolated_branches",
+    ):
+        if param not in config or args_dict[param] is not None:
+            config[param] = args_dict[param]
 
     model_cfg_path = config.get("model_cfg_path")
 
