@@ -235,7 +235,7 @@ def main(args=None):
 
     ### Prep images ###
     dsamp_size = config["dsamp_size"]
-    sd_coef = config["sd_coef"]
+    sd_coef = config["sd_coef"] if args.sd_coef is None else args.sd_coef
     rs_seed = None if (config["rs_seed"] == "None") else config["rs_seed"]
     batch_size = config["batch_size"]
 

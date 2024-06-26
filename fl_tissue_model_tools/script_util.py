@@ -88,7 +88,6 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "-C",
         "--channel",
         type=int,
         default=None,
@@ -99,7 +98,6 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "-T",
         "--time",
         type=int,
         default=None,
@@ -114,6 +112,82 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
         "--detect-well",
         action="store_true",
         help="Auto detect the well boundary and exclude regions outside the well.",
+    )
+
+    parser.add_argument(
+        "--image-width-microns",
+        type=float,
+        default=None,
+        help=(
+            "Physical width in microns of the region captured by each image. "
+            "For instance, if 1 pixel in the image corresponds to 0.8 microns, "
+            "this value should equal to 0.8x the horizontal resolution of the image. "
+            "If not specified, the script will attempt to infer this value from the "
+            "image metadata."
+        ),
+    )
+
+    parser.add_argument(
+        "--graph-thresh-1",
+        nargs="+",
+        type=float,
+        default=5,
+        help=(
+            "This threshold controls how much of the morse graph is used to compute the number of branches. "
+            "Lower values include more of the graph, and more branches are detected. "
+            "Higher values include less of the graph, and fewer branches are detected."
+            "You can provide multiple values (separated by space characters) to test multiple thresholds."
+        ),
+    )
+
+    parser.add_argument(
+        "--graph-thresh-2",
+        nargs="+",
+        type=float,
+        default=10,
+        help=(
+            "This is the threshold for connecting branches, e.g. where it is "
+            "ambiguous whether two branches are part of the same component. Lower "
+            "values result in more connected branches, and higher values result in "
+            "more disconnections.\n"
+            "You can provide multiple values (separated by space characters) to test multiple thresholds."
+        ),
+    )
+
+    parser.add_argument(
+        "--min-branch-length",
+        type=float,
+        default=12,
+        help=("The minimum branch length (in microns) to consider."),
+    )
+
+    parser.add_argument(
+        "--max-branch-length",
+        type=float,
+        default=None,
+        help=(
+            "This is the maximum branch length (in microns) to consider. By default, "
+            "this parameter is not included. If it is not specified, no maximum branch "
+            "will be enforced."
+        ),
+    )
+
+    parser.add_argument(
+        "--remove-isolated-branches",
+        action="store_true",
+        help=(
+            "Whether to remove branches that are not connected to any other branches "
+            "after the network is trimmed per the branch length constraints "
+            "(enforcing minimum and maximum branch lengths might isolate some "
+            "branches, which may or may not be desired)."
+        ),
+    )
+
+    parser.add_argument(
+        "--graph-smoothing-window",
+        type=float,
+        default=12,
+        help=("This is the window size (in microns) for smoothing the branch paths."),
     )
 
     parser.add_argument(
@@ -172,7 +246,6 @@ def parse_cell_area_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "-C",
         "--channel",
         type=int,
         default=None,
@@ -183,7 +256,6 @@ def parse_cell_area_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "-T",
         "--time",
         type=int,
         default=None,
@@ -198,6 +270,14 @@ def parse_cell_area_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
         "--detect-well",
         action="store_true",
         help="Auto detect the well boundary and exclude regions outside the well.",
+    )
+
+    parser.add_argument(
+        "--sd-coef",
+        type=float,
+        default=None,
+        help="A multiplier of the foreground standard deviation used to help "
+             "determine the threshold. See the capabilities notebook for details.",
     )
 
     parser.add_argument(
@@ -249,7 +329,6 @@ def parse_zproj_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "-C",
         "--channel",
         type=int,
         default=None,
@@ -260,7 +339,6 @@ def parse_zproj_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "-T",
         "--time",
         type=int,
         default=None,
@@ -333,7 +411,6 @@ def parse_inv_depth_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "-C",
         "--channel",
         type=int,
         default=None,
@@ -344,7 +421,6 @@ def parse_inv_depth_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "-T",
         "--time",
         type=int,
         default=None,
