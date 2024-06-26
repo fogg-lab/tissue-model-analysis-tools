@@ -186,7 +186,7 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
     parser.add_argument(
         "--graph-smoothing-window",
         type=float,
-        default=12,
+        default=None,
         help=("This is the window size (in microns) for smoothing the branch paths."),
     )
 
