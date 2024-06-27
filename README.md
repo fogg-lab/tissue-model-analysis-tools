@@ -11,8 +11,10 @@ An application for automated high-throughput analysis of cancer and endothelial 
 </a>
 
 ## Table of Contents
-**[Setup](#setup)**<br>
+**[GUI Setup](#setup-option-1-graphical-user-interface-gui)**<br>
+**[CLI Setup](setup-option-2-command-line-interface-cli)**<br>
 **[Capabilities](#capabilities)**<br>
+**[Supported Image Formats](#supported-image-formats)**<br>
 **[Usage](#usage)**<br>
 
 ## Setup Option 1: Graphical User Interface (GUI)
@@ -116,6 +118,12 @@ For a detailed description of analysis capabilities, see the [capabilities overv
 * Cell coverage area computation. The input is a directory of images (for instance, Z projections). The output is a CSV file and a directory of binary masks, one mask per image, to visually show what was detected as cells.
 * Invasion depth computation (of Z stacks). The input is a directory of Z stacks. The output is a CSV file containing invasion predictions for each Z position in each Z stack.
 * Quantify microvessel formation (number of branches, lengths of branches). The input is a directory of images. Images can either be 2D images such as Z projections for 3D, Z-stack images. Z stacks should be provided as either single files or numbered image sequences contained in subdirectories, 1 subdirectory per Z stack. The output is a CSV file containing the total number of branches, total branch length, and average branch length. Additionally, this tool outputs a directory of intermediate outputs, which are all visualizations that you can use to confirm the validity of the analysis. These visualizations can also help you tweak the configuration parameters and run the tool again if it doesn't do a very good job.
+
+## Supported Image Formats
+
+Currently supports any images that can be read by [`aicsimageio[nd2]`](https://github.com/AllenCellModeling/aicsimageio) such as TIFF, OME-TIFF, and ND2.
+
+Z stacks can be provided as input to the software in two different ways; either as a single file in a multidimensional image format such as OME-TIFF or ND2, or as a numbered image sequence which is the same as how you might load a Z stack from image sequence in ImageJ. The scripts will infer whether input Z stacks are provided as image sequences or single files, by checking whether there are multiple Z slices per file.
 
 ## Usage
 
