@@ -16,27 +16,7 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 from tensorflow.keras import utils
 from tensorflow.keras.applications import resnet50
 
-from . import defs
 from . import preprocessing as prep
-
-
-def make_dir(path: str) -> None:
-    """Create `path` and all intermediate directories.
-
-    If the provided path is `a/b/c`, all subdirectories or
-    files in `c` will be deleted and `c` will be remade.
-
-    Args:
-        path: Full path to desired directory to be created.
-
-    Returns:
-        None
-
-    """
-    if os.path.exists(path):
-        shutil.rmtree(path)
-    if not os.path.exists(path):
-        os.makedirs(path)
 
 
 def load_inv_depth_img(
