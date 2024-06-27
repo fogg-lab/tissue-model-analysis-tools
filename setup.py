@@ -48,7 +48,7 @@ exclude_packages = ["pydmtgraph.notebooks", "pydmtgraph.figures", "pydmtgraph.da
 
 setup(
     name=pkg_name,
-    version="1.0.4",
+    version="1.0.5",
     description="Automatic image processing software for 3D cancer models",
     author="Fogg Lab",
     packages=find_namespace_packages(exclude=exclude_packages),
