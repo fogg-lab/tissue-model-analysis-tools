@@ -121,7 +121,7 @@ For a detailed description of analysis capabilities, see the [capabilities overv
 
 ## Supported Image Formats
 
-Currently supports any images that can be read by [`aicsimageio[nd2]`](https://github.com/AllenCellModeling/aicsimageio) such as TIFF, OME-TIFF, and ND2. As a workaround for other formats, you can load your CZI/LIF/etc. images into Fiji and convert them, save as TIFF or OME-TIFF.
+Currently supports any images that can be read by [`aicsimageio[nd2]`](https://github.com/AllenCellModeling/aicsimageio) such as TIFF, OME-TIFF, and ND2. As a workaround for other formats, you can use the [bioformats command line tool](https://bio-formats.readthedocs.io/en/stable/users/comlinetools/conversion.html) or Fiji to convert your files to TIFF or OME-TIFF.
 
 Z stacks can be provided as input to the software in two different ways; either as a single file in a multidimensional image format such as OME-TIFF or ND2, or as a numbered image sequence which is the same as how you might load a Z stack from image sequence in ImageJ. The scripts will infer whether input Z stacks are provided as image sequences or single files, by checking whether there are multiple Z slices per file.
 
