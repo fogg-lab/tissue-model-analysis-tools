@@ -3,6 +3,7 @@ import warnings
 from glob import glob
 from typing import List, Tuple, Optional
 from pathlib import Path
+import sys
 
 # Before importing aicsimageio, ignore warning about Java from `bfio.backends`
 import logging
@@ -40,7 +41,7 @@ def load_image(
             f"\x1b[38;5;1m\x1b[1m[FAILURE]\x1b[0m Unsupported image format: {file_path}\n"
             f"Supported formats: {SUPPORTED_IMAGE_FORMATS}\n"
         )
-        exit(1)
+        sys.exit(1)
 
     # AICSImage consistently reads images with the same order of dimensions:
     # Time-Channel-Z-Y-X
