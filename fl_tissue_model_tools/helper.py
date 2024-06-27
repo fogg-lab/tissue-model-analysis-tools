@@ -1,9 +1,9 @@
 import os.path as osp
-import sys
 import warnings
 from glob import glob
 from typing import List, Tuple, Optional
 from pathlib import Path
+import sys
 
 # Before importing aicsimageio, ignore warning about Java from `bfio.backends`
 import logging

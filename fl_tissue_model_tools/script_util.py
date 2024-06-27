@@ -1,17 +1,13 @@
 import argparse
 import os
 import os.path as osp
-from pathlib import Path
 from glob import glob
 import shutil
 import json
-import imghdr
 from dataclasses import dataclass
-from typing import Sequence, Any
+from typing import Sequence, Any, Dict
 
-from typing import Dict
-
-from . import data_prep, helper
+from fl_tissue_model_tools import helper
 
 
 @dataclass
@@ -510,17 +506,18 @@ def cell_area_verify_output_dir(
     section_header("Verifying Output Directory")
 
     if not osp.isdir(output_path):
+        assert not osp.isfile(output_path), f"Output directory is a file: {output_path}"
         print(f"Did not find output dir:{os.linesep}\t{output_path}", flush=True)
         print("Creating...", flush=True)
-        data_prep.make_dir(output_path)
+        os.makedirs(output_path, exist_ok=True)
         print(f"... Created dir:{os.linesep}\t{output_path}", flush=True)
 
-    print("Creating subdirs (overwriting if previously existed)...", flush=True)
+    print("Creating subdirs...", flush=True)
     print(f"\t{output_path}/{thresh_subdir}", flush=True)
     print(f"\t{output_path}/{calc_subdir}", flush=True)
 
-    data_prep.make_dir(f"{output_path}/{thresh_subdir}")
-    data_prep.make_dir(f"{output_path}/{calc_subdir}")
+    os.makedirs(f"{output_path}/{thresh_subdir}", exist_ok=True)
+    os.makedirs(f"{output_path}/{calc_subdir}", exist_ok=True)
 
     print("... Created dirs:", flush=True)
     print(f"\t{output_path}/{thresh_subdir}", flush=True)
@@ -569,23 +566,13 @@ def zproj_verify_output_dir(output_path: str) -> None:
     section_header("Verifying Output Directory")
 
     if not osp.isdir(output_path):
+        assert not osp.isfile(output_path), f"Output directory is a file: {output_path}"
         print(f"Did not find output dir:{os.linesep}\t{output_path}", flush=True)
         print("Creating...", flush=True)
-
-        data_prep.make_dir(output_path)
-
+        os.makedirs(output_path, exist_ok=True)
         print(f"... Created dir:{os.linesep}\t{output_path}", flush=True)
-
     else:
         print(f"Found dir:{os.linesep}\t{output_path}", flush=True)
-        print("Clearing...", flush=True)
-
-        # Remove previous zproj images in output directory
-        for prev_output_fp in [Path(output_path) / f for f in os.listdir(output_path)]:
-            if osp.isfile(prev_output_fp) and imghdr.what(prev_output_fp) is not None:
-                os.remove(prev_output_fp)
-
-        print(f"... Cleared dir:{os.linesep}\t{output_path}", flush=True)
 
     print(SFM.success, flush=True)
     section_footer()
@@ -601,27 +588,13 @@ def inv_depth_verify_output_dir(output_path: str) -> None:
     section_header("Verifying Output Directory")
 
     if not osp.isdir(output_path):
+        assert not osp.isfile(output_path), f"Output directory is a file: {output_path}"
         print(f"Did not find output dir:{os.linesep}\t{output_path}", flush=True)
         print("Creating...", flush=True)
-
-        data_prep.make_dir(output_path)
-
+        os.makedirs(output_path, exist_ok=True)
         print(f"... Created dir:{os.linesep}\t{output_path}", flush=True)
     else:
         print(f"Found dir:{os.linesep}\t{output_path}", flush=True)
-        print("Clearing...", flush=True)
-
-        # Remove previous zproj output files
-        for prev_output_filepath in [
-            Path(output_path) / f for f in os.listdir(output_path)
-        ]:
-            if (
-                osp.isfile(prev_output_filepath)
-                and prev_output_filepath.suffix == ".csv"
-            ):
-                os.remove(prev_output_filepath)
-
-        print(f"... Cleared dir:{os.linesep}\t{output_path}", flush=True)
 
     print(SFM.success, flush=True)
     section_footer()
