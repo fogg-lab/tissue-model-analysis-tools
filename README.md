@@ -12,7 +12,7 @@ An application for automated high-throughput analysis of cancer and endothelial 
 
 ## Table of Contents
 **[GUI Setup](#setup-option-1-graphical-user-interface-gui)**<br>
-**[CLI Setup](setup-option-2-command-line-interface-cli)**<br>
+**[CLI Setup](#setup-option-2-command-line-interface-cli)**<br>
 **[Capabilities](#capabilities)**<br>
 **[Supported Image Formats](#supported-image-formats)**<br>
 **[Usage](#usage)**<br>
