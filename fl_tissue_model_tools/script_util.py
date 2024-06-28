@@ -107,7 +107,8 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
         "-w",
         "--detect-well",
         action="store_true",
-        help="Auto detect the well boundary and exclude regions outside the well.",
+        help=("Auto detect the well boundary and exclude regions outside the well. "
+              "This feature is only enabled when the flag is provided."),
     )
 
     parser.add_argument(
@@ -133,6 +134,7 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
             "Lower values include more of the graph, and more branches are detected. "
             "Higher values include less of the graph, and fewer branches are detected."
             "You can provide multiple values (separated by space characters) to test multiple thresholds."
+            "\nDEFAULT: If no value is specified and no config file is passed, the min branch length will be 5."
         ),
     )
 
@@ -147,6 +149,7 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
             "values result in more connected branches, and higher values result in "
             "more disconnections.\n"
             "You can provide multiple values (separated by space characters) to test multiple thresholds."
+            "\nDEFAULT: If no value is specified and no config file is passed, the min branch length will be 10."
         ),
     )
 
@@ -154,7 +157,8 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
         "--min-branch-length",
         type=float,
         default=None,   # None => config file takes precedence
-        help=("The minimum branch length (in microns) to consider."),
+        help=("The minimum branch length (in microns) to consider.\nDEFAULT: If no value is specified "
+              "and no config file is passed, the min branch length will be 12."),
     )
 
     parser.add_argument(
@@ -183,7 +187,7 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
         "--graph-smoothing-window",
         type=float,
         default=None,
-        help=("This is the window size (in microns) for smoothing the branch paths."),
+        help=("This is the window size (in microns) for smoothing the branch paths. Default=12"),
     )
 
     parser.add_argument(
@@ -277,7 +281,7 @@ def parse_cell_area_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
         type=float,
         default=None,
         help="A multiplier of the foreground standard deviation used to help "
-             "determine the threshold. See the capabilities notebook for details.",
+             "determine the threshold. See the capabilities notebook for details. Default=0",
     )
 
     parser.add_argument(
