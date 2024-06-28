@@ -179,7 +179,8 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
             "Whether to remove branches that are not connected to any other branches "
             "after the network is trimmed per the branch length constraints "
             "(enforcing minimum and maximum branch lengths might isolate some "
-            "branches, which may or may not be desired)."
+            "branches, which may or may not be desired). This behavior is only enabled "
+            "when the flag is provided."
         ),
     )
 
