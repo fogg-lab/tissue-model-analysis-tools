@@ -275,7 +275,7 @@ def parse_cell_area_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
         "--detect-well",
         action="store_true",
         help=("Auto detect the well boundary and exclude regions outside the well. "
-              "This feature is only enabled when the flag is provided.",
+              "This feature is only enabled when the flag is provided."),
     )
 
     parser.add_argument(
