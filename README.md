@@ -121,7 +121,9 @@ For a detailed description of analysis capabilities, see the [capabilities overv
 
 ## Supported Image Formats
 
-`tmat` supports any images that can be read by [`aicsimageio[nd2]`](https://github.com/AllenCellModeling/aicsimageio) such as TIFF, OME-TIFF, and ND2. As a workaround for other formats, you can use the [bioformats command line tool](https://bio-formats.readthedocs.io/en/stable/users/comlinetools/conversion.html) or Fiji to convert your files to TIFF or OME-TIFF and feed the converted files to `tmat`.
+`tmat` supports all images that can be read by [`aicsimageio[nd2]`](https://github.com/AllenCellModeling/aicsimageio) such as TIFF, OME-TIFF, and ND2.
+
+As a workaround for other formats, you can use the [bioformats command line tool](https://bio-formats.readthedocs.io/en/stable/users/comlinetools/conversion.html) or Fiji to convert your files to TIFF or OME-TIFF and feed the converted files to `tmat`. Be aware that this might not preserve metadata related to physical pixel sizes/spacing, which means you will need manually specify parameters such as `image_width_microns` as needed (as it can no longer be inferred for the converted image based on its metadata). 
 
 Z stacks can be provided as input to the software in two different ways; either as a single file in a multidimensional image format such as OME-TIFF or ND2, or as a numbered image sequence which is the same as how you might load a Z stack from image sequence in ImageJ. The scripts will infer whether input Z stacks are provided as image sequences or single files, by checking whether there are multiple Z slices per file.
 
