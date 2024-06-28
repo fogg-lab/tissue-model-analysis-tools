@@ -233,6 +233,7 @@ def analyze_img(
 
         vessels = np.where(dilation(vessels_mask, square(3)), img_vess_sharp.max(0), 0)
         img = gaussian(vessels)
+        save_vis(img, vis_dir, "vesselness_image.png")
 
         well_mask, shrunken_well_mask = make_well_mask(img, use_well_mask)
         pruning_mask = np.logical_not(shrunken_well_mask)
