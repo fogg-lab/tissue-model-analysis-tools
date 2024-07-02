@@ -13,7 +13,7 @@ from fl_tissue_model_tools.scripts import (
 )
 
 # For rich text install older version of `colored`:
-# pip install -I "colored=1.4.3"
+# pip install -I "colored==1.4.3"
 # newer versions of `colored` may not be compatible w/ Gooey.
 
 # See below for hacky fix for Gooey color theme for Mac and Linux users in dark mode:
