@@ -3,6 +3,11 @@
 # multiprocessing.set_start_method("forkserver", force=True)
 # multiprocessing.freeze_support()
 
+# Needed on Windows for something... I don't remember what:
+# import sys
+# sys.stdout.isatty = lambda: False
+# sys.stdout.encoding = sys.getdefaultencoding()
+
 from gooey import Gooey, GooeyParser, local_resource_path
 
 from fl_tissue_model_tools.scripts import (
