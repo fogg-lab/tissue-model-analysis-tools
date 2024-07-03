@@ -1,12 +1,7 @@
-# Needed on macOS to prevent the whole program from opening itself many times:
+# Needed for macOS+PyInstaller to prevent the program from opening itself many times:
 # import multiprocessing
 # multiprocessing.set_start_method("forkserver", force=True)
 # multiprocessing.freeze_support()
-
-# Needed on Windows for something... I don't remember what:
-# import sys
-# sys.stdout.isatty = lambda: False
-# sys.stdout.encoding = sys.getdefaultencoding()
 
 from gooey import Gooey, GooeyParser, local_resource_path
 
@@ -20,6 +15,14 @@ from fl_tissue_model_tools.scripts import (
 # For rich text install older version of `colored`:
 # pip install -I "colored==1.4.3"
 # newer versions of `colored` may not be compatible w/ Gooey.
+# Also need following workaround on Windows to avoid error with colored and PyInstaller:
+# import sys
+# from collections import namedtuple
+# stdout = sys.stdout
+# sys.stdout = namedtuple("DummyIO", "isatty")(isatty=lambda: False)
+# import colored
+# colored.TTY_AWARE = False
+# sys.stdout = stdout
 
 # See below for hacky fix for Gooey color theme for Mac and Linux users in dark mode:
 # Step 1: See https://github.com/chriskiehl/Gooey/pull/891
@@ -28,6 +31,7 @@ from fl_tissue_model_tools.scripts import (
 # Step 4: Look for all changes in the pull request from step 1 that used
 # `wx.SystemSettings.GetAppearance().IsUsingDarkBackground()`
 # and change it to use `darkdetect` instead.
+
 
 @Gooey(
     program_name="Tissue Model Analysis Tools",
@@ -185,7 +189,7 @@ def main():
         type=float,
         default=None,
         help="A multiplier of the foreground standard deviation used to help "
-             "determine the threshold. See the capabilities notebook for details.",
+        "determine the threshold. See the capabilities notebook for details.",
     )
 
     compute_zproj_parser.add_argument(
