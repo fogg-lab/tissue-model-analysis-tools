@@ -24,7 +24,7 @@ Examples:
     tmat configure -h
     tmat configure "C:\\Users\\Quinn\\Desktop\\some_folder_name"
     tmat compute_inv_depth -h
-    tmat compute_zproj -v "C:\\Users\\Quinn\\input_folder_name" "C:\\Users\\Quinn\\out_folder_name"
+    tmat compute_zproj "C:\\Users\\Quinn\\input_folder_name" "C:\\Users\\Quinn\\out_folder_name"
 """
 
 

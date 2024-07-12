@@ -31,7 +31,7 @@ def simplify_zstack_ids(zstack_ids: list[str]):
 
 
 def find_zstack_image_sequences(input_dir: str):
-    """ Find zstacks from image sequences with numbered filenames.
+    """Find zstacks from image sequences with numbered filenames.
 
     Args:
         input_dir: input directory
@@ -52,9 +52,11 @@ def find_zstack_image_sequences(input_dir: str):
     for zslice_relpath in [osp.relpath(img_path, input_dir) for img_path in img_paths]:
         name = osp.basename(zslice_relpath)
         dir_name = osp.dirname(zslice_relpath)
-        zstack_id = osp.join(dir_name, name.translate(str.maketrans("", "", digits)))
+        zstack_id = osp.join(dir_name, re.sub(r"z\d+", "", name, flags=re.IGNORECASE))
         zslice_stack_ids.append(zstack_id)
-        zslice_numbers_in_name.append(list(map(int, re.findall(r"\d+", name)))[::-1])
+        zslice_numbers_in_name.append(
+            list(map(int, re.findall(r"(?<=z)\d+", name, re.IGNORECASE)))[::-1]
+        )
 
     zslice_stack_ids = simplify_zstack_ids(zslice_stack_ids)
 
@@ -78,7 +80,7 @@ def find_zstack_image_sequences(input_dir: str):
 
 
 def find_zstack_files(input_dir: str):
-    """ Get paths to zstack files.
+    """Get paths to zstack files.
 
     Args:
         - input_dir: input directory

@@ -107,8 +107,10 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
         "-w",
         "--detect-well",
         action="store_true",
-        help=("Auto detect the well boundary and exclude regions outside the well. "
-              "This feature is only enabled when the flag is provided."),
+        help=(
+            "Auto detect the well boundary and exclude regions outside the well. "
+            "This feature is only enabled when the flag is provided."
+        ),
     )
 
     parser.add_argument(
@@ -128,7 +130,7 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
         "--graph-thresh-1",
         nargs="+",
         type=float,
-        default=None,   # None => config file takes precedence
+        default=None,  # None => config file takes precedence
         help=(
             "This threshold controls how much of the morse graph is used to compute the number of branches. "
             "Lower values include more of the graph, and more branches are detected. "
@@ -142,7 +144,7 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
         "--graph-thresh-2",
         nargs="+",
         type=float,
-        default=None,   # None => config file takes precedence
+        default=None,  # None => config file takes precedence
         help=(
             "This is the threshold for connecting branches, e.g. where it is "
             "ambiguous whether two branches are part of the same component. Lower "
@@ -156,15 +158,17 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
     parser.add_argument(
         "--min-branch-length",
         type=float,
-        default=None,   # None => config file takes precedence
-        help=("The minimum branch length (in microns) to consider.\nDEFAULT: If no value is specified "
-              "and no config file is passed, the min branch length will be 12."),
+        default=None,  # None => config file takes precedence
+        help=(
+            "The minimum branch length (in microns) to consider.\nDEFAULT: If no value is specified "
+            "and no config file is passed, the min branch length will be 12."
+        ),
     )
 
     parser.add_argument(
         "--max-branch-length",
         type=float,
-        default=None,   # None => config file takes precedence
+        default=None,  # None => config file takes precedence
         help=(
             "This is the maximum branch length (in microns) to consider. By default, "
             "this parameter is not included. If it is not specified, no maximum branch "
@@ -188,7 +192,9 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
         "--graph-smoothing-window",
         type=float,
         default=None,
-        help=("This is the window size (in microns) for smoothing the branch paths. Default=12"),
+        help=(
+            "This is the window size (in microns) for smoothing the branch paths. Default=12"
+        ),
     )
 
     parser.add_argument(
@@ -205,7 +211,7 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
     args = parser.parse_args()
 
     if not args.remove_isolated_branches:
-        args.remove_isolated_branches = None    # None => config file takes precedence
+        args.remove_isolated_branches = None  # None => config file takes precedence
 
     return _strip_quotes(args)
 
@@ -274,8 +280,10 @@ def parse_cell_area_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
         "-w",
         "--detect-well",
         action="store_true",
-        help=("Auto detect the well boundary and exclude regions outside the well. "
-              "This feature is only enabled when the flag is provided."),
+        help=(
+            "Auto detect the well boundary and exclude regions outside the well. "
+            "This feature is only enabled when the flag is provided."
+        ),
     )
 
     parser.add_argument(
@@ -283,7 +291,7 @@ def parse_cell_area_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
         type=float,
         default=None,
         help="A multiplier of the foreground standard deviation used to help "
-             "determine the threshold. See the capabilities notebook for details. Default=0",
+        "determine the threshold. See the capabilities notebook for details. Default=0",
     )
 
     parser.add_argument(
@@ -517,6 +525,14 @@ def cell_area_verify_output_dir(
         print("Creating...", flush=True)
         os.makedirs(output_path, exist_ok=True)
         print(f"... Created dir:{os.linesep}\t{output_path}", flush=True)
+    elif len(glob(osp.join(output_path, "*"))) > 0:
+        print(
+            f"{SFM.warning}Output directory is not empty:{os.linesep}\t{output_path}\n"
+            f"{SFM.warning}This will add to the existing contents, which might not be desired.",
+            flush=True,
+        )
+    else:
+        print(f"Found dir:{os.linesep}\t{output_path}", flush=True)
 
     print("Creating subdirs...", flush=True)
     print(f"\t{output_path}/{thresh_subdir}", flush=True)
@@ -577,6 +593,40 @@ def zproj_verify_output_dir(output_path: str) -> None:
         print("Creating...", flush=True)
         os.makedirs(output_path, exist_ok=True)
         print(f"... Created dir:{os.linesep}\t{output_path}", flush=True)
+    elif len(glob(osp.join(output_path, "*"))) > 0:
+        print(
+            f"{SFM.warning}Output directory is not empty:{os.linesep}\t{output_path}\n"
+            f"{SFM.warning}This will add to the existing contents, which might not be desired.",
+            flush=True,
+        )
+    else:
+        print(f"Found dir:{os.linesep}\t{output_path}", flush=True)
+
+    print(SFM.success, flush=True)
+    section_footer()
+
+
+def branching_verify_output_dir(output_path: str) -> None:
+    """Verify output directory is either created or wiped.
+
+    Args:
+        output_path: Path to root output directory.
+
+    """
+    section_header("Verifying Output Directory")
+
+    if not osp.isdir(output_path):
+        assert not osp.isfile(output_path), f"Output directory is a file: {output_path}"
+        print(f"Did not find output dir:{os.linesep}\t{output_path}", flush=True)
+        print("Creating...", flush=True)
+        os.makedirs(output_path, exist_ok=True)
+        print(f"... Created dir:{os.linesep}\t{output_path}", flush=True)
+    elif len(glob(osp.join(output_path, "*"))) > 0:
+        print(
+            f"{SFM.warning}Output directory is not empty:{os.linesep}\t{output_path}\n"
+            f"{SFM.warning}This will add to the existing contents, which might not be desired.",
+            flush=True,
+        )
     else:
         print(f"Found dir:{os.linesep}\t{output_path}", flush=True)
 
@@ -599,6 +649,12 @@ def inv_depth_verify_output_dir(output_path: str) -> None:
         print("Creating...", flush=True)
         os.makedirs(output_path, exist_ok=True)
         print(f"... Created dir:{os.linesep}\t{output_path}", flush=True)
+    elif len(glob(osp.join(output_path, "*"))) > 0:
+        print(
+            f"{SFM.warning}Output directory is not empty:{os.linesep}\t{output_path}\n"
+            f"{SFM.warning}This will add to the existing contents, which might not be desired.",
+            flush=True,
+        )
     else:
         print(f"Found dir:{os.linesep}\t{output_path}", flush=True)
 
