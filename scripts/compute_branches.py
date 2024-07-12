@@ -1,5 +1,6 @@
 import os
 import sys
+from typing import Union
 from pathlib import Path
 from glob import glob
 import json
@@ -14,7 +15,14 @@ from skimage.exposure import rescale_intensity
 from skimage.feature import canny
 from skimage.filters import gaussian, sato, unsharp_mask
 from skimage.transform import resize
-from skimage.morphology import medial_axis, disk, binary_erosion, dilation, square, closing
+from skimage.morphology import (
+    medial_axis,
+    disk,
+    binary_erosion,
+    dilation,
+    square,
+    closing,
+)
 from scipy.ndimage import distance_transform_edt
 
 from fl_tissue_model_tools import helper, models, models_util, defs
@@ -25,6 +33,7 @@ from fl_tissue_model_tools.well_mask_generation import (
     generate_well_mask,
     gen_superellipse_mask,
 )
+from fl_tissue_model_tools import zstacks as zs
 
 
 DEFAULT_CONFIG_PATH = str(defs.SCRIPT_CONFIG_DIR / "default_branching_computation.json")
@@ -82,17 +91,13 @@ def microns_to_pixels(
     return (im_width_px / im_width_microns) * num_microns
 
 
-def make_well_mask(img: np.ndarray, use_well_mask: bool):
+def make_well_mask(img: np.ndarray):
     """
     Create a mask over the well and a smaller, inverted mask for pruning
     The pruning mask is used to remove spurious branches detected near the well edge
     """
 
-    if use_well_mask:
-        print("Applying mask to image...", flush=True)
-        well_mask = generate_well_mask(img, return_superellipse_params=True)
-    else:
-        well_mask = np.full_like(img, fill_value=True, dtype=bool)
+    well_mask = generate_well_mask(img, return_superellipse_params=True)
 
     if isinstance(well_mask, tuple):
         well_mask, t, d, s_a, s_b, c_x, c_y, n = well_mask
@@ -109,11 +114,21 @@ def make_well_mask(img: np.ndarray, use_well_mask: bool):
         # shrink superellipse for the pruning mask using binary erosion
         shrunken_well_mask = binary_erosion(well_mask, disk(5))
 
+    well_mask_coverage = np.sum(well_mask) / well_mask.size
+    if well_mask_coverage < 0.4:
+        print(
+            f"{su.SFM.warning} Well mask coverage is too low ({well_mask_coverage * 100:.2f}%) "
+            "so it will not be used for analysis."
+        )
+        well_mask = np.full_like(img, fill_value=True, dtype=bool)
+        shrunken_well_mask = np.full_like(img, fill_value=True, dtype=bool)
+
     return well_mask, shrunken_well_mask
 
 
 def analyze_img(
-    img_path: Path,
+    img_id: str,
+    img_files: Union[str, list[str]],
     model: models.UNetXceptionPatchSegmentor,
     output_dir: Path,
     config: dict,
@@ -122,9 +137,12 @@ def analyze_img(
     """Measure branches in image and save results to output directory.
 
     Args:
-        img_path (pathlib.Path): Path to image.
+        img_id (str): Name of image.
+        img_files (Union[str, list[str]]): Path to image or list of paths to Z stack images.
         model (models.UNetXceptionPatchSegmentor): Model to use for segmentation.
         output_dir (pathlib.Path): Directory to save results to.
+        config (dict): Configuration parameters for microvessel analysis.
+        use_well_mask (bool, optional): Whether to use a well mask for analysis. Default=False.
     """
 
     image_width_microns = config.get("image_width_microns")
@@ -139,24 +157,38 @@ def analyze_img(
 
     print("", flush=True)
     print("=========================================", flush=True)
-    print(f"Analyzing {img_path.stem}...", flush=True)
+    print(f"Analyzing {img_id}...", flush=True)
     print("=========================================", flush=True)
 
-    img, pix_sizes = helper.load_image(img_path, time_index, channel_index)
+    if isinstance(img_files, str):
+        img_files = [img_files]
+    if len(img_files) == 1:
+        img_path = img_files[0]
+        img, pix_sizes = helper.load_image(img_path, time_index, channel_index)
+    else:
+        imgs = []
+        pix_sizes = None
+        for img_path in img_files:
+            img, pix_sizes = helper.load_image(img_path, time_index, channel_index)
+            imgs.append(img)
+        img = np.stack(imgs, axis=0)
+
     n_dims = img.ndim
 
     if image_width_microns is None:
         # Use pixel size from image metadata if available
         if pix_sizes.X is None:
-            print(f"{su.SFM.warning} image_width_microns not provided in the config, "
-                  "and could not be inferred from the image metadata. "
-                  "Using arbitrary value of 1000 microns.")
+            print(
+                f"{su.SFM.warning} image_width_microns not provided in the config, "
+                "and could not be inferred from the image metadata. "
+                "Using arbitrary value of 1000 microns."
+            )
             image_width_microns = 1000
         else:
             image_width_microns = img.shape[-1] * pix_sizes.X
 
     # Create directory for intermediate outputs
-    vis_dir = output_dir / "visualizations" / img_path.stem
+    vis_dir = output_dir / "visualizations" / img_id
     vis_dir.mkdir(parents=True, exist_ok=True)
 
     img_dsamp_res = (
@@ -171,6 +203,20 @@ def analyze_img(
         # Store max-projection of original image in visualizations directory
         original_image = img.max(0)
         save_vis(original_image, vis_dir, "original_image.png")
+
+        if use_well_mask:
+            original_image_dsamp = resize(
+                original_image,
+                img_dsamp_res,
+                order=1,
+                preserve_range=True,
+                anti_aliasing=True,
+            )
+            well_mask, shrunken_well_mask = make_well_mask(original_image_dsamp)
+        else:
+            well_mask = np.full(img_dsamp_res, fill_value=True, dtype=bool)
+            shrunken_well_mask = np.full(img_dsamp_res, fill_value=True, dtype=bool)
+        pruning_mask = np.logical_not(shrunken_well_mask)
 
         # Apply mild gaussian filter and downsample
         for i in range(len(img)):
@@ -235,9 +281,6 @@ def analyze_img(
         img = gaussian(vessels)
         save_vis(img, vis_dir, "vesselness_image.png")
 
-        well_mask, shrunken_well_mask = make_well_mask(img, use_well_mask)
-        pruning_mask = np.logical_not(shrunken_well_mask)
-
     else:
         ### 2D image. Mask vessels using binary segmentation model and post-process.
         target_shape = tuple(
@@ -249,7 +292,11 @@ def analyze_img(
         save_vis(original_image, vis_dir, "original_image.png")
         img = rescale_intensity(img, out_range=(0, 1)).astype(np.float32)
 
-        well_mask, shrunken_well_mask = make_well_mask(img, use_well_mask)
+        if use_well_mask:
+            well_mask, shrunken_well_mask = make_well_mask(img)
+        else:
+            well_mask = np.full_like(img, fill_value=True, dtype=bool)
+            shrunken_well_mask = np.full_like(img, fill_value=True, dtype=bool)
         pruning_mask = np.logical_not(shrunken_well_mask)
 
         print("", flush=True)
@@ -355,7 +402,7 @@ def analyze_img(
                 pruning_mask=pruning_mask,
             )
         except nxPointlessConceptException:
-            print(f"No branches found for {img_path.stem}.", flush=True)
+            print(f"No branches found for {img_id}.", flush=True)
             return
 
         # Save barcode and Morse tree visualization
@@ -393,7 +440,7 @@ def analyze_img(
 
         # Write results to csv file
         fields = [
-            img_path.stem,
+            img_id,
             total_num_branches,
             total_branch_length,
             avg_branch_length,
@@ -464,18 +511,40 @@ def main(args=None):
         )
         sys.exit()
 
-    output_dir = Path(args.out_root)
-    if not output_dir.exists():
-        output_dir.mkdir(parents=True)
+    try:
+        su.branching_verify_output_dir(args.out_root)
+    except PermissionError as error:
+        print(f"{su.SFM.failure} {error}", flush=True)
+        sys.exit()
 
+    output_dir = Path(args.out_root)
     # Save config to output directory
     with open(output_dir / "config.json", "w", encoding="utf8") as f:
         json.dump(config, f, indent=4)
 
     ### Get image paths ###
-    img_paths = glob(str(input_dir / "*"))
+    img_paths = glob(os.path.join(args.in_root, "*")) + glob(os.path.join(args.in_root, "*", "*"))
 
-    if not img_paths:
+    if len(img_paths) == 0:
+        print(f"{su.SFM.failure} Input directory is empty: {args.in_root}", flush=True)
+        sys.exit(1)
+
+    test_path = img_paths[0]
+    if os.path.isdir(test_path) or helper.get_image_dims(test_path).Z == 1:
+        try:
+            img_paths = zs.find_zstack_image_sequences(args.in_root)
+        except ValueError:
+            img_paths = {}
+    else:
+        img_paths = zs.find_zstack_files(args.in_root)
+    if len(img_paths) == 0:
+        img_paths = {
+            Path(fp).stem: fp
+            for fp in glob(str(input_dir / "*"))
+            if helper.get_image_dims(fp).Z == 1
+        }
+
+    if len(img_paths) == 0:
         print(f"{su.SFM.failure}No images found in {input_dir}", flush=True)
         sys.exit()
 
@@ -486,8 +555,8 @@ def main(args=None):
     config["channel"] = args.channel
 
     ### Analyze images ###
-    for img_path in img_paths:
-        analyze_img(Path(img_path), model, output_dir, config, args.detect_well)
+    for img_id, img_files in img_paths.items():
+        analyze_img(img_id, img_files, model, output_dir, config, args.detect_well)
 
 
 if __name__ == "__main__":
