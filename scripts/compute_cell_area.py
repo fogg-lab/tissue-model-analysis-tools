@@ -1,7 +1,7 @@
 import os
 import sys
 from pathlib import Path
-from typing import Sequence, Tuple, List, Optional
+from typing import Sequence, Tuple, List, Optional, Union
 import cv2
 import numpy as np
 import numpy.typing as npt
@@ -21,7 +21,7 @@ CALC_SUBDIR = "calculations"
 
 
 def load_img(
-    img_path: str,
+    img_path: Union[str, List[str]],
     dsamp_size: Optional[int] = None,
     T: Optional[int] = None,
     C: Optional[int] = None,
@@ -29,7 +29,7 @@ def load_img(
     """Load and optionally downsample image.
 
     Args:
-        img_path: Path to image.
+        img_path: Path to image, or list of paths if z stack from image sequence.
         dsize: If downsampling image, size to downsample to.
         T (int, optional): Index of the time to use (needed if time series).
         C (int, optional): Index of the color channel to use (needed if multi channel).
@@ -40,8 +40,13 @@ def load_img(
     """
 
     img = helper.load_image(img_path, T, C)[0]
+
     if img.ndim == 3:
-        # Max projection
+        print(
+            f"{su.SFM.warning} Input images are Z stacks. Creating maximum intensity "
+            "Z projections prior to cell area calculation.",
+            flush=True,
+        )
         img = img.max(0)
     if dsamp_size is not None:
         dsamp_ratio = dsamp_size / max(img.shape)
@@ -81,7 +86,7 @@ def mask_and_threshold(
 
 
 def prep_images(
-    img_paths: Sequence[str],
+    img_paths: Dict[str, Union[str, List[str]]],
     dsamp_size: int,
     T: Optional[int] = None,
     C: Optional[int] = None,
@@ -210,11 +215,7 @@ def main(args=None):
         args_prespecified = True
 
     ### Verify input source ###
-    try:
-        all_img_paths = su.cell_area_verify_input_dir(args.in_root)
-    except FileNotFoundError as error:
-        print(f"{su.SFM.failure} {error}", flush=True)
-        sys.exit(1)
+    all_img_paths = su.cell_area_verify_input_dir(args.in_root)
 
     ### Verify output destination ###
     try:

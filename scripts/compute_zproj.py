@@ -24,26 +24,6 @@ proj_methods = {
 }
 
 
-def get_zstack(
-    zs_path: Union[str, list[str]], T: Optional[int] = None, C: Optional[int] = None
-) -> npt.NDArray:
-    """Given path to Z stack, return Z stack as array of images.
-
-    Args:
-        zs_path: Path to Z stack or an ordered sequence of paths to Z slices.
-        T (int, optional): Index of the time to use (needed if time series).
-        C (int, optional): Index of the color channel to use (needed if multi channel).
-
-    Returns:
-        Z stack as array of images.
-    """
-
-    if isinstance(zs_path, str):
-        return helper.load_image(zs_path, T, C)[0]
-    else:
-        return np.array([helper.load_image(zsp, T, C)[0] for zsp in zs_path])
-
-
 def main(args=None):
     """Computes z projections and saves to output directory."""
     if args is None:
@@ -62,7 +42,10 @@ def main(args=None):
         sys.exit(1)
 
     if not os.path.isdir(args.in_root):
-        print(f"{su.SFM.failure} Input directory does not exist: {args.in_root}", flush=True)
+        print(
+            f"{su.SFM.failure} Input directory does not exist: {args.in_root}",
+            flush=True,
+        )
         sys.exit(1)
 
     zstack_paths = glob(os.path.join(args.in_root, "*"))
@@ -92,7 +75,7 @@ def main(args=None):
     try:
         # zprojs: A dictionary of Z projections, keyed by Z stack ID.
         zprojs = {
-            zs_id: proj_method(get_zstack(zsp, args.time, args.channel))
+            zs_id: proj_method(helper.load_image(zsp, args.time, args.channel)[0])
             for (zs_id, zsp) in zstack_paths.items()
         }
     except OSError as error:
@@ -130,7 +113,9 @@ def main(args=None):
             script_path = defs.SCRIPT_DIR / "compute_cell_area.py"
 
             options = [
-                arg for arg in sys.argv[1:] if arg != args.in_root and arg != args.out_root
+                arg
+                for arg in sys.argv[1:]
+                if arg != args.in_root and arg != args.out_root
             ]
 
             # use out_root as both in_root and out_root

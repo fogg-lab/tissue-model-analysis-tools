@@ -1,7 +1,7 @@
 import os.path as osp
 import warnings
 from glob import glob
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Union
 from pathlib import Path
 import sys
 
@@ -13,18 +13,19 @@ from aicsimageio import AICSImage
 from aicsimageio.dimensions import Dimensions
 from aicsimageio.types import PhysicalPixelSizes
 from aicsimageio.exceptions import UnsupportedFileFormatError
+import numpy as np
 from numpy.typing import NDArray
 
 from fl_tissue_model_tools.defs import SUPPORTED_IMAGE_FORMATS
 
 
 def load_image(
-    file_path: str, T: Optional[int] = None, C: Optional[int] = None
+    file_path: Union[str, list[str]], T: Optional[int] = None, C: Optional[int] = None
 ) -> tuple[NDArray, PhysicalPixelSizes]:
     """Load ZYX or YX image from path using AICSImage.
 
     Args:
-        file_path (str): Path to image.
+        file_path (Union[str, list[str]]): Path to image or paths for image sequence.
         T (int, optional): Index of the time to use (needed if time series).
         C (int, optional): Index of the color channel to use (needed if multi channel).
 
@@ -33,6 +34,13 @@ def load_image(
         PhysicalPixelSizes: Physical pixel sizes, most likely in microns. If unparsable,
                             returns `PhysicalPixelSizes(Z=None, Y=None, X=None)`.
     """
+
+    if isinstance(file_path, list):
+        # Z stack from image sequence
+        images, pixel_sizes = zip(*[load_image(fp, T, C) for fp in file_path])
+        pixel_sizes = pixel_sizes[0]
+        image = np.array(images)
+        return image, pixel_sizes
 
     try:
         img_reader = AICSImage(file_path)
