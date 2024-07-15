@@ -82,7 +82,7 @@ def main(args=None):
         su.zproj_verify_output_dir(args.out_root)
     except PermissionError as error:
         print(f"{su.SFM.failure} {error}", flush=True)
-        sys.exit()
+        sys.exit(1)
 
     ### Compute Z projections ###
     su.section_header("Constructing Z projections")
@@ -97,7 +97,7 @@ def main(args=None):
         }
     except OSError as error:
         print(f"{su.SFM.failure}{error}", flush=True)
-        sys.exit()
+        sys.exit(1)
 
     print("... Projections computed.", flush=True)
 

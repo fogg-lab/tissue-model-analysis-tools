@@ -49,7 +49,7 @@ def main(args=None):
         su.inv_depth_verify_output_dir(args.out_root)
     except PermissionError as e:
         print(f"{su.SFM.failure} {e}", flush=True)
-        sys.exit()
+        sys.exit(1)
 
     ### Load best hyperparameters ###
     su.section_header("Loading Classifier")
@@ -78,7 +78,7 @@ def main(args=None):
         config = su.inv_depth_verify_config_file(config_path, n_models)
     except FileNotFoundError as e:
         print(f"{su.SFM.failure} {e}", flush=True)
-        sys.exit()
+        sys.exit(1)
     n_pred_models = config["n_pred_models"]
 
     best_ensemble_dir = defs.MODEL_TRAINING_DIR / "best_ensemble"

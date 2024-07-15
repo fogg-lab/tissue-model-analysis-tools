@@ -214,14 +214,14 @@ def main(args=None):
         all_img_paths = su.cell_area_verify_input_dir(args.in_root)
     except FileNotFoundError as error:
         print(f"{su.SFM.failure} {error}", flush=True)
-        sys.exit()
+        sys.exit(1)
 
     ### Verify output destination ###
     try:
         su.cell_area_verify_output_dir(args.out_root, THRESH_SUBDIR, CALC_SUBDIR)
     except PermissionError as error:
         print(f"{su.SFM.failure} {error}", flush=True)
-        sys.exit()
+        sys.exit(1)
 
     ### Load config ###
     config_path = DEFAULT_CONFIG_PATH if args_prespecified else args.config
@@ -229,7 +229,7 @@ def main(args=None):
         config = su.cell_area_verify_config_file(config_path)
     except FileNotFoundError as error:
         print(f"{su.SFM.failure} {error}", flush=True)
-        sys.exit()
+        sys.exit(1)
 
     su.section_header("Performing Analysis")
 
@@ -256,7 +256,7 @@ def main(args=None):
             gs_ds_imgs = prep_images(img_paths, dsamp_size, T=args.time, C=args.channel)
         except OSError as error:
             print(f"{su.SFM.failure}{error}", flush=True)
-            sys.exit()
+            sys.exit(1)
 
         # Well masking
         if args.detect_well:

@@ -468,7 +468,7 @@ def main(args=None):
             print(
                 f"{su.SFM.failure}Config file {args.config} does not exist.", flush=True
             )
-            sys.exit()
+            sys.exit(1)
         with open(args.config, "r", encoding="utf8") as config_fp:
             config = json.load(config_fp)
     else:
@@ -500,7 +500,7 @@ def main(args=None):
             f"{su.SFM.failure}Model config file {model_cfg_path} does not exist.",
             flush=True,
         )
-        sys.exit()
+        sys.exit(1)
 
     ### Verify input and output directories ###
     input_dir = Path(args.in_root)
@@ -509,13 +509,13 @@ def main(args=None):
             f"{su.SFM.failure}Input directory {args.in_root} does not exist.",
             flush=True,
         )
-        sys.exit()
+        sys.exit(1)
 
     try:
         su.branching_verify_output_dir(args.out_root)
     except PermissionError as error:
         print(f"{su.SFM.failure} {error}", flush=True)
-        sys.exit()
+        sys.exit(1)
 
     output_dir = Path(args.out_root)
     # Save config to output directory
@@ -546,7 +546,7 @@ def main(args=None):
 
     if len(img_paths) == 0:
         print(f"{su.SFM.failure}No images found in {input_dir}", flush=True)
-        sys.exit()
+        sys.exit(1)
 
     ### Load model ###
     model = models.get_unet_patch_segmentor_from_cfg(model_cfg_path)
