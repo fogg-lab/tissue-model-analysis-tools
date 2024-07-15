@@ -1,7 +1,7 @@
 import os
 import sys
 from pathlib import Path
-from typing import Sequence, Tuple, List, Optional, Union
+from typing import Dict, Tuple, List, Optional, Union
 import cv2
 import numpy as np
 import numpy.typing as npt
