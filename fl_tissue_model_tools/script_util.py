@@ -1,13 +1,16 @@
 import argparse
+import sys
 import os
 import os.path as osp
+from pathlib import Path
 from glob import glob
 import shutil
 import json
 from dataclasses import dataclass
-from typing import Sequence, Any, Dict
+from typing import Any, Dict, Union, List
 
 from fl_tissue_model_tools import helper
+from fl_tissue_model_tools import zstacks as zs
 
 
 @dataclass
@@ -461,7 +464,9 @@ def parse_inv_depth_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
 
 
 ### File/Directory Validation ###
-def cell_area_verify_input_dir(input_path: str) -> Sequence[str]:
+
+
+def cell_area_verify_input_dir(input_path: str) -> Dict[str, Union[str, List[str]]]:
     """Verify appropriate contents of input data directory.
 
     Args:
@@ -472,30 +477,42 @@ def cell_area_verify_input_dir(input_path: str) -> Sequence[str]:
         FileNotFoundError: Input data directory has no images.
 
     Returns:
-        The full paths to each relevant image in the directory.
+        A dictionary containing image names mapped to their paths.
+        Z stacks stored as image sequences are represented by a list of paths.
 
     """
     section_header("Verifying Input Directory")
 
     if not osp.isdir(input_path):
-        raise FileNotFoundError(
-            f"Input data directory not found:{os.linesep}\t{input_path}"
+        print(
+            f"{SFM.failure} Input data directory not found:{os.linesep}\t{input_path}",
+            flush=True,
         )
+        sys.exit(1)
 
-    # Make sure all files are valid image files
-    img_paths = []
-    for fp in glob(osp.join(input_path, "*")):
-        if osp.isfile(fp):
-            # Reading image dimensions should not raise an error
-            # If image is in an unsupported format, `get_image_dims` will raise an error
-            # and print out what the supported formats are.
-            helper.get_image_dims(fp)
-            img_paths.append(fp)
+    img_files = glob(osp.join(input_path, "*")) + glob(osp.join(input_path, "*", "*"))
+    if len(img_files) == 0:
+        print(f"{SFM.failure} Input data directory is empty: {input_path}", flush=True)
+        sys.exit(1)
+
+    test_path = img_files[0]
+    if os.path.isdir(test_path) or helper.get_image_dims(test_path).Z == 1:
+        try:
+            img_paths = zs.find_zstack_image_sequences(input_path)
+        except ValueError:
+            img_paths = {}
+    else:
+        img_paths = zs.find_zstack_files(input_path)
 
     if len(img_paths) == 0:
-        raise FileNotFoundError(
-            f"No files found in input directory:{os.linesep}\t{input_path}"
-        )
+        img_paths = {
+            Path(fp).stem: fp
+            for fp in glob(str(input_path / "*"))
+            if helper.get_image_dims(fp).Z == 1
+        }
+        if len(img_paths) == 0:
+            print(f"{SFM.failure}No images found in {input_path}", flush=True)
+            sys.exit(1)
 
     print(f"Found {len(img_paths)} images in:{os.linesep}\t{input_path}", flush=True)
     print(SFM.success, flush=True)
