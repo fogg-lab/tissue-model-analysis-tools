@@ -5,8 +5,11 @@
 from PyInstaller.utils.hooks import collect_data_files, collect_all
 
 import distributed
+import imagecodecs
 import os.path as osp
+
 distributed_yml_path = osp.join(osp.dirname(distributed.__file__), "distributed.yaml")
+imagecodecs_hiddenimports =  ["imagecodecs." + x for x in imagecodecs._extensions()] + ["imagecodecs._shared"]
 
 block_cipher = None
 
@@ -41,7 +44,7 @@ a = Analysis(
         ("../model_training/binary_segmentation/checkpoints/checkpoint_1.h5", "model_training/binary_segmentation/checkpoints"),
         ("../model_training/binary_segmentation/configs/unet_patch_segmentor_1.json", "model_training/binary_segmentation/configs"),
     ],
-    hiddenimports=["xsdata_pydantic_basemodel.hooks", "xsdata_pydantic_basemodel.hooks.class_type", "PIL._tkinter_finder"],
+    hiddenimports=["xsdata_pydantic_basemodel.hooks", "xsdata_pydantic_basemodel.hooks.class_type", "PIL._tkinter_finder"] + imagecodecs_hiddenimports,
     hookspath=[],
     runtime_hooks=[],
     excludes=[],
