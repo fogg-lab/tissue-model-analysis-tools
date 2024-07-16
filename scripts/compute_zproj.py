@@ -93,7 +93,8 @@ def main(args=None):
 
     print(f"{os.linesep}Saving projections...", flush=True)
     for z_id, zproj in zprojs.items():
-        filename = f"{Path(z_id).stem}_{args.method}{out_ext}"
+        img_id = z_id.replace("/", "_").replace("\\", "_")
+        filename = f"{img_id}_{args.method}{out_ext}"
         save_path = os.path.join(args.out_root, filename)
         cv2.imwrite(save_path, zproj)
 

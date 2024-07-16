@@ -283,7 +283,7 @@ def main(args=None):
     ### Save results ###
     print(f"{os.linesep}Saving results...", flush=True)
 
-    img_ids = [Path(img_n).stem for img_n in img_ids]
+    img_ids = [img_id.replace("/", "_").replace("\\", "_") for img_id in img_ids]
     area_df = pd.DataFrame(data={"image_id": img_ids, "area_pct": area_prop * 100})
 
     # Save intermediate output: thresholded images
