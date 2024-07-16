@@ -251,6 +251,7 @@ def main(args=None):
 
     # Keep a list of all well masks for saving intermediate outputs later
     all_well_masks = []
+    img_ids, all_img_paths = zip(*all_img_paths.items())
 
     for img_paths in chunks(all_img_paths, batch_size):
         try:
@@ -282,7 +283,7 @@ def main(args=None):
     ### Save results ###
     print(f"{os.linesep}Saving results...", flush=True)
 
-    img_ids = [Path(img_n).stem for img_n in all_img_paths]
+    img_ids = [Path(img_n).stem for img_n in img_ids]
     area_df = pd.DataFrame(data={"image_id": img_ids, "area_pct": area_prop * 100})
 
     # Save intermediate output: thresholded images
