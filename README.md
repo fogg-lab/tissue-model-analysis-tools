@@ -15,6 +15,7 @@ An application for automated high-throughput analysis of cancer and endothelial 
 **[CLI Setup](#setup-option-2-command-line-interface-cli)**<br>
 **[Capabilities](#capabilities)**<br>
 **[Supported Image Formats](#supported-image-formats)**<br>
+**[Image Input Directory Structure](#image-input-directory-structure)**<br>
 **[Usage](#usage)**<br>
 
 ## Setup Option 1: Graphical User Interface (GUI)
@@ -126,6 +127,57 @@ For a detailed description of analysis capabilities, see the [capabilities overv
 As a workaround for other formats, you can use the [bioformats command line tool](https://bio-formats.readthedocs.io/en/stable/users/comlinetools/conversion.html) or Fiji to convert your files to TIFF or OME-TIFF and feed the converted files to `tmat`. Be aware that this might not preserve metadata related to physical pixel sizes/spacing, which means you will need manually specify parameters such as `image_width_microns` as needed (as it can no longer be inferred for the converted image based on its metadata). 
 
 Z stacks can be provided as input to the software in two different ways; either as a single file in a multidimensional image format such as OME-TIFF or ND2, or as a numbered image sequence which is the same as how you might load a Z stack from image sequence in ImageJ. The scripts will infer whether input Z stacks are provided as image sequences or single files, by checking whether there are multiple Z slices per file.
+
+## Image Input Directory Structure
+
+Input images should be organized in directories containing only input images, and no other files. Make sure your input images for each tool are organized in one of the following ways:
+
+### 1. Single File Z Stacks (e.g. ND2, OME-TIFF)
+*Valid input directory structure for all tools*
+
+For example:
+- input_directory/
+  - first_zstack.nd2
+  - second_zstack.nd2
+  - ...
+
+### 2. Image Sequences
+*Valid input for all tools*
+
+Example 1 (using subdirectories):
+- input_directory/
+  - first_zstack/
+    - zstack1_z0.tif
+    - zstack1_z1.tif
+    - zstack1_z2.tif
+    - ...
+  - second_zstack/
+    - zstack2_z0.tif
+    - zstack1_z1.tif
+    - zstack1_z2.tif
+    - ...
+
+Example 2 (no subdirectories):
+- input_directory/
+  - first_zstack_Z0.tif
+  - first_zstack_Z1.tif
+  - first_zstack_Z2.tif
+  - ...
+  - second_zstack_Z0.tif
+  - second_zstack_Z1.tif
+  - second_zstack_Z2.tif
+  - ...
+
+What's important here is that all filenames contain the z position denoted by the letter z (uppercase or lowercase) followed by a number. Other characters in the filename must be consistent across all files in the sequence. Also note that nested subdirectories are not supported.
+
+### 3. Z Projections or 2D Images
+*Valid input for cell coverage area computation and microvessels quantification*
+
+For example:
+- input_directory/
+  - image1.tiff
+  - image2.tiff
+  - ...
 
 ## Usage
 
