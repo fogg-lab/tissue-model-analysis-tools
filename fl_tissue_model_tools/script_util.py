@@ -509,7 +509,7 @@ def cell_area_verify_input_dir(input_path: str) -> Dict[str, Union[str, List[str
     if len(img_paths) == 0:
         img_paths = {
             Path(fp).stem: fp
-            for fp in glob(str(input_path / "*"))
+            for fp in glob(osp.join(input_path, "*"))
             if helper.get_image_dims(fp).Z == 1
         }
         if len(img_paths) == 0:
