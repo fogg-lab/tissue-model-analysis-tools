@@ -153,8 +153,8 @@ Example 1 (using subdirectories):
     - ...
   - second_zstack/
     - zstack2_z0.tif
-    - zstack1_z1.tif
-    - zstack1_z2.tif
+    - zstack2_z1.tif
+    - zstack2_z2.tif
     - ...
 
 Example 2 (no subdirectories):
