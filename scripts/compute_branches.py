@@ -524,10 +524,13 @@ def main(args=None):
     if os.path.isdir(test_path) or helper.get_image_dims(test_path).Z == 1:
         try:
             img_paths = zs.find_zstack_image_sequences(args.in_root)
+            if any(len(img_seq) == 1 for img_seq in img_paths.values()):
+                img_paths = {}  # not z stacks. probably projections.
         except ValueError:
             img_paths = {}
     else:
         img_paths = zs.find_zstack_files(args.in_root)
+
     if len(img_paths) == 0:
         img_paths = {
             Path(fp).stem: fp
