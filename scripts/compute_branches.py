@@ -160,18 +160,7 @@ def analyze_img(
     print(f"Analyzing {img_id}...", flush=True)
     print("=========================================", flush=True)
 
-    if isinstance(img_files, str):
-        img_files = [img_files]
-    if len(img_files) == 1:
-        img_path = img_files[0]
-        img, pix_sizes = helper.load_image(img_path, time_index, channel_index)
-    else:
-        imgs = []
-        pix_sizes = None
-        for img_path in img_files:
-            img, pix_sizes = helper.load_image(img_path, time_index, channel_index)
-            imgs.append(img)
-        img = np.stack(imgs, axis=0)
+    img, pix_sizes = helper.load_image(img_files, time_index, channel_index)
 
     n_dims = img.ndim
 
@@ -523,7 +512,9 @@ def main(args=None):
         json.dump(config, f, indent=4)
 
     ### Get image paths ###
-    img_paths = glob(os.path.join(args.in_root, "*")) + glob(os.path.join(args.in_root, "*", "*"))
+    img_paths = glob(os.path.join(args.in_root, "*")) + glob(
+        os.path.join(args.in_root, "*", "*")
+    )
 
     if len(img_paths) == 0:
         print(f"{su.SFM.failure} Input directory is empty: {args.in_root}", flush=True)
@@ -533,10 +524,13 @@ def main(args=None):
     if os.path.isdir(test_path) or helper.get_image_dims(test_path).Z == 1:
         try:
             img_paths = zs.find_zstack_image_sequences(args.in_root)
+            if any(len(img_seq) == 1 for img_seq in img_paths.values()):
+                img_paths = {}  # not z stacks. probably projections.
         except ValueError:
             img_paths = {}
     else:
         img_paths = zs.find_zstack_files(args.in_root)
+
     if len(img_paths) == 0:
         img_paths = {
             Path(fp).stem: fp

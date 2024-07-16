@@ -11,6 +11,7 @@ import pandas as pd
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 os.environ["AUTOGRAPH_VERBOSITY"] = "2"
 import tensorflow as tf
+
 tf.get_logger().setLevel("ERROR")
 tf.autograph.set_verbosity(2)
 import tensorflow.keras.backend as K
@@ -19,7 +20,9 @@ from fl_tissue_model_tools import models, data_prep, defs, helper
 from fl_tissue_model_tools import script_util as su
 from fl_tissue_model_tools import zstacks as zs
 
-DEFAULT_CONFIG_PATH = str(defs.SCRIPT_CONFIG_DIR / "default_invasion_depth_computation.json")
+DEFAULT_CONFIG_PATH = str(
+    defs.SCRIPT_CONFIG_DIR / "default_invasion_depth_computation.json"
+)
 
 
 def main(args=None):
@@ -35,7 +38,10 @@ def main(args=None):
         sys.exit(1)
 
     if not os.path.isdir(args.in_root):
-        print(f"{su.SFM.failure} Input directory does not exist: {args.in_root}", flush=True)
+        print(
+            f"{su.SFM.failure} Input directory does not exist: {args.in_root}",
+            flush=True,
+        )
         sys.exit(1)
 
     zstack_paths = glob(os.path.join(args.in_root, "*"))
@@ -55,13 +61,15 @@ def main(args=None):
     su.section_header("Loading Classifier")
 
     best_hp_path = defs.MODEL_TRAINING_DIR / "invasion_depth_best_hp.json"
-    with open(best_hp_path, 'r') as fp:
+    with open(best_hp_path, "r") as fp:
         best_hp = json.load(fp)
 
     ### Load model training parameters ###
-    training_params_path = defs.MODEL_TRAINING_DIR / "invasion_depth_training_values.json"
-    with open(training_params_path, 'r') as fp:
-       training_values = json.load(fp)
+    training_params_path = (
+        defs.MODEL_TRAINING_DIR / "invasion_depth_training_values.json"
+    )
+    with open(training_params_path, "r") as fp:
+        training_values = json.load(fp)
     if training_values["rs_seed"] == "None":
         training_values["rs_seed"] = None
 
@@ -96,9 +104,14 @@ def main(args=None):
     # Create the (n_pred_models) best models from the saved weights
     K.clear_session()
     inv_depth_models = [
-        models.build_ResNet50_TL(n_outputs, resnet_inp_shape, base_init_weights=None,
-            base_last_layer=last_resnet_layer, base_model_trainable=False)
-            for _ in range(n_pred_models)
+        models.build_ResNet50_TL(
+            n_outputs,
+            resnet_inp_shape,
+            base_init_weights=None,
+            base_last_layer=last_resnet_layer,
+            base_model_trainable=False,
+        )
+        for _ in range(n_pred_models)
     ]
 
     for i, m in enumerate(inv_depth_models):
@@ -107,7 +120,9 @@ def main(args=None):
         # Set trainable to True, load weights, then set back to False
         ith_best_idx = sorted_best_model_idx[i]
         m.trainable = True
-        weights_path = str(best_ensemble_dir / f"best_finetune_weights_{ith_best_idx}.h5")
+        weights_path = str(
+            best_ensemble_dir / f"best_finetune_weights_{ith_best_idx}.h5"
+        )
         m.load_weights(weights_path)
         m.trainable = False
         print(f"... Classifier {i} loaded.", flush=True)
@@ -158,8 +173,7 @@ def main(args=None):
     # Make predictions
     # Probability predictions of each model
     yhatp_m = np.array(
-        d.compute([d.delayed(m.predict)(x).squeeze()
-                    for m in inv_depth_models])[0]
+        d.compute([d.delayed(m.predict)(x).squeeze() for m in inv_depth_models])[0]
     ).T
     # Mean probability predictions (ensemble predictions)
     yhatp = np.mean(yhatp_m, axis=1, keepdims=True)
@@ -169,8 +183,13 @@ def main(args=None):
 
     # Save outputs
     print("Saving results...", flush=True)
-    output_file = pd.DataFrame({"img_name": image_names,
-                    "inv_prob": yhatp.squeeze(), "inv_label": yhat.squeeze()})
+    output_file = pd.DataFrame(
+        {
+            "img_name": image_names,
+            "inv_prob": yhatp.squeeze(),
+            "inv_label": yhat.squeeze(),
+        }
+    )
     out_csv_path = os.path.join(args.out_root, "invasion_depth_predictions.csv")
     output_file.to_csv(out_csv_path, index=False)
     print("... Results saved.", flush=True)

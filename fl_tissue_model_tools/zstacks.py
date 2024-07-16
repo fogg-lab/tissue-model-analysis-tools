@@ -4,13 +4,15 @@ https://github.com/cmcguinness/focusstack
 
 """
 
+from typing import Optional, Union
 import re
-from string import digits
 import os.path as osp
 from glob import glob
 import numpy.typing as npt
 import numpy as np
 import cv2
+
+from fl_tissue_model_tools import helper
 
 
 def simplify_zstack_ids(zstack_ids: list[str]):
