@@ -523,7 +523,7 @@ def main(args=None):
     # Save config to output directory
     cfg_path = helper.get_unique_output_filepath(output_dir / "config.json")
     with open(cfg_path, "w", encoding="utf8") as f:
-        json.dump(config, f, indent=4)
+        json.dump({k: v for k, v in config.items() if v is not None}, f, indent=4)
 
     ### Get image paths ###
     img_paths = glob(os.path.join(args.in_root, "*")) + glob(
