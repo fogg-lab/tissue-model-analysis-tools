@@ -3,9 +3,7 @@ from glob import glob
 from pathlib import Path
 import subprocess
 import sys
-from typing import Optional, Union
 import numpy as np
-import numpy.typing as npt
 import cv2
 
 from fl_tissue_model_tools import defs
@@ -96,6 +94,7 @@ def main(args=None):
         img_id = z_id.replace("/", "_").replace("\\", "_")
         filename = f"{img_id}_{args.method}{out_ext}"
         save_path = os.path.join(args.out_root, filename)
+        save_path = helper.get_unique_output_filepath(save_path)
         cv2.imwrite(save_path, zproj)
 
     print("... Projections saved.", flush=True)

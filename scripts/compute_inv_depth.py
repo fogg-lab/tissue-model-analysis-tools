@@ -191,6 +191,7 @@ def main(args=None):
         }
     )
     out_csv_path = os.path.join(args.out_root, "invasion_depth_predictions.csv")
+    out_csv_path = helper.get_unique_output_filepath(out_csv_path)
     output_file.to_csv(out_csv_path, index=False)
     print("... Results saved.", flush=True)
 

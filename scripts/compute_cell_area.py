@@ -279,9 +279,11 @@ def main(args=None):
     area_prop = np.array(area_prop)
 
     print("... Areas computed successfully.", flush=True)
+    print(su.SFM.success, flush=True)
+    su.section_footer()
 
     ### Save results ###
-    print(f"{os.linesep}Saving results...", flush=True)
+    su.section_header("Saving results...")
 
     img_ids = [img_id.replace("/", "_").replace("\\", "_") for img_id in img_ids]
     area_df = pd.DataFrame(data={"image_id": img_ids, "area_pct": area_prop * 100})
@@ -291,16 +293,14 @@ def main(args=None):
         if args.detect_well:
             # Save masked image
             out_img = all_well_masks[i]
-            out_path = os.path.join(
-                args.out_root, THRESH_SUBDIR, f"{img_id}_well_mask.png"
-            )
-            cv2.imwrite(out_path, out_img)
+            file = os.path.join(args.out_root, THRESH_SUBDIR, f"{img_id}_well_mask.png")
+            file = helper.get_unique_output_filepath(file)
+            cv2.imwrite(file, out_img)
         # Save thresholded image
         out_img = gmm_thresh_all[i].astype(np.uint8)
-        out_path = os.path.join(
-            args.out_root, THRESH_SUBDIR, f"{img_id}_thresholded.png"
-        )
-        cv2.imwrite(out_path, out_img)
+        file = os.path.join(args.out_root, THRESH_SUBDIR, f"{img_id}_thresholded.png")
+        file = helper.get_unique_output_filepath(file)
+        cv2.imwrite(file, out_img)
 
     if args.detect_well:
         print(
@@ -313,6 +313,7 @@ def main(args=None):
     )
 
     area_out_path = os.path.join(args.out_root, CALC_SUBDIR, "cell_area.csv")
+    area_out_path = helper.get_unique_output_filepath(area_out_path)
     area_df.to_csv(area_out_path, index=False)
 
     print(f"... Area calculations saved to:{os.linesep}\t{area_out_path}", flush=True)
