@@ -1,11 +1,9 @@
 import os
 import sys
 import json
-from pathlib import Path
 from glob import glob
 
 import numpy as np
-import dask as d
 import pandas as pd
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
@@ -143,57 +141,47 @@ def main(args=None):
     else:
         zstack_paths = zs.find_zstack_files(args.in_root)
 
-    images = []
-    image_names = []
+    inv_id_col = "Z Slice ID"
+    inv_prob_col = "Invasion Probability"
+    inv_pred_col = "Invasion Prediction (0=no 1=yes)"
 
-    for zsp in zstack_paths.values():
-        if isinstance(zsp, list):
-            for img_path in zsp:
-                image = helper.load_image(img_path, args.time, args.channel)[0]
-                if image.ndim == 2:
-                    images.append(image)
-                    image_names.append(Path(img_path).stem)
-                else:
-                    for z in range(len(image)):
-                        images.append(image[z])
-                        image_names.append(f"{Path(img_path).stem}_z{z}")
-        else:
-            image = helper.load_image(zsp, args.time, args.channel)[0]
-            if image.ndim == 2:
-                images.append(image)
-                image_names.append(Path(zsp).stem)
-            else:
-                for z in range(len(image)):
-                    images.append(image[z])
-                    image_names.append(f"{Path(zsp).stem}_z{z}")
+    predictions = {
+        inv_prob_col: [],
+        inv_pred_col: [],
+    }
+    z_slice_ids = []
 
-    x = data_prep.prep_inv_depth_imgs(images, resnet_inp_shape[:-1])
-    # Convert to tensor before calling predict() to speed up execution
-    x = tf.convert_to_tensor(x, dtype="float")
+    for zstack_id, zstack_path in zstack_paths.items():
+        # zstack_path might also be a list of paths (z stack from image sequence)
+        print(f"Processing {zstack_id}...", flush=True)
+        try:
+            img, _ = helper.load_image(zstack_path, args.time, args.channel)
+        except OSError as error:
+            print(f"{SFM.failure}{error}", flush=True)
+            sys.exit(1)
+        x = data_prep.prep_inv_depth_imgs(img, resnet_inp_shape[:-1])
+        x = tf.convert_to_tensor(x, dtype="float")
+        # Make predictions
+        yhatp_m = np.array([m.predict(x).squeeze() for m in inv_depth_models]).T
+        # Mean probability predictions (ensemble predictions)
+        yhatp = np.mean(yhatp_m, axis=1, keepdims=True)
+        for z in range(len(yhatp)):
+            slice_id = f"{zstack_id}_z{z}"
+            # yhatp[z] is either a float or a numpy array with one element
+            inv_prob = np.atleast_1d(yhatp[z])[0]
+            inv_prob = round(inv_prob, 4)
+            inv_label = int(inv_prob > cls_thresh)
+            z_slice_ids.append(slice_id)
+            predictions[inv_prob_col].append(inv_prob)
+            predictions[inv_pred_col].append(inv_label)
 
-    # Make predictions
-    # Probability predictions of each model
-    yhatp_m = np.array(
-        d.compute([d.delayed(m.predict)(x).squeeze() for m in inv_depth_models])[0]
-    ).T
-    # Mean probability predictions (ensemble predictions)
-    yhatp = np.mean(yhatp_m, axis=1, keepdims=True)
-    # Threshold probability predictions
-    yhat = (yhatp > cls_thresh).astype(np.int32)
-    print("... Predictions finished.", flush=True)
+    results = pd.DataFrame(predictions, index=pd.Index(z_slice_ids, name=inv_id_col))
 
     # Save outputs
     print("Saving results...", flush=True)
-    output_file = pd.DataFrame(
-        {
-            "img_name": image_names,
-            "inv_prob": yhatp.squeeze(),
-            "inv_label": yhat.squeeze(),
-        }
-    )
     out_csv_path = os.path.join(args.out_root, "invasion_depth_predictions.csv")
     out_csv_path = helper.get_unique_output_filepath(out_csv_path)
-    output_file.to_csv(out_csv_path, index=False)
+    results.to_csv(out_csv_path)
     print("... Results saved.", flush=True)
 
     print(SFM.success, flush=True)
