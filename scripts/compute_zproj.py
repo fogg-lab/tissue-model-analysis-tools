@@ -8,6 +8,7 @@ import cv2
 
 from fl_tissue_model_tools import defs
 from fl_tissue_model_tools import script_util as su
+from fl_tissue_model_tools import success_fail_messages as SFM
 from fl_tissue_model_tools import zstacks as zs
 from fl_tissue_model_tools import helper
 from fl_tissue_model_tools.scripts import compute_cell_area
@@ -36,12 +37,12 @@ def main(args=None):
 
     ### Verify input source ###
     if os.path.isfile(args.in_root):
-        print(f"{su.SFM.failure} Input directory is a file: {args.in_root}", flush=True)
+        print(f"{SFM.failure} Input directory is a file: {args.in_root}", flush=True)
         sys.exit(1)
 
     if not os.path.isdir(args.in_root):
         print(
-            f"{su.SFM.failure} Input directory does not exist: {args.in_root}",
+            f"{SFM.failure} Input directory does not exist: {args.in_root}",
             flush=True,
         )
         sys.exit(1)
@@ -49,7 +50,7 @@ def main(args=None):
     zstack_paths = glob(os.path.join(args.in_root, "*"))
 
     if len(zstack_paths) == 0:
-        print(f"{su.SFM.failure} Input directory is empty: {args.in_root}", flush=True)
+        print(f"{SFM.failure} Input directory is empty: {args.in_root}", flush=True)
         sys.exit(1)
 
     test_path = zstack_paths[0]
@@ -62,7 +63,7 @@ def main(args=None):
     try:
         su.zproj_verify_output_dir(args.out_root)
     except PermissionError as error:
-        print(f"{su.SFM.failure} {error}", flush=True)
+        print(f"{SFM.failure} {error}", flush=True)
         sys.exit(1)
 
     ### Compute Z projections ###
@@ -77,7 +78,7 @@ def main(args=None):
             for (zs_id, zsp) in zstack_paths.items()
         }
     except OSError as error:
-        print(f"{su.SFM.failure}{error}", flush=True)
+        print(f"{SFM.failure}{error}", flush=True)
         sys.exit(1)
 
     print("... Projections computed.", flush=True)
@@ -98,7 +99,7 @@ def main(args=None):
         cv2.imwrite(save_path, zproj)
 
     print("... Projections saved.", flush=True)
-    print(su.SFM.success, flush=True)
+    print(SFM.success, flush=True)
     print(su.END_SEPARATOR, flush=True)
 
     if compute_area_after_zproj:

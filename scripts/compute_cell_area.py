@@ -13,6 +13,7 @@ from fl_tissue_model_tools import defs
 from fl_tissue_model_tools import helper
 from fl_tissue_model_tools import preprocessing as prep
 from fl_tissue_model_tools import script_util as su
+from fl_tissue_model_tools import success_fail_messages as SFM
 from fl_tissue_model_tools.well_mask_generation import generate_well_mask
 
 DEFAULT_CONFIG_PATH = str(defs.SCRIPT_CONFIG_DIR / "default_cell_area_computation.json")
@@ -43,7 +44,7 @@ def load_img(
 
     if img.ndim == 3:
         print(
-            f"{su.SFM.warning} Input images are Z stacks. Creating maximum intensity "
+            f"{SFM.warning} Input images are Z stacks. Creating maximum intensity "
             "Z projections prior to cell area calculation.",
             flush=True,
         )
@@ -221,7 +222,7 @@ def main(args=None):
     try:
         su.cell_area_verify_output_dir(args.out_root, THRESH_SUBDIR, CALC_SUBDIR)
     except PermissionError as error:
-        print(f"{su.SFM.failure} {error}", flush=True)
+        print(f"{SFM.failure} {error}", flush=True)
         sys.exit(1)
 
     ### Load config ###
@@ -229,7 +230,7 @@ def main(args=None):
     try:
         config = su.cell_area_verify_config_file(config_path)
     except FileNotFoundError as error:
-        print(f"{su.SFM.failure} {error}", flush=True)
+        print(f"{SFM.failure} {error}", flush=True)
         sys.exit(1)
 
     su.section_header("Performing Analysis")
@@ -257,7 +258,7 @@ def main(args=None):
         try:
             gs_ds_imgs = prep_images(img_paths, dsamp_size, T=args.time, C=args.channel)
         except OSError as error:
-            print(f"{su.SFM.failure}{error}", flush=True)
+            print(f"{SFM.failure}{error}", flush=True)
             sys.exit(1)
 
         # Well masking
@@ -279,7 +280,7 @@ def main(args=None):
     area_prop = np.array(area_prop)
 
     print("... Areas computed successfully.", flush=True)
-    print(su.SFM.success, flush=True)
+    print(SFM.success, flush=True)
     su.section_footer()
 
     ### Save results ###
@@ -317,7 +318,7 @@ def main(args=None):
     area_df.to_csv(area_out_path, index=False)
 
     print(f"... Area calculations saved to:{os.linesep}\t{area_out_path}", flush=True)
-    print(su.SFM.success, flush=True)
+    print(SFM.success, flush=True)
     print(su.END_SEPARATOR, flush=True)
 
 

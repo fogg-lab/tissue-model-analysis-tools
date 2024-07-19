@@ -27,6 +27,7 @@ from scipy.ndimage import distance_transform_edt
 
 from fl_tissue_model_tools import helper, models, models_util, defs
 from fl_tissue_model_tools import script_util as su
+from fl_tissue_model_tools import success_fail_messages as SFM
 from fl_tissue_model_tools.transforms import filter_branch_seg_mask, regionprops_image
 from fl_tissue_model_tools.topology import MorseGraph
 from fl_tissue_model_tools.well_mask_generation import (
@@ -119,7 +120,7 @@ def make_well_mask(img: np.ndarray):
     well_mask_coverage = np.sum(well_mask) / well_mask.size
     if well_mask_coverage < 0.4:
         print(
-            f"{su.SFM.warning} Well mask coverage is too low ({well_mask_coverage * 100:.2f}%) "
+            f"{SFM.warning} Well mask coverage is too low ({well_mask_coverage * 100:.2f}%) "
             "so it will not be used for analysis."
         )
         well_mask = np.full_like(img, fill_value=True, dtype=bool)
@@ -172,7 +173,7 @@ def analyze_img(
         # Use pixel size from image metadata if available
         if pix_sizes.X is None:
             print(
-                f"{su.SFM.warning} image_width_microns not provided in the config, "
+                f"{SFM.warning} image_width_microns not provided in the config, "
                 "and could not be inferred from the image metadata. "
                 "Using arbitrary value of 1000 microns."
             )
@@ -468,9 +469,7 @@ def main(args=None):
         args = su.parse_branching_args(arg_defaults)
         ### Load/validate config ###
         if not Path(args.config).is_file():
-            print(
-                f"{su.SFM.failure}Config file {args.config} does not exist.", flush=True
-            )
+            print(f"{SFM.failure}Config file {args.config} does not exist.", flush=True)
             sys.exit(1)
         with open(args.config, "r", encoding="utf8") as config_fp:
             config = json.load(config_fp)
@@ -500,7 +499,7 @@ def main(args=None):
 
     if not Path(model_cfg_path).is_file():
         print(
-            f"{su.SFM.failure}Model config file {model_cfg_path} does not exist.",
+            f"{SFM.failure}Model config file {model_cfg_path} does not exist.",
             flush=True,
         )
         sys.exit(1)
@@ -509,7 +508,7 @@ def main(args=None):
     input_dir = Path(args.in_root)
     if not input_dir.exists():
         print(
-            f"{su.SFM.failure}Input directory {args.in_root} does not exist.",
+            f"{SFM.failure}Input directory {args.in_root} does not exist.",
             flush=True,
         )
         sys.exit(1)
@@ -517,7 +516,7 @@ def main(args=None):
     try:
         su.branching_verify_output_dir(args.out_root)
     except PermissionError as error:
-        print(f"{su.SFM.failure} {error}", flush=True)
+        print(f"{SFM.failure} {error}", flush=True)
         sys.exit(1)
 
     output_dir = Path(args.out_root)
@@ -532,7 +531,7 @@ def main(args=None):
     )
 
     if len(img_paths) == 0:
-        print(f"{su.SFM.failure} Input directory is empty: {args.in_root}", flush=True)
+        print(f"{SFM.failure} Input directory is empty: {args.in_root}", flush=True)
         sys.exit(1)
 
     test_path = img_paths[0]
@@ -554,7 +553,7 @@ def main(args=None):
         }
 
     if len(img_paths) == 0:
-        print(f"{su.SFM.failure}No images found in {input_dir}", flush=True)
+        print(f"{SFM.failure}No images found in {input_dir}", flush=True)
         sys.exit(1)
 
     ### Load model ###
