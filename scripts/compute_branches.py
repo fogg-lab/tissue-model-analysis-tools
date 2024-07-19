@@ -27,7 +27,7 @@ from scipy.ndimage import distance_transform_edt
 
 from fl_tissue_model_tools import helper, models, models_util, defs
 from fl_tissue_model_tools import script_util as su
-from fl_tissue_model_tools import success_fail_messages as SFM
+from fl_tissue_model_tools.success_fail_messages import SFM
 from fl_tissue_model_tools.transforms import filter_branch_seg_mask, regionprops_image
 from fl_tissue_model_tools.topology import MorseGraph
 from fl_tissue_model_tools.well_mask_generation import (

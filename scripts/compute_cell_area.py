@@ -13,7 +13,7 @@ from fl_tissue_model_tools import defs
 from fl_tissue_model_tools import helper
 from fl_tissue_model_tools import preprocessing as prep
 from fl_tissue_model_tools import script_util as su
-from fl_tissue_model_tools import success_fail_messages as SFM
+from fl_tissue_model_tools.success_fail_messages import SFM
 from fl_tissue_model_tools.well_mask_generation import generate_well_mask
 
 DEFAULT_CONFIG_PATH = str(defs.SCRIPT_CONFIG_DIR / "default_cell_area_computation.json")

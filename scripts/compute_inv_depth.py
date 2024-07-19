@@ -18,7 +18,7 @@ import tensorflow.keras.backend as K
 
 from fl_tissue_model_tools import models, data_prep, defs, helper
 from fl_tissue_model_tools import script_util as su
-from fl_tissue_model_tools import success_fail_messages as SFM
+from fl_tissue_model_tools.success_fail_messages import SFM
 from fl_tissue_model_tools import zstacks as zs
 
 DEFAULT_CONFIG_PATH = str(

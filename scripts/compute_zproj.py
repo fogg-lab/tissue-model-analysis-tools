@@ -8,7 +8,7 @@ import cv2
 
 from fl_tissue_model_tools import defs
 from fl_tissue_model_tools import script_util as su
-from fl_tissue_model_tools import success_fail_messages as SFM
+from fl_tissue_model_tools.success_fail_messages import SFM
 from fl_tissue_model_tools import zstacks as zs
 from fl_tissue_model_tools import helper
 from fl_tissue_model_tools.scripts import compute_cell_area
