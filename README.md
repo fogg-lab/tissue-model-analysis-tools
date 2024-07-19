@@ -11,12 +11,17 @@ An application for automated high-throughput analysis of cancer and endothelial 
 </a>
 
 ## Table of Contents
+**[Capabilities](#capabilities)**<br>
 **[GUI Setup](#setup-option-1-graphical-user-interface-gui)**<br>
 **[CLI Setup](#setup-option-2-command-line-interface-cli)**<br>
-**[Capabilities](#capabilities)**<br>
+**[Tools](#tools)**<br>
 **[Supported Image Formats](#supported-image-formats)**<br>
 **[Image Input Directory Structure](#image-input-directory-structure)**<br>
 **[Usage](#usage)**<br>
+
+## Capabilities
+
+For a detailed description of analysis capabilities, see the [capabilities overview notebook](notebooks/capabilities_overview.ipynb).
 
 ## Setup Option 1: Graphical User Interface (GUI)
 
@@ -108,10 +113,6 @@ To update `tmat`, just reinstall it with the `--force` flag:
 pipx install git+https://github.com/fogg-lab/tissue-model-analysis-tools.git@#egg=fl_tissue_model_tools --force
 tmat configure
 ```
-
-## Capabilities
-
-For a detailed description of analysis capabilities, see the [capabilities overview notebook](notebooks/capabilities_overview.ipynb).
 
 ## Tools
 `tmat` consists of four automated image analysis tools:
