@@ -6,27 +6,11 @@ from pathlib import Path
 from glob import glob
 import shutil
 import json
-from dataclasses import dataclass
 from typing import Any, Dict, Union, List
 
 from fl_tissue_model_tools import helper
+from fl_tissue_model_tools.success_fail_messages import SFM
 from fl_tissue_model_tools import zstacks as zs
-
-
-@dataclass
-class SFM:
-    """Colorized messages for success/failure output using Ansi escape sequences."""
-
-    red = "\x1b[38;5;1m\x1b[1m"
-    green = "\x1b[38;5;2m\x1b[1m"
-    cyan = "\x1b[38;5;6m\x1b[1m"
-    yellow = "\x1b[38;5;3m\x1b[1m"
-    reset = "\x1b[0m"
-    success = f"{green}[SUCCESS]{reset}"
-    failure = f"{red}[FAILURE]{reset}"
-    warning = f"{yellow}[WARNING]{reset}"
-    all_succeeded = f"{green}[ALL SUCCEEDED]{reset}"
-    failures_present = f"{red}[FAILURES PRESENT]{reset}"
 
 
 DASH = "="

@@ -4,32 +4,12 @@ https://github.com/cmcguinness/focusstack
 
 """
 
-from typing import Optional, Union
 import re
 import os.path as osp
 from glob import glob
 import numpy.typing as npt
 import numpy as np
 import cv2
-
-from fl_tissue_model_tools import helper
-
-
-def simplify_zstack_ids(zstack_ids: list[str]):
-    """Trim identifiers to remove common prefixes and suffixes.
-
-    Args:
-        zstack_ids: List of zstack ids.
-
-    Returns:
-        list[str]: List of zstack ids with common prefixes and suffixes removed.
-
-    """
-    while zstack_ids[0] and all(zid.startswith(zstack_ids[0][0]) for zid in zstack_ids):
-        zstack_ids = [zid[1:] for zid in zstack_ids]
-    while zstack_ids[0] and all(zid.endswith(zstack_ids[0][-1]) for zid in zstack_ids):
-        zstack_ids = [zid[:-1] for zid in zstack_ids]
-    return zstack_ids
 
 
 def find_zstack_image_sequences(input_dir: str):
@@ -59,8 +39,6 @@ def find_zstack_image_sequences(input_dir: str):
         zslice_numbers_in_name.append(
             list(map(int, re.findall(r"(?<=z)\d+", name, re.IGNORECASE)))[::-1]
         )
-
-    zslice_stack_ids = simplify_zstack_ids(zslice_stack_ids)
 
     # Group Z slices by Z stack identifier
     zstacks = {}
@@ -94,7 +72,7 @@ def find_zstack_files(input_dir: str):
     img_paths = list(filter(osp.isfile, glob(osp.join(input_dir, "*"))))
     if any(osp.isdir(fp) for fp in glob(osp.join(input_dir, "*"))):
         raise ValueError("Found both files and directories in input directory")
-    zstack_ids = simplify_zstack_ids([osp.basename(img_path) for img_path in img_paths])
+    zstack_ids = [osp.basename(img_path) for img_path in img_paths]
     return {zs_id: fp for zs_id, fp in zip(zstack_ids, img_paths)}
 
 

@@ -94,6 +94,31 @@ def load_image(
     return image, pixel_sizes
 
 
+def get_unique_output_filepath(file: Union[str, Path]) -> Union[str, Path]:
+    """Get output path that does not overwrite existing files.
+    If the file already exists, a number is appended to the file name.
+
+    Args:
+        file (Union[str, Path]): Path to the file.
+
+    Returns:
+        Union[str, Path]: Path to the output file.
+    """
+
+    is_pathlib = isinstance(file, Path)
+    file = Path(file)
+    dirname = Path(osp.dirname(file))
+    basename = osp.basename(file)
+    name, ext = osp.splitext(basename)
+    file_num = 1
+    while file.exists():
+        file_num += 1
+        basename = f"{name}-{file_num}{ext}"
+        file = dirname / basename
+
+    return file if is_pathlib else str(file)
+
+
 def get_image_dims(file_path: str) -> Dimensions:
     """Get dimensions of image (Time-Channel-Z-Y-X) from metadata.
 

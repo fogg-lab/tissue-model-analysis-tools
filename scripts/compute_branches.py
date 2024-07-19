@@ -27,6 +27,7 @@ from scipy.ndimage import distance_transform_edt
 
 from fl_tissue_model_tools import helper, models, models_util, defs
 from fl_tissue_model_tools import script_util as su
+from fl_tissue_model_tools.success_fail_messages import SFM
 from fl_tissue_model_tools.transforms import filter_branch_seg_mask, regionprops_image
 from fl_tissue_model_tools.topology import MorseGraph
 from fl_tissue_model_tools.well_mask_generation import (
@@ -60,7 +61,9 @@ def create_output_csv(output_file: Path):
 
 def save_vis(img, save_dir, filename):
     img = rescale_intensity(img, out_range=(0, 255))
-    cv2.imwrite(os.path.join(save_dir, filename), img)
+    file = os.path.join(save_dir, filename)
+    file = helper.get_unique_output_filepath(file)
+    cv2.imwrite(file, img)
 
 
 def pixels_to_microns(
@@ -117,7 +120,7 @@ def make_well_mask(img: np.ndarray):
     well_mask_coverage = np.sum(well_mask) / well_mask.size
     if well_mask_coverage < 0.4:
         print(
-            f"{su.SFM.warning} Well mask coverage is too low ({well_mask_coverage * 100:.2f}%) "
+            f"{SFM.warning} Well mask coverage is too low ({well_mask_coverage * 100:.2f}%) "
             "so it will not be used for analysis."
         )
         well_mask = np.full_like(img, fill_value=True, dtype=bool)
@@ -132,6 +135,7 @@ def analyze_img(
     model: models.UNetXceptionPatchSegmentor,
     output_dir: Path,
     config: dict,
+    created_csv_files: set,
     use_well_mask: bool = False,
 ) -> None:
     """Measure branches in image and save results to output directory.
@@ -142,6 +146,7 @@ def analyze_img(
         model (models.UNetXceptionPatchSegmentor): Model to use for segmentation.
         output_dir (pathlib.Path): Directory to save results to.
         config (dict): Configuration parameters for microvessel analysis.
+        created_csv_files (set): Set of csv files which were already created for this run.
         use_well_mask (bool, optional): Whether to use a well mask for analysis. Default=False.
     """
 
@@ -168,7 +173,7 @@ def analyze_img(
         # Use pixel size from image metadata if available
         if pix_sizes.X is None:
             print(
-                f"{su.SFM.warning} image_width_microns not provided in the config, "
+                f"{SFM.warning} image_width_microns not provided in the config, "
                 "and could not be inferred from the image metadata. "
                 "Using arbitrary value of 1000 microns."
             )
@@ -269,7 +274,6 @@ def analyze_img(
         vessels = np.where(dilation(vessels_mask, square(3)), img_vess_sharp.max(0), 0)
         img = gaussian(vessels)
         save_vis(img, vis_dir, "vesselness_image.png")
-
     else:
         ### 2D image. Mask vessels using binary segmentation model and post-process.
         target_shape = tuple(
@@ -327,7 +331,7 @@ def analyze_img(
         ).astype(bool)
 
     if use_well_mask:
-        cv2.imwrite(os.path.join(vis_dir, "well_mask.png"), well_mask * 255)
+        save_vis(well_mask * 255, vis_dir, "well_mask.png")
 
     embed_graph_params = {
         "thresh1": np.atleast_1d(graph_thresh_1).tolist(),
@@ -396,6 +400,7 @@ def analyze_img(
 
         # Save barcode and Morse tree visualization
         save_path = str(vis_dir / f"barcode{tuned_str}.png")
+        save_path = helper.get_unique_output_filepath(save_path)
         plt.figure(figsize=(6, 6))
         plt.margins(0)
         ax = plt.gca()
@@ -403,6 +408,7 @@ def analyze_img(
         morse_graph.plot_colored_barcode(scaling_factor=scaling_factor, ax=ax)
         plt.savefig(save_path, dpi=300, bbox_inches="tight", pad_inches=0)
         save_path = str(vis_dir / f"morse_tree{tuned_str}.png")
+        save_path = helper.get_unique_output_filepath(save_path)
         fig_width = 10
         fig_height = fig_width * (original_image.shape[0] / original_image.shape[1])
         plt.figure(figsize=(fig_width, fig_height))
@@ -434,9 +440,18 @@ def analyze_img(
             total_branch_length,
             avg_branch_length,
         ]
+
         output_file = output_dir / f"branching_analysis{tuned_str}.csv"
-        if not output_file.is_file():
+        csv_num = 1
+
+        while output_file.is_file() and str(output_file) not in created_csv_files:
+            csv_num += 1
+            output_file = output_dir / f"branching_analysis{tuned_str}-{csv_num}.csv"
+
+        if str(output_file) not in created_csv_files:
             create_output_csv(output_file)
+            created_csv_files.add(str(output_file))
+
         with open(output_file, "a", encoding="utf-16") as f:
             writer = csv.writer(f, lineterminator="\n")
             writer.writerow(fields)
@@ -454,9 +469,7 @@ def main(args=None):
         args = su.parse_branching_args(arg_defaults)
         ### Load/validate config ###
         if not Path(args.config).is_file():
-            print(
-                f"{su.SFM.failure}Config file {args.config} does not exist.", flush=True
-            )
+            print(f"{SFM.failure}Config file {args.config} does not exist.", flush=True)
             sys.exit(1)
         with open(args.config, "r", encoding="utf8") as config_fp:
             config = json.load(config_fp)
@@ -486,7 +499,7 @@ def main(args=None):
 
     if not Path(model_cfg_path).is_file():
         print(
-            f"{su.SFM.failure}Model config file {model_cfg_path} does not exist.",
+            f"{SFM.failure}Model config file {model_cfg_path} does not exist.",
             flush=True,
         )
         sys.exit(1)
@@ -495,7 +508,7 @@ def main(args=None):
     input_dir = Path(args.in_root)
     if not input_dir.exists():
         print(
-            f"{su.SFM.failure}Input directory {args.in_root} does not exist.",
+            f"{SFM.failure}Input directory {args.in_root} does not exist.",
             flush=True,
         )
         sys.exit(1)
@@ -503,12 +516,13 @@ def main(args=None):
     try:
         su.branching_verify_output_dir(args.out_root)
     except PermissionError as error:
-        print(f"{su.SFM.failure} {error}", flush=True)
+        print(f"{SFM.failure} {error}", flush=True)
         sys.exit(1)
 
     output_dir = Path(args.out_root)
     # Save config to output directory
-    with open(output_dir / "config.json", "w", encoding="utf8") as f:
+    cfg_path = helper.get_unique_output_filepath(output_dir / "config.json")
+    with open(cfg_path, "w", encoding="utf8") as f:
         json.dump(config, f, indent=4)
 
     ### Get image paths ###
@@ -517,7 +531,7 @@ def main(args=None):
     )
 
     if len(img_paths) == 0:
-        print(f"{su.SFM.failure} Input directory is empty: {args.in_root}", flush=True)
+        print(f"{SFM.failure} Input directory is empty: {args.in_root}", flush=True)
         sys.exit(1)
 
     test_path = img_paths[0]
@@ -539,7 +553,7 @@ def main(args=None):
         }
 
     if len(img_paths) == 0:
-        print(f"{su.SFM.failure}No images found in {input_dir}", flush=True)
+        print(f"{SFM.failure}No images found in {input_dir}", flush=True)
         sys.exit(1)
 
     ### Load model ###
@@ -548,9 +562,19 @@ def main(args=None):
     config["time"] = args.time
     config["channel"] = args.channel
 
+    created_csv_files = set()
+
     ### Analyze images ###
     for img_id, img_files in img_paths.items():
-        analyze_img(img_id, img_files, model, output_dir, config, args.detect_well)
+        analyze_img(
+            img_id,
+            img_files,
+            model,
+            output_dir,
+            config,
+            created_csv_files,
+            use_well_mask=args.detect_well,
+        )
 
 
 if __name__ == "__main__":
