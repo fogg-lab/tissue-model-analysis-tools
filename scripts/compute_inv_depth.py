@@ -5,13 +5,8 @@ from glob import glob
 
 import numpy as np
 import pandas as pd
-
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
-os.environ["AUTOGRAPH_VERBOSITY"] = "2"
+import silence_tensorflow.auto  # noqa: F401  # pylint:disable=unused-import
 import tensorflow as tf
-
-tf.get_logger().setLevel("ERROR")
-tf.autograph.set_verbosity(2)
 import tensorflow.keras.backend as K
 
 from fl_tissue_model_tools import models, data_prep, defs, helper

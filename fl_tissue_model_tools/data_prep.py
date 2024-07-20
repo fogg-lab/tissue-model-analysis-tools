@@ -1,4 +1,3 @@
-import os
 from typing import Sequence, Callable, Union, Tuple, Dict, Optional
 from copy import deepcopy
 import numpy as np
@@ -9,9 +8,7 @@ from skimage.exposure import rescale_intensity
 from numpy.random import RandomState
 
 from fl_tissue_model_tools import helper
-
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
-
+import silence_tensorflow.auto  # noqa: F401  # pylint:disable=unused-import
 from tensorflow.keras import utils
 from tensorflow.keras.applications import resnet50
 
