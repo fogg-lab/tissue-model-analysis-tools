@@ -1,6 +1,5 @@
 import os
 import sys
-from pathlib import Path
 from typing import Dict, Tuple, List, Optional, Union
 import cv2
 import numpy as np
@@ -43,11 +42,7 @@ def load_img(
     img = helper.load_image(img_path, T, C)[0]
 
     if img.ndim == 3:
-        print(
-            f"{SFM.warning} Input images are Z stacks. Creating maximum intensity "
-            "Z projections prior to cell area calculation.",
-            flush=True,
-        )
+        # If 3D image, take max projection
         img = img.max(0)
     if dsamp_size is not None:
         dsamp_ratio = dsamp_size / max(img.shape)
@@ -253,6 +248,13 @@ def main(args=None):
     # Keep a list of all well masks for saving intermediate outputs later
     all_well_masks = []
     img_ids, all_img_paths = zip(*all_img_paths.items())
+    test_img_path = np.atleast_1d(all_img_paths[0])[0]
+    if helper.get_image_dims(test_img_path).Z > 1:
+        print(
+            f"{SFM.warning} Input images are Z stacks. Creating maximum intensity "
+            "Z projections prior to cell area calculation.",
+            flush=True,
+        )
 
     for img_paths in chunks(all_img_paths, batch_size):
         try:
@@ -284,7 +286,7 @@ def main(args=None):
     su.section_footer()
 
     ### Save results ###
-    su.section_header("Saving results...")
+    su.section_header("Saving Results...")
 
     img_ids = [img_id.replace("/", "_").replace("\\", "_") for img_id in img_ids]
     area_df = pd.DataFrame(data={"image_id": img_ids, "area_pct": area_prop * 100})

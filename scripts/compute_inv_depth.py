@@ -126,7 +126,7 @@ def main(args=None):
     su.section_footer()
 
     ### Generate predictions ###
-    su.section_header("Making predictions")
+    su.section_header("Making Predictions")
 
     # Load data
 

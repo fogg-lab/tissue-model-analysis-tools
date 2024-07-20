@@ -67,7 +67,7 @@ def main(args=None):
         sys.exit(1)
 
     ### Compute Z projections ###
-    su.section_header("Constructing Z projections")
+    su.section_header("Constructing Z Projections")
 
     proj_method = proj_methods[args.method]
     print("Loading and computing Z stacks...", flush=True)
