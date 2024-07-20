@@ -48,7 +48,7 @@ exclude_packages = ["pydmtgraph.notebooks", "pydmtgraph.figures", "pydmtgraph.da
 
 setup(
     name=pkg_name,
-    version="1.0.5",
+    version="1.0.6",
     description="Automatic image processing software for 3D cancer models",
     author="Fogg Lab",
     packages=find_namespace_packages(exclude=exclude_packages),
@@ -74,6 +74,7 @@ setup(
         "scikit-image==0.22.0",
         "scikit-learn==1.5.0",
         "scipy==1.13.1",
+        "silence-tensorflow==1.2.2",
         "tifffile==2023.2.28",
         "tqdm==4.66.4",
         "keras-tuner==1.4.7",
@@ -81,9 +82,7 @@ setup(
         "tensorflow==2.14.1",
     ],
     extras_require={"and-cuda": ["tensorflow[and-cuda]==2.14.1"]},
-    entry_points={
-        "console_scripts": [f"tmat={pkg_name}.cli:main"]
-    },
+    entry_points={"console_scripts": [f"tmat={pkg_name}.cli:main"]},
     classifiers=[
         "Programming Language :: Python :: 3",
         "Operating System :: OS Independent",

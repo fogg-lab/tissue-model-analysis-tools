@@ -1,3 +1,11 @@
+"""Compute Z projections from image stacks.
+
+This module provides functionality to create Z projections from image stacks
+using various projection methods. It supports both single-file Z-stacks and
+image sequences representing Z-stacks.
+See the README and capabilities notebook for more information.
+"""
+
 import os
 from glob import glob
 from pathlib import Path
@@ -8,7 +16,7 @@ import cv2
 
 from fl_tissue_model_tools import defs
 from fl_tissue_model_tools import script_util as su
-from fl_tissue_model_tools.success_fail_messages import SFM
+from fl_tissue_model_tools.colored_messages import SFM
 from fl_tissue_model_tools import zstacks as zs
 from fl_tissue_model_tools import helper
 from fl_tissue_model_tools.scripts import compute_cell_area
@@ -67,36 +75,28 @@ def main(args=None):
         sys.exit(1)
 
     ### Compute Z projections ###
-    su.section_header("Constructing Z projections")
+    su.section_header("Constructing Z Projections")
 
     proj_method = proj_methods[args.method]
     print("Loading and computing Z stacks...", flush=True)
-    try:
-        # zprojs: A dictionary of Z projections, keyed by Z stack ID.
-        zprojs = {
-            zs_id: proj_method(helper.load_image(zsp, args.time, args.channel)[0])
-            for (zs_id, zsp) in zstack_paths.items()
-        }
-    except OSError as error:
-        print(f"{SFM.failure}{error}", flush=True)
-        sys.exit(1)
 
-    print("... Projections computed.", flush=True)
-
-    ### Save Z projections ###
-
-    # Use first extension from the input directory as the output extension
-    out_ext = Path(np.atleast_1d(list(zstack_paths.values())[0])[0]).suffix
-    if out_ext not in (".tif", ".tiff", ".png"):
-        out_ext = ".tiff"
-
-    print(f"{os.linesep}Saving projections...", flush=True)
-    for z_id, zproj in zprojs.items():
-        img_id = z_id.replace("/", "_").replace("\\", "_")
-        filename = f"{img_id}_{args.method}{out_ext}"
+    for zs_id, zs_path in zstack_paths.items():
+        # zs_path might also be a list of paths (z stack from image sequence)
+        print(f"Processing {zs_id}...", flush=True)
+        try:
+            img, _ = helper.load_image(zs_path, args.time, args.channel)
+        except OSError as error:
+            print(f"{SFM.failure}{error}", flush=True)
+            sys.exit(1)
+        zproj = proj_method(img)
+        out_ext = Path(np.atleast_1d(zs_path)[0]).suffix.lower()
+        if out_ext not in (".tif", ".tiff", ".png"):
+            out_ext = ".tiff"
+        filename = f"{zs_id}_{args.method}{out_ext}"
         save_path = os.path.join(args.out_root, filename)
         save_path = helper.get_unique_output_filepath(save_path)
         cv2.imwrite(save_path, zproj)
+        print(f"Z projection saved to {save_path}", flush=True)
 
     print("... Projections saved.", flush=True)
     print(SFM.success, flush=True)

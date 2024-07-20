@@ -14,35 +14,37 @@ EPSILON = np.finfo(np.float32).eps
 
 # Base directory of this package (where it is installed) and its config file path
 PKG_BASE_DIR = Path(__file__).resolve().parent
-PKG_CFG_PATH = PKG_BASE_DIR / 'package.cfg'
+PKG_CFG_PATH = PKG_BASE_DIR / "package.cfg"
 
 # Name of this package
 try:
     _pkg_config = configparser.ConfigParser()
     _pkg_config.read(PKG_CFG_PATH)
-    PKG_NAME = _pkg_config['metadata']['name']
+    PKG_NAME = _pkg_config["metadata"]["name"]
 except KeyError:
     PKG_NAME = "fl_tissue_model_tools"
 
 # Paths to scripts and config files from this package
-PKG_SCRIPTS_DIR = PKG_BASE_DIR / 'scripts'
-PKG_CONFIG_DIR = PKG_BASE_DIR / 'config'
-PKG_MODEL_DIR = PKG_BASE_DIR / 'model_training'
+PKG_SCRIPTS_DIR = PKG_BASE_DIR / "scripts"
+PKG_CONFIG_DIR = PKG_BASE_DIR / "config"
+PKG_MODEL_DIR = PKG_BASE_DIR / "model_training"
 
 # Get the user-specified base directory to store scripts, config, and output
 try:
-    _user_base_dir = _pkg_config[PKG_NAME]['base_dir']
+    _user_base_dir = _pkg_config[PKG_NAME]["base_dir"]
+    is_pyinstaller = False
 except KeyError as e:
     # Might just mean that the user is running the Pyinstaller executable,
     # and that Pyinstaller created a directory containing an executable + files
     # If there is an "_internal" dir, we can safely assume this is the case.
     _user_base_dir = str(Path(sys.executable).parent / "_internal")
-    if not Path(_user_base_dir).is_dir():
+    is_pyinstaller = Path(_user_base_dir).is_dir()
+    if not is_pyinstaller:
         # The original error is probably the most appropriate to raise
         raise e
 
 # Expand a user-relative base directory to an absolute path for current user
-if _user_base_dir.startswith('~'):
+if _user_base_dir.startswith("~"):
     BASE_DIR = Path.home().resolve() / _user_base_dir[2:]
 else:
     BASE_DIR = Path(_user_base_dir)
@@ -50,13 +52,13 @@ else:
 ### Subdirectories in the user-specified base directory
 
 # Directory to store model config files, checkpoints, and logs
-MODEL_TRAINING_DIR = BASE_DIR / 'model_training'
+MODEL_TRAINING_DIR = BASE_DIR / "model_training"
 
 # Config files for each script
-SCRIPT_CONFIG_DIR = BASE_DIR / 'config'
+SCRIPT_CONFIG_DIR = BASE_DIR / "config"
 
 # Scripts from this package plus any custom scripts
-SCRIPT_DIR = BASE_DIR / 'scripts'
+SCRIPT_DIR = BASE_DIR / "scripts"
 
 # Output directory for scripts (each script will create its own subdirectory here)
-OUTPUT_DIR = BASE_DIR / 'output'
+OUTPUT_DIR = BASE_DIR / "output"

@@ -2,17 +2,12 @@ import json
 from pathlib import Path
 from typing import Sequence, Tuple, Union
 from numbers import Number
-import os
 
 import numpy as np
 import cv2
 import dask as d
-
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
-os.environ["AUTOGRAPH_VERBOSITY"] = "2"
+import silence_tensorflow.auto  # noqa
 import tensorflow as tf
-tf.get_logger().setLevel("ERROR")
-tf.autograph.set_verbosity(2)
 import tensorflow.keras.backend as K
 from tensorflow.keras.utils import Sequence as KerasSequence
 from tensorflow.keras import Model, optimizers
@@ -21,8 +16,13 @@ from tensorflow.keras.optimizers.schedules import LearningRateSchedule
 from fl_tissue_model_tools import defs
 
 
-def mean_iou_coef(y: tf.Tensor, yhat: tf.Tensor, smooth: float=1.0,
-                  obs_axes: Tuple[int, ...]=(1, 2, 3), thresh: float=0.5):
+def mean_iou_coef(
+    y: tf.Tensor,
+    yhat: tf.Tensor,
+    smooth: float = 1.0,
+    obs_axes: Tuple[int, ...] = (1, 2, 3),
+    thresh: float = 0.5,
+):
     """Compute mean intersection over union coefficient.
 
     Args:
@@ -46,8 +46,9 @@ def mean_iou_coef(y: tf.Tensor, yhat: tf.Tensor, smooth: float=1.0,
     return mean_iou
 
 
-def mean_iou_coef_factory(smooth: int=1, obs_axes: Tuple[int, ...]=(1, 2, 3),
-                          thresh: float=0.5):
+def mean_iou_coef_factory(
+    smooth: int = 1, obs_axes: Tuple[int, ...] = (1, 2, 3), thresh: float = 0.5
+):
     """Returns a an instance of the `iou_coef` function with extra parameters filled in.
 
     Allows user to use `Keras` metrics tracking without defining a lambda function.
@@ -62,8 +63,8 @@ def mean_iou_coef_factory(smooth: int=1, obs_axes: Tuple[int, ...]=(1, 2, 3),
     """
 
     def fn(y, yhat):
-        return mean_iou_coef(y, yhat, smooth=smooth, obs_axes=obs_axes,
-                             thresh=thresh)
+        return mean_iou_coef(y, yhat, smooth=smooth, obs_axes=obs_axes, thresh=thresh)
+
     fn.__name__ = "mean_iou_coef"
     return fn
 
@@ -115,6 +116,7 @@ def get_last_exp_num() -> int:
 
 class WarmupSchedule(LearningRateSchedule):
     """Linear warmup before either settling at a constant LR or starting a different schedule."""
+
     def __init__(self, warmup_steps: int, after_warmup_lr: Union[dict, float]):
         """Create linear warmup schedule.
 
@@ -141,8 +143,10 @@ class WarmupSchedule(LearningRateSchedule):
             self.after_warmup_lr = optimizers.schedules.deserialize(after_warmup_lr)
             self.after_warmup_init_lr = tf.cast(self.after_warmup_lr(0), tf.float32)
         else:
-            raise TypeError("after_warmup_lr must be a float or a serialized LearningRateSchedule"
-                            f" (a dict or JSON-serialized string). Got: {type(after_warmup_lr)}")
+            raise TypeError(
+                "after_warmup_lr must be a float or a serialized LearningRateSchedule"
+                f" (a dict or JSON-serialized string). Got: {type(after_warmup_lr)}"
+            )
 
     def __call__(self, step):
         """Compute LR at a given training step."""
@@ -150,21 +154,29 @@ class WarmupSchedule(LearningRateSchedule):
 
     def get_lr(self, step: tf.float32) -> tf.float32:
         def get_lr_before_warmup():
-            return tf.cast(self.after_warmup_init_lr * (step+1) / self.warmup_steps, tf.float32)
+            return tf.cast(
+                self.after_warmup_init_lr * (step + 1) / self.warmup_steps, tf.float32
+            )
+
         def get_lr_after_warmup():
-            return tf.cast(self.after_warmup_lr((step+1) - self.warmup_steps), tf.float32)
-        lr = tf.cond(tf.less(step, self.warmup_steps), get_lr_before_warmup, get_lr_after_warmup)
+            return tf.cast(
+                self.after_warmup_lr((step + 1) - self.warmup_steps), tf.float32
+            )
+
+        lr = tf.cond(
+            tf.less(step, self.warmup_steps), get_lr_before_warmup, get_lr_after_warmup
+        )
         return lr
 
     def get_config(self):
         """Get config for serialization."""
         return {
             "warmup_steps": str(self.warmup_steps),
-            "after_warmup_lr": self.after_warmup_lr_config
+            "after_warmup_lr": self.after_warmup_lr_config,
         }
 
 
-def toggle_TL_freeze(tl_model: Model, base_model_name: str="base_model") -> None:
+def toggle_TL_freeze(tl_model: Model, base_model_name: str = "base_model") -> None:
     """Toggle the `trainable` property of a transfer learning model.
 
     IMPORTANT: `tl_model` must be recompiled after changing this attribute.
@@ -179,7 +191,9 @@ def toggle_TL_freeze(tl_model: Model, base_model_name: str="base_model") -> None
     base_model.trainable = not base_model.trainable
 
 
-def check_consec_factor(x: Sequence[float], factor: float, reverse: bool=False) -> bool:
+def check_consec_factor(
+    x: Sequence[float], factor: float, reverse: bool = False
+) -> bool:
     """Check that consecutive elements of `x` increase by a constant factor.
 
     Args:
@@ -205,7 +219,7 @@ def check_consec_factor(x: Sequence[float], factor: float, reverse: bool=False) 
 def load_y(batch_mask_paths):
     # Load the binary segmentation masks
     y = np.array([cv2.imread(mask_path, 0) for mask_path in batch_mask_paths])
-    y[y>0] = 1
+    y[y > 0] = 1
     return y
 
 
@@ -218,9 +232,19 @@ def load_x(batch_img_paths):
 class BinaryMaskSequence(KerasSequence):
     """Helper to iterate over the data"""
 
-    def __init__(self, batch_size, img_paths, seg_paths, random_state,
-                load_x, load_y, augmentation_function=None, sample_weights=None,
-                repeat_n_times=1, shuffle=True):
+    def __init__(
+        self,
+        batch_size,
+        img_paths,
+        seg_paths,
+        random_state,
+        load_x,
+        load_y,
+        augmentation_function=None,
+        sample_weights=None,
+        repeat_n_times=1,
+        shuffle=True,
+    ):
         """Initialize the data loader
 
         Args:
@@ -267,8 +291,12 @@ class BinaryMaskSequence(KerasSequence):
         if self.shuffle or self.repeat_n_times > 1:
             remaining_samples_at_i = len(self.img_paths) - i
             if remaining_samples_at_i < self.batch_size:
-                batch_img_paths += self.img_paths[0:self.batch_size - remaining_samples_at_i]
-                batch_seg_paths += self.seg_paths[0:self.batch_size - remaining_samples_at_i]
+                batch_img_paths += self.img_paths[
+                    0 : self.batch_size - remaining_samples_at_i
+                ]
+                batch_seg_paths += self.seg_paths[
+                    0 : self.batch_size - remaining_samples_at_i
+                ]
 
         if self.shuffle:
             # Shuffle the data keeping pairs together
@@ -277,13 +305,14 @@ class BinaryMaskSequence(KerasSequence):
             self.seg_paths = [self.seg_paths[i] for i in indices]
 
         for i, im_path in enumerate(batch_img_paths):
-            if Path(im_path).name != Path(batch_seg_paths[i]).name.replace('_mask', ''):
-                raise ValueError(f"Image {im_path} and mask {batch_seg_paths[i]} do not match")
+            if Path(im_path).name != Path(batch_seg_paths[i]).name.replace("_mask", ""):
+                raise ValueError(
+                    f"Image {im_path} and mask {batch_seg_paths[i]} do not match"
+                )
 
-        x, y = d.compute([
-            d.delayed(load_x)(batch_img_paths),
-            d.delayed(load_y)(batch_seg_paths)
-        ])[0]
+        x, y = d.compute(
+            [d.delayed(load_x)(batch_img_paths), d.delayed(load_y)(batch_seg_paths)]
+        )[0]
 
         if self.augmentation_function is not None:
             x, y = self.augmentation_function(x, y)

@@ -1,4 +1,3 @@
-import os
 from typing import Sequence, Callable, Union, Tuple, Dict, Optional
 from copy import deepcopy
 import numpy as np
@@ -7,11 +6,8 @@ import dask as d
 import cv2
 from skimage.exposure import rescale_intensity
 from numpy.random import RandomState
-
 from fl_tissue_model_tools import helper
-
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
-
+import silence_tensorflow.auto  # noqa
 from tensorflow.keras import utils
 from tensorflow.keras.applications import resnet50
 
@@ -43,7 +39,7 @@ def load_inv_depth_img(
 
 
 def prep_inv_depth_imgs(
-    images: Union[Sequence[str], list[npt.NDArray]],
+    images: Union[Sequence[str], Sequence[npt.NDArray]],
     img_hw: Tuple[int, int],
     T: Optional[int] = None,
     C: Optional[int] = None,
@@ -51,7 +47,7 @@ def prep_inv_depth_imgs(
     """Prepare a batch of invasion depth images.
 
     Args:
-        paths: Paths to each image in batch.
+        images: Paths to each image in batch or an already-loaded batch of images.
         img_hw: Desired height and width for each image to be resized to.
         T (int, optional): Index of the time to use (needed if time series).
         C (int, optional): Index of the color channel to use (needed if multi channel).

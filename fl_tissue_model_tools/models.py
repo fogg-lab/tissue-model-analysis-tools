@@ -4,21 +4,16 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Sequence, Tuple, Optional
 from itertools import product
-import os
 
 import numpy as np
 from numpy import typing as npt
-import keras_tuner as kt
 from PIL import Image
 
 if not hasattr(Image, "Resampling"):
     Image.Resampling = Image
 
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
-os.environ["AUTOGRAPH_VERBOSITY"] = "2"
-import tensorflow as tf
-tf.get_logger().setLevel("ERROR")
-tf.autograph.set_verbosity(2)
+import silence_tensorflow.auto  # noqa
+import keras_tuner as kt
 import tensorflow.keras.backend as K
 from tensorflow.keras import Input, Model, optimizers
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Conv2D
@@ -64,7 +59,7 @@ def build_ResNet50_TL(
 
     """
     resnet50_model = resnet50.ResNet50(
-       weights=base_init_weights, include_top=False, input_shape=img_shape
+        weights=base_init_weights, include_top=False, input_shape=img_shape
     )
     bll_idx = [l.name for l in resnet50_model.layers].index(base_last_layer)
     base_model = Model(

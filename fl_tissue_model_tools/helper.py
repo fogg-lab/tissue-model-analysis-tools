@@ -86,7 +86,7 @@ def load_image(
             category=UserWarning,
         )
         pixel_sizes = img_reader.physical_pixel_sizes
-    image = img_reader.get_image_data("ZYX", T=T, C=C)
+        image = img_reader.get_image_data("ZYX", T=T, C=C)
 
     if len(image) == 1:
         return image[0], pixel_sizes
