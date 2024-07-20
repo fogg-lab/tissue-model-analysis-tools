@@ -180,20 +180,21 @@ def analyze_img(
             if defs.is_pyinstaller:
                 param_name = f"{SFM.purple}image_width_microns{SFM.reset}"
                 print(
-                    f"\n{SFM.failure} {fail_msg.format(param=param_name)}\n\n"
-                    f"{SFM.info} Provide a value for the {param_name} parameter "
-                    "on the options page and try again. Exiting...\n"
+                    f"\n{SFM.failure} {fail_msg.format(param=param_name)}\n"
+                    f"{SFM.info} {SFM.bold}Solution:{SFM.reset} Specify the value for "
+                    f"{param_name} on the options page and try again. Exiting...\n"
                 )
             else:
                 param_name = f"{SFM.purple}--image-width-microns{SFM.reset}"
                 print(
-                    f"\n{SFM.failure} {fail_msg.format(param=param_name)}\n\n"
+                    f"\n{SFM.failure} {fail_msg.format(param=param_name)}\n"
                     "For general help and command examples, run "
                     f"{SFM.purple}tmat -h{SFM.reset}\n"
                     f"For {SFM.purple}compute_branches{SFM.reset} help and a "
                     f"description of the {param_name} parameter, run: "
-                    f"{SFM.purple}tmat compute_branches -h{SFM.reset}\n\n"
-                    f"{SFM.info} Specify {param_name} and try again. Exiting...\n"
+                    f"{SFM.purple}tmat compute_branches -h{SFM.reset}\n"
+                    f"{SFM.info} {SFM.bold}Solution:{SFM.reset} Specify {param_name} "
+                    "and try again. Exiting...\n"
                 )
             sys.exit(1)
         else:

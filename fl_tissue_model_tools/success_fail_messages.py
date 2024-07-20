@@ -11,6 +11,7 @@ class SFM:
     purple = "\x1b[38;5;5m\x1b[1m"
     yellow = "\x1b[38;5;3m\x1b[1m"
     blue = "\x1b[38;5;4m\x1b[1m"
+    bold = "\x1b[1m"
     reset = "\x1b[0m"
     success = f"{green}[SUCCESS]{reset}"
     failure = f"{red}[FAILURE]{reset}"
