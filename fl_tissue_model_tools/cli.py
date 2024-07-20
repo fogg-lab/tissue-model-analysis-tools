@@ -150,7 +150,7 @@ def main():
         try:
             subprocess.run(command, check=True)
         except subprocess.CalledProcessError as e:
-            print(f"Command:  {e}  did not complete successfully.")
+            print(e)
             sys.exit(1)
 
 

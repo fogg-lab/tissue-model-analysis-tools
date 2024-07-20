@@ -174,26 +174,26 @@ def analyze_img(
         # Use pixel size from image metadata if available
         if pix_sizes.X is None:
             fail_msg = (
-                "The {param} parameter is not specified, and the pixel to micron "
+                "The {param} parameter was not specified, and the pixel to micron "
                 "conversion factor was not found in the image metadata."
             )
             if defs.is_pyinstaller:
+                param_name = f"{SFM.purple}image_width_microns{SFM.reset}"
                 print(
-                    f"{SFM.failure} {fail_msg.format(param='image_width_microns')}\n"
-                    f"{SFM.info} Provide a value for the image_width_microns parameter "
-                    "on the options page and try again.\n"
-                    "Exiting..."
+                    f"\n{SFM.failure} {fail_msg.format(param=param_name)}\n\n"
+                    f"{SFM.info} Provide a value for the {param_name} parameter "
+                    "on the options page and try again. Exiting...\n"
                 )
             else:
+                param_name = f"{SFM.purple}--image-width-microns{SFM.reset}"
                 print(
-                    f"{SFM.failure} {fail_msg.format(param='--image-width-microns')}\n"
-                    "For general help and command examples, run:\n"
-                    "tmat -h\n"
-                    "For compute_branches help and a description of the "
-                    "--image-width-microns parameter, run:\n"
-                    "tmat compute_branches -h"
-                    f"{SFM.info} Specify --image-width-microns and try again.\n"
-                    "Exiting..."
+                    f"\n{SFM.failure} {fail_msg.format(param=param_name)}\n\n"
+                    "For general help and command examples, run "
+                    f"{SFM.purple}tmat -h{SFM.reset}\n"
+                    f"For {SFM.purple}compute_branches{SFM.reset} help and a "
+                    f"description of the {param_name} parameter, run: "
+                    f"{SFM.purple}tmat compute_branches -h{SFM.reset}\n\n"
+                    f"{SFM.info} Specify {param_name} and try again. Exiting...\n"
                 )
             sys.exit(1)
         else:
