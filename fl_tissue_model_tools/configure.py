@@ -1,5 +1,5 @@
-"""
-Create or move the base directory to store config files, custom scripts, data, and output.
+"""Create or move the base directory to store config files, custom scripts, data, and output.
+
 Creates the following directory structure:
     fl_tissue_model_tools/
         config/

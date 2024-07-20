@@ -1,9 +1,12 @@
+"""
+Colored terminal messages using Ansi escape sequences."""
+
 from dataclasses import dataclass
 
 
 @dataclass
 class SFM:
-    """Colorized messages for success/failure output using Ansi escape sequences."""
+    """Colored terminal messages using Ansi escape sequences."""
 
     red = "\x1b[38;5;1m\x1b[1m"
     green = "\x1b[38;5;2m\x1b[1m"
@@ -19,3 +22,7 @@ class SFM:
     info = f"{blue}[INFO]{reset}"
     all_succeeded = f"{green}[ALL SUCCEEDED]{reset}"
     failures_present = f"{red}[FAILURES PRESENT]{reset}"
+
+    @classmethod
+    def highlight(cls, cmd: str) -> str:
+        return f"{cls.purple}{cmd}{cls.reset}"

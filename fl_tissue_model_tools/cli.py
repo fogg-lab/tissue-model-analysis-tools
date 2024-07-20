@@ -1,13 +1,36 @@
+"""Command-line interface for Fogg Lab Tissue Model Analysis Tools.
+
+This module provides the main entry point for the tissue model analysis tools
+command-line interface (CLI). It handles parsing arguments, executing commands,
+and managing the interactive mode. The interface supports both direct command
+execution and an interactive mode where users can select commands and provide arguments.
+"""
+
+from time import perf_counter
+
 import argparse
+import ast
+import importlib.util
 import subprocess
 import sys
 from glob import glob
 from pathlib import Path
 
 from fl_tissue_model_tools import defs
+from fl_tissue_model_tools.colored_messages import SFM
 from fl_tissue_model_tools.configure import configure
 
-USAGE = """Usage: tissue-model-analysis-tools [SUBCOMMAND] [OPTIONS]
+EXAMPLES = SFM.highlight(
+    """
+    tmat configure -h
+    tmat configure "C:\\Users\\Quinn\\Desktop\\some_folder_name"
+    tmat compute_inv_depth -h
+    tmat compute_zproj "C:\\Users\\Quinn\\input_folder_name" "C:\\Users\\Quinn\\out_folder_name"
+    tmat compute_branches "path/to/in_folder" "path/to/out_folder" --image-width-microns 1200
+"""
+)
+
+USAGE = f"""Usage: tissue-model-analysis-tools [SUBCOMMAND] [OPTIONS]
 Shorthand: tmat [SUBCOMMAND] [OPTIONS]
 
 If no subcommand is given, the interactive mode will be used. For example, run: tmat
@@ -21,26 +44,33 @@ Get available options:
     [SUBCOMMAND] -h: Show help (including available options) for a particular subcommand.
 
 Examples:
-    tmat configure -h
-    tmat configure "C:\\Users\\Quinn\\Desktop\\some_folder_name"
-    tmat compute_inv_depth -h
-    tmat compute_zproj "C:\\Users\\Quinn\\input_folder_name" "C:\\Users\\Quinn\\out_folder_name"
-    tmat compute_branches "path/to/my/input_folder" "path/to/my/output_folder" --image-width-microns 1200
+{EXAMPLES}
 """
 
 
 def main():
-    commands = ["configure"] + [
-        Path(script).stem for script in glob(str(defs.SCRIPT_DIR / "*.py"))
-    ]
-
-    def print_usage_and_exit():
-        print(USAGE)
-        sys.exit(1)
-
     # for '-h' or '--help', print the usage and exit
     if len(sys.argv) > 1 and sys.argv[1] in ["-h", "--help"]:
-        print_usage_and_exit()
+        print(USAGE)
+        sys.exit(0)
+
+    commands = ["help", "configure"] + [
+        Path(script).stem for script in glob(str(defs.SCRIPT_DIR / "*.py"))
+    ]
+    commands_descriptions = [
+        ("help", f"Show usage information for {SFM.highlight('tmat')}"),
+        ("configure", "Set the base directory for the package"),
+    ]
+    # Get the descriptions for each script
+    for script in commands[2:]:
+        file = Path(defs.SCRIPT_DIR / f"{script}.py")
+        tree = ast.parse(file.read_text())
+        docstring = ast.get_docstring(tree)
+        if isinstance(docstring, str):
+            description = docstring.strip().split("\n")[0]
+        else:
+            description = "No description found."
+        commands_descriptions.append((script, description))
 
     # Arguments are the command and any arguments for the command
     parser = argparse.ArgumentParser(
@@ -73,32 +103,35 @@ def main():
     if args.command is None:
         print("Command options:")
 
-        for i, command in enumerate(commands):
-            print(f"  {i+1}. {command}")
+        for i, (command, description) in enumerate(commands_descriptions):
+            print(SFM.highlight(f"  {i+1}. {command}") + f": {description}")
 
-        command_num = input("Enter the number of the command to run (or q to quit): ")
-        if command_num == "":
-            print("No command entered")
-            sys.exit(1)
-
-        if command_num == "q":
-            print("Quitting")
-            sys.exit(0)
-
-        try:
-            command_num = int(command_num)
-        except ValueError:
-            print(f"Invalid command number: '{command_num}'")
-            sys.exit(1)
-
-        if command_num < 1 or command_num > len(commands):
-            print(f"Invalid command number: {command_num}")
-            sys.exit(1)
-
+        prompt = (
+            f"Enter a command option by number or enter {SFM.highlight('q')} to quit: "
+        )
+        while True:
+            command_num = input(prompt)
+            if command_num == "q":
+                print("Exiting...")
+                sys.exit(0)
+            try:
+                command_num = int(command_num)
+            except ValueError:
+                try:
+                    command_num = commands.index(command_num) + 1
+                except ValueError:
+                    command_num = -1
+            if command_num < 1 or command_num > len(commands):
+                print(f"Invalid command option: {command_num}")
+            elif commands[command_num - 1] == "help":
+                print(USAGE)
+            else:
+                break
         args.command = commands[command_num - 1]
 
     if not args.command_args and args.command != "configure":
-        args.command_args = input("Arguments, if any (or -h to list options): ").split()
+        prompt = f"Arguments, if any (or {SFM.highlight('-h')} to list options): "
+        args.command_args = input(prompt).split()
 
     if args.command == "configure":
         if in_args(["--help", "-h"], args.command_args):
@@ -143,10 +176,10 @@ def main():
         script_path = defs.SCRIPT_DIR / f"{args.command}.py"
         command = [sys.executable, str(script_path), *args.command_args]
         if args.command_args == ["-h"]:
-            print(f"Getting options for: {args.command}")
+            print(f"Getting options for: {SFM.purple}{args.command}{SFM.reset}")
         else:
-            command_printout = " ".join(command)
-            print(f"Executing: {command_printout}")
+            command_printout = f"{SFM.purple}{' '.join(command)}{SFM.reset}"
+            print(f"{SFM.bold}Executing:{SFM.reset} {command_printout}")
         try:
             subprocess.run(command, check=True)
         except subprocess.CalledProcessError as e:

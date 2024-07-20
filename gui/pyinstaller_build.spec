@@ -6,7 +6,7 @@ from PyInstaller.utils.hooks import collect_data_files, collect_all, get_module_
 import sys
 import os
 import warnings
-from fl_tissue_model_tools.success_fail_messages import SFM
+from fl_tissue_model_tools.colored_messages import SFM
 
 # If on Windows, look for msvcp140_1.dll needed by tensorflow
 dll_path = None

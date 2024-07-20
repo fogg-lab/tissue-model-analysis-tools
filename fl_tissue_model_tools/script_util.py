@@ -9,7 +9,7 @@ import json
 from typing import Any, Dict, Union, List
 
 from fl_tissue_model_tools import helper
-from fl_tissue_model_tools.success_fail_messages import SFM
+from fl_tissue_model_tools.colored_messages import SFM
 from fl_tissue_model_tools import zstacks as zs
 
 

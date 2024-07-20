@@ -1,3 +1,11 @@
+"""Predict depths of invasion in input directory of Z-stacks or Z-projections.
+
+This module provides functionality to analyze invasion depth in a directory of
+microscopy image Z-stacks. It uses pre-trained ResNet classification models to predict
+the probability of invasion for each Z-slice within every input Z-stack.
+See the README and capabilities notebook for more information.
+"""
+
 import os
 import sys
 import json
@@ -11,7 +19,7 @@ import tensorflow.keras.backend as K
 
 from fl_tissue_model_tools import models, data_prep, defs, helper
 from fl_tissue_model_tools import script_util as su
-from fl_tissue_model_tools.success_fail_messages import SFM
+from fl_tissue_model_tools.colored_messages import SFM
 from fl_tissue_model_tools import zstacks as zs
 
 DEFAULT_CONFIG_PATH = str(

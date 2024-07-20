@@ -1,3 +1,13 @@
+"""Analyze microvessels in input directory of Z-stacks or Z-projections.
+
+This module provides functionality to analyze 2D images or Z-stacks for
+microvessel formation by detecting and quantifying branch structures. It uses
+a combination of image processing techniques and machine learning models to
+identify vessels, construct an embedded graph representation of the microvessel
+network, and report microvessel branching statistics. See the README and capabilities
+notebook for more information.
+"""
+
 import os
 import sys
 from typing import Union
@@ -28,7 +38,7 @@ from scipy.ndimage import distance_transform_edt
 from fl_tissue_model_tools import helper, models, models_util, defs
 
 from fl_tissue_model_tools import script_util as su
-from fl_tissue_model_tools.success_fail_messages import SFM
+from fl_tissue_model_tools.colored_messages import SFM
 from fl_tissue_model_tools.transforms import filter_branch_seg_mask, regionprops_image
 from fl_tissue_model_tools.topology import MorseGraph
 from fl_tissue_model_tools.well_mask_generation import (

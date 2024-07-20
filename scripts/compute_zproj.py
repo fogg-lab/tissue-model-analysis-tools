@@ -1,3 +1,11 @@
+"""Compute Z projections from image stacks.
+
+This module provides functionality to create Z projections from image stacks
+using various projection methods. It supports both single-file Z-stacks and
+image sequences representing Z-stacks.
+See the README and capabilities notebook for more information.
+"""
+
 import os
 from glob import glob
 from pathlib import Path
@@ -8,7 +16,7 @@ import cv2
 
 from fl_tissue_model_tools import defs
 from fl_tissue_model_tools import script_util as su
-from fl_tissue_model_tools.success_fail_messages import SFM
+from fl_tissue_model_tools.colored_messages import SFM
 from fl_tissue_model_tools import zstacks as zs
 from fl_tissue_model_tools import helper
 from fl_tissue_model_tools.scripts import compute_cell_area

@@ -1,3 +1,9 @@
+"""Compute cell coverage area in input directory of Z-stacks or Z-projections.
+
+If 3D data is provided, maximum intensity Z projection is applied prior to cell area
+calculation. See the README for more information on usage and configuration options.
+"""
+
 import os
 import sys
 from typing import Dict, Tuple, List, Optional, Union
@@ -12,7 +18,7 @@ from fl_tissue_model_tools import defs
 from fl_tissue_model_tools import helper
 from fl_tissue_model_tools import preprocessing as prep
 from fl_tissue_model_tools import script_util as su
-from fl_tissue_model_tools.success_fail_messages import SFM
+from fl_tissue_model_tools.colored_messages import SFM
 from fl_tissue_model_tools.well_mask_generation import generate_well_mask
 
 DEFAULT_CONFIG_PATH = str(defs.SCRIPT_CONFIG_DIR / "default_cell_area_computation.json")
