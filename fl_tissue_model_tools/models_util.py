@@ -6,7 +6,7 @@ from numbers import Number
 import numpy as np
 import cv2
 import dask as d
-import silence_tensorflow.auto  # noqa: F401  # pylint:disable=unused-import
+import silence_tensorflow.auto  # noqa
 import tensorflow as tf
 import tensorflow.keras.backend as K
 from tensorflow.keras.utils import Sequence as KerasSequence

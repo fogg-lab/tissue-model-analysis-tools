@@ -6,9 +6,8 @@ import dask as d
 import cv2
 from skimage.exposure import rescale_intensity
 from numpy.random import RandomState
-
 from fl_tissue_model_tools import helper
-import silence_tensorflow.auto  # noqa: F401  # pylint:disable=unused-import
+import silence_tensorflow.auto  # noqa
 from tensorflow.keras import utils
 from tensorflow.keras.applications import resnet50
 

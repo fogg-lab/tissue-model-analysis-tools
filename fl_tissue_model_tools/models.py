@@ -7,13 +7,13 @@ from itertools import product
 
 import numpy as np
 from numpy import typing as npt
-import keras_tuner as kt
 from PIL import Image
 
 if not hasattr(Image, "Resampling"):
     Image.Resampling = Image
 
-import silence_tensorflow.auto  # noqa: F401  # pylint:disable=unused-import
+import silence_tensorflow.auto  # noqa
+import keras_tuner as kt
 import tensorflow.keras.backend as K
 from tensorflow.keras import Input, Model, optimizers
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Conv2D

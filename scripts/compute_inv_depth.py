@@ -5,7 +5,7 @@ from glob import glob
 
 import numpy as np
 import pandas as pd
-import silence_tensorflow.auto  # noqa: F401  # pylint:disable=unused-import
+import silence_tensorflow.auto  # noqa
 import tensorflow as tf
 import tensorflow.keras.backend as K
 
