@@ -175,15 +175,15 @@ def main():
         # Run the command as a subprocess
         script_path = defs.SCRIPT_DIR / f"{args.command}.py"
         command = [sys.executable, str(script_path), *args.command_args]
+        command_printout = SFM.highlight(" ".join(command))
         if args.command_args == ["-h"]:
-            print(f"Getting options for: {SFM.purple}{args.command}{SFM.reset}")
+            print(f"Getting options for: {SFM.highlight(args.command)}")
         else:
-            command_printout = f"{SFM.purple}{' '.join(command)}{SFM.reset}"
             print(f"{SFM.bold}Executing:{SFM.reset} {command_printout}")
         try:
             subprocess.run(command, check=True)
         except subprocess.CalledProcessError as e:
-            print(e)
+            print(f"{SFM.bold}Exited on failure:{SFM.reset} {command_printout}")
             sys.exit(1)
 
 
