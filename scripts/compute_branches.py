@@ -26,6 +26,7 @@ from skimage.morphology import (
 from scipy.ndimage import distance_transform_edt
 
 from fl_tissue_model_tools import helper, models, models_util, defs
+
 from fl_tissue_model_tools import script_util as su
 from fl_tissue_model_tools.success_fail_messages import SFM
 from fl_tissue_model_tools.transforms import filter_branch_seg_mask, regionprops_image
@@ -172,12 +173,29 @@ def analyze_img(
     if image_width_microns is None:
         # Use pixel size from image metadata if available
         if pix_sizes.X is None:
-            print(
-                f"{SFM.warning} image_width_microns not provided in the config, "
-                "and could not be inferred from the image metadata. "
-                "Using arbitrary value of 1000 microns."
+            fail_msg = (
+                "The {param} parameter is not specified, and the pixel to micron "
+                "conversion factor was not found in the image metadata."
             )
-            image_width_microns = 1000
+            if defs.is_pyinstaller:
+                print(
+                    f"{SFM.failure} {fail_msg.format(param='image_width_microns')}\n"
+                    f"{SFM.info} Provide a value for the image_width_microns parameter "
+                    "on the options page and try again.\n"
+                    "Exiting..."
+                )
+            else:
+                print(
+                    f"{SFM.failure} {fail_msg.format(param='--image-width-microns')}\n"
+                    "For general help and command examples, run:\n"
+                    "tmat -h\n"
+                    "For compute_branches help and a description of the "
+                    "--image-width-microns parameter, run:\n"
+                    "tmat compute_branches -h"
+                    f"{SFM.info} Specify --image-width-microns and try again.\n"
+                    "Exiting..."
+                )
+            sys.exit(1)
         else:
             image_width_microns = img.shape[-1] * pix_sizes.X
 
@@ -468,10 +486,11 @@ def main(args=None):
     if args is None:
         args = su.parse_branching_args(arg_defaults)
         ### Load/validate config ###
-        if not Path(args.config).is_file():
-            print(f"{SFM.failure}Config file {args.config} does not exist.", flush=True)
+        cfg_file = args.config
+        if not Path(cfg_file).is_file():
+            print(f"{SFM.failure} Config file {cfg_file} does not exist.", flush=True)
             sys.exit(1)
-        with open(args.config, "r", encoding="utf8") as config_fp:
+        with open(cfg_file, "r", encoding="utf8") as config_fp:
             config = json.load(config_fp)
     else:
         config = {}
@@ -519,12 +538,6 @@ def main(args=None):
         print(f"{SFM.failure} {error}", flush=True)
         sys.exit(1)
 
-    output_dir = Path(args.out_root)
-    # Save config to output directory
-    cfg_path = helper.get_unique_output_filepath(output_dir / "config.json")
-    with open(cfg_path, "w", encoding="utf8") as f:
-        json.dump({k: v for k, v in config.items() if v is not None}, f, indent=4)
-
     ### Get image paths ###
     img_paths = glob(os.path.join(args.in_root, "*")) + glob(
         os.path.join(args.in_root, "*", "*")
@@ -556,15 +569,16 @@ def main(args=None):
         print(f"{SFM.failure}No images found in {input_dir}", flush=True)
         sys.exit(1)
 
-    ### Load model ###
+    # Load model
     model = models.get_unet_patch_segmentor_from_cfg(model_cfg_path)
 
     config["time"] = args.time
     config["channel"] = args.channel
-
+    output_dir = Path(args.out_root)
     created_csv_files = set()
 
     ### Analyze images ###
+    su.section_header("Performing Analysis", sep="=")
     for img_id, img_files in img_paths.items():
         analyze_img(
             img_id,
@@ -575,6 +589,14 @@ def main(args=None):
             created_csv_files,
             use_well_mask=args.detect_well,
         )
+
+    # Save config to output directory
+    cfg_path = helper.get_unique_output_filepath(output_dir / "config.json")
+    with open(cfg_path, "w", encoding="utf8") as f:
+        json.dump({k: v for k, v in config.items() if v is not None}, f, indent=4)
+
+    print(f"{SFM.success} Analysis complete.", flush=True)
+    su.section_footer()
 
 
 if __name__ == "__main__":

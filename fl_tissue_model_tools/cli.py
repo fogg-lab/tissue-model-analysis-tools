@@ -25,6 +25,7 @@ Examples:
     tmat configure "C:\\Users\\Quinn\\Desktop\\some_folder_name"
     tmat compute_inv_depth -h
     tmat compute_zproj "C:\\Users\\Quinn\\input_folder_name" "C:\\Users\\Quinn\\out_folder_name"
+    tmat compute_branches "path/to/my/input_folder" "path/to/my/output_folder" --image-width-microns 1200
 """
 
 

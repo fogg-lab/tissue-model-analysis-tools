@@ -106,10 +106,10 @@ def parse_branching_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
         default=None,
         help=(
             "Physical width in microns of the region captured by each image. "
-            "For instance, if 1 pixel in the image corresponds to 0.8 microns, "
-            "this value should equal to 0.8x the horizontal resolution of the image. "
-            "If not specified, the script will attempt to infer this value from the "
-            "image metadata."
+            "If not specified, the script will try to find the pixel to micron "
+            "conversion factor from the image metadata, but if it cannot be found, "
+            "you must provide this value. It is equal to the the horizontal resolution "
+            "of the image multiplied by the pixel size in microns."
         ),
     )
 
