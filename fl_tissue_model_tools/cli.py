@@ -69,16 +69,6 @@ def main():
                 return True
         return False
 
-    def get_flag_value(flag_name, flag_alias, args):
-        # Get the value of a flag (e.g. '--local') from a list of arguments
-        flag_index = (
-            args.index(flag_name) if flag_name in args else args.index(flag_alias)
-        )
-        if flag_index == len(args) - 1:
-            print(f"Error: No value given for {flag_name} flag.")
-            sys.exit(1)
-        return args[flag_index + 1]
-
     if args.command is None:
         print("Command options:")
 
