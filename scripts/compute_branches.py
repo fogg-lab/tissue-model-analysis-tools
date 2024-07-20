@@ -578,7 +578,7 @@ def main(args=None):
     created_csv_files = set()
 
     ### Analyze images ###
-    su.section_header("Performing Analysis", sep="=")
+    su.section_header("Performing Analysis")
     for img_id, img_files in img_paths.items():
         analyze_img(
             img_id,
