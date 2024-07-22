@@ -281,7 +281,7 @@ class MorseGraph:
         """
 
         if window_size <= 1:
-            return
+            return vertices
 
         vertices = vertices.copy()
 
