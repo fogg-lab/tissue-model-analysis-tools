@@ -73,9 +73,11 @@ setup(
         "silence-tensorflow==1.2.2",
         "tqdm==4.66.4",
         "keras-tuner==1.4.7",
-        "tensorflow==2.14.1",
-    ],
-    extras_require={"and-cuda": ["tensorflow[and-cuda]==2.14.1"]},
+        # Using patched version of Gooey for proper dark mode support, especially on Linux and macOS
+        "gooey@git+https://github.com/wigginno/Gooey.git",
+        "pyinstaller==6.9.0",
+    ]
+    + ["tensorflow-cpu==2.14.1" if os.name == "nt" else "tensorflow==2.14.1"],
     entry_points={"console_scripts": [f"tmat={pkg_name}.cli:main"]},
     classifiers=[
         "Programming Language :: Python :: 3",
