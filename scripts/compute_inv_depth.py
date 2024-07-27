@@ -21,6 +21,7 @@ from fl_tissue_model_tools import models, data_prep, defs, helper
 from fl_tissue_model_tools import script_util as su
 from fl_tissue_model_tools.colored_messages import SFM
 from fl_tissue_model_tools import zstacks as zs
+from fl_tissue_model_tools.exceptions import ZStackInputException
 
 DEFAULT_CONFIG_PATH = str(
     defs.SCRIPT_CONFIG_DIR / "default_invasion_depth_computation.json"
@@ -34,23 +35,10 @@ def main(args=None):
     else:
         args_prespecified = True
 
-    ### Verify input source ###
-    if os.path.isfile(args.in_root):
-        print(f"{SFM.failure} Input directory is a file: {args.in_root}", flush=True)
-        sys.exit(1)
-
-    if not os.path.isdir(args.in_root):
-        print(
-            f"{SFM.failure} Input directory does not exist: {args.in_root}",
-            flush=True,
-        )
-        sys.exit(1)
+    ### Verify input directory ###
+    su.check_input_dir_structure(args.in_root)
 
     zstack_paths = glob(os.path.join(args.in_root, "*"))
-
-    if len(zstack_paths) == 0:
-        print(f"{SFM.failure} Input directory is empty: {args.in_root}", flush=True)
-        sys.exit(1)
 
     ### Verify output destination ###
     try:
@@ -139,10 +127,14 @@ def main(args=None):
     # Load data
 
     test_path = zstack_paths[0]
-    if os.path.isdir(test_path) or helper.get_image_dims(test_path).Z == 1:
-        zstack_paths = zs.find_zstack_image_sequences(args.in_root)
-    else:
-        zstack_paths = zs.find_zstack_files(args.in_root)
+    try:
+        if os.path.isdir(test_path) or helper.get_image_dims(test_path).Z == 1:
+            zstack_paths = zs.find_zstack_image_sequences(args.in_root)
+        else:
+            zstack_paths = zs.find_zstack_files(args.in_root)
+    except ZStackInputException as exc:
+        print(f"{SFM.failure} {exc}")
+        sys.exit(1)
 
     inv_id_col = "Z Slice ID"
     inv_prob_col = "Invasion Probability"

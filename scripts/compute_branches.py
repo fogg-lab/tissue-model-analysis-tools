@@ -46,6 +46,7 @@ from fl_tissue_model_tools.well_mask_generation import (
     gen_superellipse_mask,
 )
 from fl_tissue_model_tools import zstacks as zs
+from fl_tissue_model_tools.exceptions import ZStackInputException
 
 
 DEFAULT_CONFIG_PATH = str(defs.SCRIPT_CONFIG_DIR / "default_branching_computation.json")
@@ -535,13 +536,8 @@ def main(args=None):
         sys.exit(1)
 
     ### Verify input and output directories ###
+    su.check_input_dir_structure(args.in_root)
     input_dir = Path(args.in_root)
-    if not input_dir.exists():
-        print(
-            f"{SFM.failure}Input directory {args.in_root} does not exist.",
-            flush=True,
-        )
-        sys.exit(1)
 
     try:
         su.branching_verify_output_dir(args.out_root)
@@ -550,24 +546,20 @@ def main(args=None):
         sys.exit(1)
 
     ### Get image paths ###
-    img_paths = glob(os.path.join(args.in_root, "*")) + glob(
-        os.path.join(args.in_root, "*", "*")
-    )
-
-    if len(img_paths) == 0:
-        print(f"{SFM.failure} Input directory is empty: {args.in_root}", flush=True)
-        sys.exit(1)
-
-    test_path = img_paths[0]
+    test_path = glob(os.path.join(args.in_root, "*"))[0]
     if os.path.isdir(test_path) or helper.get_image_dims(test_path).Z == 1:
         try:
             img_paths = zs.find_zstack_image_sequences(args.in_root)
             if any(len(img_seq) == 1 for img_seq in img_paths.values()):
                 img_paths = {}  # not z stacks. probably projections.
-        except ValueError:
+        except ZStackInputException:
             img_paths = {}
     else:
-        img_paths = zs.find_zstack_files(args.in_root)
+        try:
+            img_paths = zs.find_zstack_files(args.in_root)
+        except ZStackInputException as exc:
+            print(f"{SFM.failure} {exc}")
+            sys.exit(1)
 
     if len(img_paths) == 0:
         img_paths = {

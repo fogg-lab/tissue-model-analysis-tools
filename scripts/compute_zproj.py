@@ -20,6 +20,7 @@ from fl_tissue_model_tools.colored_messages import SFM
 from fl_tissue_model_tools import zstacks as zs
 from fl_tissue_model_tools import helper
 from fl_tissue_model_tools.scripts import compute_cell_area
+from fl_tissue_model_tools.exceptions import ZStackInputException
 
 
 proj_methods = {
@@ -38,34 +39,26 @@ def main(args=None):
         args_prespecified = False
     else:
         args_prespecified = True
+
     try:
         compute_area_after_zproj = args.area
     except AttributeError:
         compute_area_after_zproj = False
 
     ### Verify input source ###
-    if os.path.isfile(args.in_root):
-        print(f"{SFM.failure} Input directory is a file: {args.in_root}", flush=True)
-        sys.exit(1)
-
-    if not os.path.isdir(args.in_root):
-        print(
-            f"{SFM.failure} Input directory does not exist: {args.in_root}",
-            flush=True,
-        )
-        sys.exit(1)
+    su.check_input_dir_structure(args.in_root)
 
     zstack_paths = glob(os.path.join(args.in_root, "*"))
 
-    if len(zstack_paths) == 0:
-        print(f"{SFM.failure} Input directory is empty: {args.in_root}", flush=True)
-        sys.exit(1)
-
     test_path = zstack_paths[0]
-    if os.path.isdir(test_path) or helper.get_image_dims(test_path).Z == 1:
-        zstack_paths = zs.find_zstack_image_sequences(args.in_root)
-    else:
-        zstack_paths = zs.find_zstack_files(args.in_root)
+    try:
+        if os.path.isdir(test_path) or helper.get_image_dims(test_path).Z == 1:
+            zstack_paths = zs.find_zstack_image_sequences(args.in_root)
+        else:
+            zstack_paths = zs.find_zstack_files(args.in_root)
+    except ZStackInputException as exc:
+        print(f"{SFM.failure} {exc}")
+        sys.exit(1)
 
     ### Verify output destination ###
     try:
