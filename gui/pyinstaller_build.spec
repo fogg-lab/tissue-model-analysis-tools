@@ -4,13 +4,14 @@
 
 from PyInstaller.utils.hooks import collect_data_files, collect_all, get_module_file_attribute
 import sys
+import platform
 import os
 import warnings
 from fl_tissue_model_tools.colored_messages import SFM
 
 # If on Windows, look for msvcp140_1.dll needed by tensorflow
 dll_path = None
-if os.name == "nt":
+if platform.system() == "Windows":
     search_paths = [
         os.path.dirname(sys.executable),
         os.environ.get("PATH", "").split(os.pathsep),
@@ -26,9 +27,10 @@ if os.name == "nt":
             break
 
     if dll_path is None:
-        print(f"\n{SFM.warning} msvcp140_1.dll (needed by TensorFlow) was not found. "
-            "To make sure your pyinstaller created executable is portable, "
-            "you should manually find it and move it to the _internal folder afterwards.\n")
+        print(f"\n{SFM.failure} msvcp140_1.dll (needed by TensorFlow) was not found. "
+              "Make sure you have Microsoft Visual C++ Redistributable. If not, get it from "
+              "https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist\n")
+        sys.exit(1)
 
 import distributed
 import imagecodecs
