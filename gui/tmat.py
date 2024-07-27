@@ -12,10 +12,7 @@ from fl_tissue_model_tools.scripts import (
     compute_zproj,
 )
 
-# For rich text install older version of `colored`:
-# pip install -I "colored==1.4.3"
-# newer versions of `colored` may not be compatible w/ Gooey.
-# Also need following workaround on Windows to avoid error with colored and PyInstaller:
+# If you're on Windows & using PyInstaller, uncomment the following workaround for colored:
 # import sys
 # from collections import namedtuple
 # stdout = sys.stdout
@@ -23,14 +20,6 @@ from fl_tissue_model_tools.scripts import (
 # import colored
 # colored.TTY_AWARE = False
 # sys.stdout = stdout
-
-# See below for hacky fix for Gooey color theme for Mac and Linux users in dark mode:
-# Step 1: See https://github.com/chriskiehl/Gooey/pull/891
-# Step 2: Incorporate the changes into your environment in site-packages/gooey
-# Step 3: Install pip package `darkdetect` into your environment
-# Step 4: Look for all changes in the pull request from step 1 that used
-# `wx.SystemSettings.GetAppearance().IsUsingDarkBackground()`
-# and change it to use `darkdetect` instead.
 
 
 @Gooey(
