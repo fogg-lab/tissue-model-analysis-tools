@@ -17,6 +17,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from fl_tissue_model_tools.defs import SUPPORTED_IMAGE_FORMATS
+from fl_tissue_model_tools.colored_messages import SFM
 
 
 def load_image(
@@ -46,7 +47,7 @@ def load_image(
         img_reader = AICSImage(file_path)
     except UnsupportedFileFormatError as exc:
         print(
-            f"\x1b[38;5;1m\x1b[1m[FAILURE]\x1b[0m Unsupported image format: {file_path}\n"
+            f"{SFM.failure} Unsupported image format: {file_path}\n"
             f"Supported formats: {SUPPORTED_IMAGE_FORMATS}\n"
         )
         sys.exit(1)
@@ -129,10 +130,11 @@ def get_image_dims(file_path: str) -> Dimensions:
     try:
         img_reader = AICSImage(file_path)
     except UnsupportedFileFormatError as exc:
-        raise UnsupportedFileFormatError(
-            f"Unsupported image format: {file_path}"
-            f"Supported formats: {SUPPORTED_IMAGE_FORMATS}"
+        print(
+            f"{SFM.failure} Unsupported image format: {file_path}\n"
+            f"Supported formats: {SUPPORTED_IMAGE_FORMATS}\n"
         )
+        sys.exit(1)
 
     return img_reader.dims
 

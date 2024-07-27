@@ -11,6 +11,7 @@ from typing import Any, Dict, Union, List
 from fl_tissue_model_tools import helper
 from fl_tissue_model_tools.colored_messages import SFM
 from fl_tissue_model_tools import zstacks as zs
+from fl_tissue_model_tools.exceptions import ZStackInputException
 
 
 DASH = "="
@@ -450,15 +451,63 @@ def parse_inv_depth_args(arg_defaults: Dict[str, Any]) -> argparse.Namespace:
 ### File/Directory Validation ###
 
 
+def print_input_dir_help():
+    """Print help message for input directory structure."""
+    print(
+        f"{SFM.info} Documentation for input directory structure can be found at the following link:\n"
+        "https://github.com/fogg-lab/tissue-model-analysis-tools/tree/main?tab=readme-ov-file#image-input-directory-structure",
+        flush=True,
+    )
+
+
+def check_input_dir_structure(input_path: str):
+    """Verify input directory contains either files or subfolders of files.
+
+    Args:
+        input_path: Path to input images.
+
+    """
+    if not osp.isdir(input_path):
+        print(
+            f"{SFM.failure} Input data directory not found:{os.linesep}\t{input_path}",
+            print_input_dir_help(),
+            flush=True,
+        )
+        sys.exit(1)
+
+    files = list(filter(osp.isfile, glob(osp.join(input_path, "*"))))
+    dirs = list(filter(osp.isdir, glob(osp.join(input_path, "*"))))
+
+    if not files and not dirs:
+        print(f"{SFM.failure} Input directory is empty: {input_path}", flush=True)
+        print_input_dir_help()
+        sys.exit(1)
+    if files and dirs:
+        print(
+            f"{SFM.failure} Input directory contains both files and subfolders: {input_path}",
+            flush=True,
+        )
+        print_input_dir_help()
+        sys.exit(1)
+
+    # Check for nested directories
+    nested_dirs = list(filter(osp.isdir, glob(osp.join(input_path, "*", "*"))))
+    if nested_dirs:
+        nested_dirs_str = "  \n".join(nested_dirs)
+        print(
+            f"{SFM.failure} Input directory contains nested subfolders:\n"
+            f"{nested_dirs_str}\n",
+            flush=True,
+        )
+        print_input_dir_help()
+        sys.exit(1)
+
+
 def cell_area_verify_input_dir(input_path: str) -> Dict[str, Union[str, List[str]]]:
     """Verify appropriate contents of input data directory.
 
     Args:
         input_path: Path to input images.
-
-    Raises:
-        FileNotFoundError: Input data directory not found.
-        FileNotFoundError: Input data directory has no images.
 
     Returns:
         A dictionary containing image names mapped to their paths.
@@ -467,28 +516,23 @@ def cell_area_verify_input_dir(input_path: str) -> Dict[str, Union[str, List[str
     """
     section_header("Verifying Input Directory")
 
-    if not osp.isdir(input_path):
-        print(
-            f"{SFM.failure} Input data directory not found:{os.linesep}\t{input_path}",
-            flush=True,
-        )
-        sys.exit(1)
+    check_input_dir_structure(input_path)
 
-    img_files = glob(osp.join(input_path, "*")) + glob(osp.join(input_path, "*", "*"))
-    if len(img_files) == 0:
-        print(f"{SFM.failure} Input data directory is empty: {input_path}", flush=True)
-        sys.exit(1)
-
-    test_path = img_files[0]
+    test_path = glob(osp.join(input_path, "*"))[0]
     if os.path.isdir(test_path) or helper.get_image_dims(test_path).Z == 1:
         try:
             img_paths = zs.find_zstack_image_sequences(input_path)
             if any(len(img_seq) == 1 for img_seq in img_paths.values()):
                 img_paths = {}  # not z stacks. probably projections.
-        except ValueError:
+        except ZStackInputException:
             img_paths = {}
     else:
-        img_paths = zs.find_zstack_files(input_path)
+        try:
+            img_paths = zs.find_zstack_files(input_path)
+        except ZStackInputException as exc:
+            print(f"{SFM.failure} {exc}", flush=True)
+            print_input_dir_help()
+            sys.exit(1)
 
     if len(img_paths) == 0:
         img_paths = {
@@ -498,6 +542,7 @@ def cell_area_verify_input_dir(input_path: str) -> Dict[str, Union[str, List[str
         }
         if len(img_paths) == 0:
             print(f"{SFM.failure}No images found in {input_path}", flush=True)
+            print_input_dir_help()
             sys.exit(1)
 
     print(f"Found {len(img_paths)} images in:{os.linesep}\t{input_path}", flush=True)
@@ -523,7 +568,9 @@ def cell_area_verify_output_dir(
     section_header("Verifying Output Directory")
 
     if not osp.isdir(output_path):
-        assert not osp.isfile(output_path), f"Output directory is a file: {output_path}"
+        if osp.isfile(output_path):
+            print(f"{SFM.failure} Output path is a file: {output_path}")
+            sys.exit(1)
         print(f"Did not find output dir:{os.linesep}\t{output_path}", flush=True)
         print("Creating...", flush=True)
         os.makedirs(output_path, exist_ok=True)
@@ -591,7 +638,9 @@ def zproj_verify_output_dir(output_path: str) -> None:
     section_header("Verifying Output Directory")
 
     if not osp.isdir(output_path):
-        assert not osp.isfile(output_path), f"Output directory is a file: {output_path}"
+        if osp.isfile(output_path):
+            print(f"{SFM.failure} Output path is a file: {output_path}")
+            sys.exit(1)
         print(f"Did not find output dir:{os.linesep}\t{output_path}", flush=True)
         print("Creating...", flush=True)
         os.makedirs(output_path, exist_ok=True)
@@ -619,7 +668,9 @@ def branching_verify_output_dir(output_path: str) -> None:
     section_header("Verifying Output Directory")
 
     if not osp.isdir(output_path):
-        assert not osp.isfile(output_path), f"Output directory is a file: {output_path}"
+        if osp.isfile(output_path):
+            print(f"{SFM.failure} Output path is a file: {output_path}")
+            sys.exit(1)
         print(f"Did not find output dir:{os.linesep}\t{output_path}", flush=True)
         print("Creating...", flush=True)
         os.makedirs(output_path, exist_ok=True)
@@ -647,7 +698,9 @@ def inv_depth_verify_output_dir(output_path: str) -> None:
     section_header("Verifying Output Directory")
 
     if not osp.isdir(output_path):
-        assert not osp.isfile(output_path), f"Output directory is a file: {output_path}"
+        if osp.isfile(output_path):
+            print(f"{SFM.failure} Output path is a file: {output_path}")
+            sys.exit(1)
         print(f"Did not find output dir:{os.linesep}\t{output_path}", flush=True)
         print("Creating...", flush=True)
         os.makedirs(output_path, exist_ok=True)

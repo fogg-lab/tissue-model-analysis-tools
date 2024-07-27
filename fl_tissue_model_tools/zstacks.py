@@ -12,6 +12,8 @@ import numpy.typing as npt
 import numpy as np
 import cv2
 
+from fl_tissue_model_tools.exceptions import ZStackInputException
+
 
 def clean_zstack_ids(zstack_ids: list[str]) -> list[str]:
     """Clean up z stack identifiers.
@@ -72,8 +74,6 @@ def find_zstack_image_sequences(input_dir: str):
     img_paths = list(filter(osp.isfile, glob(osp.join(input_dir, "*"))))
     if not img_paths:
         img_paths = list(filter(osp.isfile, glob(osp.join(input_dir, "*", "*"))))
-    elif any(osp.isdir(fp) for fp in glob(osp.join(input_dir, "*"))):
-        raise ValueError("Found both files and directories in input directory")
 
     # Get Z stack identifier for each Z slice and parse numbers present in file names
     zslice_stack_ids = []
@@ -103,9 +103,11 @@ def find_zstack_image_sequences(input_dir: str):
         zs_inds = [i for i, zid in enumerate(zslice_stack_ids) if zid == zstack_id]
         zs_nums_in_name = [zslice_numbers_in_name[i] for i in zs_inds]
         if not all([len(nums) == len(zs_nums_in_name[0]) for nums in zs_nums_in_name]):
-            raise ValueError("Unrecognized Z slice naming convention")
+            raise ZStackInputException("Unrecognized Z slice naming convention")
         if len(set([tuple(nums) for nums in zs_nums_in_name])) != len(zs_inds):
-            raise ValueError("Unrecognized Z slice numbering convention in image names")
+            raise ZStackInputException(
+                "Unrecognized Z slice numbering convention in image names"
+            )
         zs_nums = [nums + [i] for i, nums in zip(zs_inds, zs_nums_in_name)]
         for nums in sorted(zs_nums):
             index = nums[-1]
@@ -125,8 +127,6 @@ def find_zstack_files(input_dir: str):
 
     """
     img_paths = list(filter(osp.isfile, glob(osp.join(input_dir, "*"))))
-    if any(osp.isdir(fp) for fp in glob(osp.join(input_dir, "*"))):
-        raise ValueError("Found both files and directories in input directory")
     zstack_ids = [osp.splitext(osp.basename(img_path))[0] for img_path in img_paths]
     return {zs_id: fp for zs_id, fp in zip(zstack_ids, img_paths)}
 
