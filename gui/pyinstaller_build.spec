@@ -75,7 +75,7 @@ a = Analysis(
     hiddenimports=["xsdata_pydantic_basemodel.hooks", "xsdata_pydantic_basemodel.hooks.class_type", "PIL._tkinter_finder"] + imagecodecs_hiddenimports,
     hookspath=[],
     runtime_hooks=[],
-    excludes=[],
+    excludes=['botocore'],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
@@ -94,8 +94,6 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
-    upx_exclude=[],
     console=False,
     icon="images/program_icon.ico",
 )
@@ -107,7 +105,5 @@ coll = COLLECT(
     a.datas,
     image_overrides,
     strip=False,
-    upx=True,
-    upx_exclude=[],
     name="tmat",
 )
