@@ -9,6 +9,8 @@ import os
 import warnings
 from fl_tissue_model_tools.colored_messages import SFM
 
+sys.modules['FixTk'] = None
+
 # If on Windows, look for msvcp140_1.dll needed by tensorflow
 dll_path = None
 if platform.system() == "Windows":
@@ -75,7 +77,7 @@ a = Analysis(
     hiddenimports=["xsdata_pydantic_basemodel.hooks", "xsdata_pydantic_basemodel.hooks.class_type", "PIL._tkinter_finder"] + imagecodecs_hiddenimports,
     hookspath=[],
     runtime_hooks=[],
-    excludes=['botocore'],
+    excludes=['botocore', 'FixTk', 'tcl', 'tk', '_tkinter', 'tkinter', 'Tkinter', 'tzdata'],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
