@@ -66,7 +66,6 @@ setup(
         "opencv-python>=4.9.0,<4.10",
         "pandas==2.2.2",
         "pillow==10.3.0",
-        "pip==24.0",
         "scikit-image==0.22.0",
         "scikit-learn==1.5.0",
         "scipy==1.13.1",
@@ -75,7 +74,14 @@ setup(
         "keras-tuner==1.4.7",
         "tensorflow==2.14.1",
     ],
-    extras_require={"and-cuda": ["tensorflow[and-cuda]==2.14.1"]},
+    extras_require={
+        "and-cuda": ["tensorflow[and-cuda]==2.14.1"],
+        "package-gui": [
+            # Using patched version of Gooey for proper dark mode support, especially for Linux and macOS
+            "gooey@git+https://github.com/wigginno/Gooey.git",
+            "pyinstaller==6.9.0",
+        ],
+    },
     entry_points={"console_scripts": [f"tmat={pkg_name}.cli:main"]},
     classifiers=[
         "Programming Language :: Python :: 3",

@@ -77,11 +77,11 @@ Run the following commands in a terminal or command prompt window.
 
 **Regular Installation**
 ```bash
-pipx install git+https://github.com/fogg-lab/tissue-model-analysis-tools.git#egg=fl_tissue_model_tools
+pipx install fl_tissue_model_tools@git+https://github.com/fogg-lab/tissue-model-analysis-tools.git
 ```
 **Installation with CUDA (GPU Acceleration)**
 ```bash
-pipx install 'git+https://github.com/fogg-lab/tissue-model-analysis-tools.git#egg=fl_tissue_model_tools[and-cuda]'
+pipx install 'fl_tissue_model_tools[and-cuda]@git+https://github.com/fogg-lab/tissue-model-analysis-tools.git'
 ```
 **2**. Configure base directory to store data, scripts, and script configuration files:
 ```bash
@@ -110,7 +110,7 @@ pipx uninstall fl_tissue_model_tools
 #### Update `fl_tissue_model_tools` CLI Utility
 To update `tmat`, just reinstall it with the `--force` flag:
 ```bash
-pipx install git+https://github.com/fogg-lab/tissue-model-analysis-tools.git#egg=fl_tissue_model_tools --force
+pipx install fl_tissue_model_tools@git+https://github.com/fogg-lab/tissue-model-analysis-tools.git --force
 tmat configure
 ```
 
