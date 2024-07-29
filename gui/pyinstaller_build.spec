@@ -86,6 +86,13 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+if platform.system() == "Windows":
+    icon = "program_icon.ico"
+elif platform.system() == "Darwin":
+    icon = "program_icon.icns"
+else:
+    icon = None
+
 exe = EXE(
     pyz,
     a.scripts,
@@ -97,7 +104,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     console=False,
-    icon="images/program_icon.ico",
+    icon=icon,
 )
 
 coll = COLLECT(
@@ -109,3 +116,11 @@ coll = COLLECT(
     strip=False,
     name="tmat",
 )
+
+if platform.system() == "Darwin":
+    app = BUNDLE(
+        coll,
+        name='tmat.app',
+        icon=None,
+        bundle_identifier=None
+    )
